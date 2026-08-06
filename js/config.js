@@ -1,0 +1,15 @@
+// 预设目的地（与 weather-note-analysis skill 及笔记覆盖区域一致）
+// marine: true 表示该地点适合同时查询海况（乘船/浮潜/冲浪等）
+const DESTINATIONS = [
+  { id: 'sanya',    name: '三亚·亚龙湾',     lat: 18.224, lon: 109.512, marine: false },
+  { id: 'lingshui', name: '陵水·清水湾',     lat: 18.5,   lon: 110.03,  marine: false },
+  { id: 'haitang',  name: '海棠湾·蜈支洲岛', lat: 18.31,  lon: 109.73,  marine: false },
+  { id: 'wanning',  name: '万宁·神州半岛',   lat: 18.8,   lon: 110.39,  marine: false },
+  { id: 'houhai',   name: '后海·分界洲岛',   lat: 18.3,   lon: 109.72,  marine: true  },
+];
+
+// 默认展示未来 7 天（4-7 天属于"可能有变"窗口，符合 skill 时效规则）
+const DEFAULT_DAYS = 7;
+
+// 受众全在中国，统一使用上海时区
+const TIMEZONE = 'Asia/Shanghai';

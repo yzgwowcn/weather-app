@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="海南旅游目的地天气与近海海况查询——基于 Open-Meteo 模式数据">
+  <title>🌤️ 海南天气旅行查询</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1>🌤️ 海南天气旅行查询</h1>
+      <p class="subtitle">三亚 · 陵水 · 万宁 · 近海海况</p>
+    </header>
+
+    <main>
+      <!-- 目的地选择 -->
+      <section class="panel">
+        <h2>📍 选择目的地</h2>
+        <div id="dest-list" class="dest-list"></div>
+      </section>
+
+      <!-- 查询控制 -->
+      <section class="panel">
+        <div class="control-row">
+          <label for="days-select">预报范围</label>
+          <select id="days-select">
+            <option value="3">未来 3 天（较确定）</option>
+            <option value="7" selected>未来 7 天（可能有变）</option>
+            <option value="14">未来 14 天（趋势参考）</option>
+          </select>
+          <button id="query-btn" type="button">查询</button>
+        </div>
+      </section>
+
+      <!-- 结果区 -->
+      <section id="result" class="result" aria-live="polite"></section>
+
+      <div id="loading" class="loading hidden">
+        <span class="spinner"></span> 正在获取最新模式数据…
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>数据来源：<a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> 模式指导（非官方预警）。</p>
+      <p>出行请以当地气象台、码头与景区通知为准。</p>
+    </footer>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

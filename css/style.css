@@ -1,0 +1,234 @@
+/* 海南天气旅行查询 —— 移动端优先，暖色调（热带珊瑚色） */
+
+:root {
+  --coral: #ff7e5f;
+  --coral-dark: #eb6448;
+  --sun: #feb47b;
+  --bg: #fff7f0;
+  --card: #ffffff;
+  --text: #3d322b;
+  --muted: #8a7d72;
+  --border: #f0e2d6;
+  --sea: #eaf4fb;
+  --sea-text: #2a7fb8;
+  --warn-bg: #fff4d6;
+  --warn-text: #8a6d1d;
+  --ok: #2e9e5b;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  background: linear-gradient(180deg, var(--bg) 0%, #fff 100%);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.page {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px 14px 40px;
+}
+
+/* Header */
+.header {
+  text-align: center;
+  padding: 20px 0 12px;
+}
+.header h1 {
+  font-size: 22px;
+  color: var(--coral-dark);
+}
+.subtitle {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* 面板 */
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(235, 100, 72, 0.06);
+}
+.panel h2 {
+  font-size: 15px;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+
+/* 目的地按钮 */
+.dest-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dest-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 15px;
+  color: var(--text);
+  background: #fdf5ef;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.dest-btn.active {
+  background: linear-gradient(135deg, var(--coral), var(--sun));
+  border-color: var(--coral);
+  color: #fff;
+  font-weight: 600;
+}
+.dest-tag {
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--coral-dark);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.dest-btn.active .dest-tag {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+/* 控制行 */
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.control-row label {
+  font-size: 14px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.control-row select {
+  flex: 1;
+  padding: 9px 10px;
+  font-size: 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+}
+#query-btn {
+  padding: 9px 22px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, var(--coral), var(--sun));
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#query-btn:active { transform: scale(0.97); }
+
+/* 结果区 */
+.result { margin-top: 4px; }
+.section { margin-bottom: 14px; }
+.section h3 {
+  font-size: 15px;
+  margin: 8px 0 10px;
+}
+
+/* 每日卡片 */
+.day-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.day-left { flex: 0 0 86px; }
+.day-date {
+  font-size: 14px;
+  font-weight: 600;
+}
+.weekday { font-size: 12px; color: var(--muted); font-weight: 400; }
+.day-horizon {
+  display: inline-block;
+  margin-top: 3px;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.day-horizon.ok { background: #e6f6ec; color: var(--ok); }
+.day-horizon.warn { background: var(--warn-bg); color: var(--warn-text); }
+.day-horizon.far { background: #f1ede9; color: var(--muted); }
+
+.day-icon { font-size: 26px; flex: 0 0 34px; text-align: center; }
+.day-mid { flex: 1; }
+.day-desc { font-size: 15px; font-weight: 600; }
+.day-temp { font-size: 13px; color: var(--muted); }
+.day-right { text-align: right; font-size: 12px; color: var(--muted); flex: 0 0 auto; }
+.day-rain { margin-bottom: 2px; }
+
+/* 海况卡片 */
+.marine .section h3 { color: var(--sea-text); }
+.marine-card { background: var(--sea); border-color: #cfe4f2; }
+.marine-card .day-desc { color: var(--sea-text); }
+.footnote { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+/* 提示条 */
+.notice {
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.notice.warn { background: var(--warn-bg); color: var(--warn-text); }
+.notice.info { background: #eef4fb; color: #3a6ea5; }
+
+/* 错误 */
+.error { color: #c0392b; font-size: 13px; padding: 8px 0; }
+
+/* Loading */
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  padding: 18px 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.loading.hidden { display: none; }
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--border);
+  border-top-color: var(--coral);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Footer */
+.footer {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.footer a { color: var(--coral-dark); }
+
+/* 窄屏适配 */
+@media (max-width: 380px) {
+  .day-left { flex-basis: 74px; }
+  .day-right { font-size: 11px; }
+}
