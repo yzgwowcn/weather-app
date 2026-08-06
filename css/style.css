@@ -26,7 +26,7 @@ body {
 }
 
 .page {
-  max-width: 600px;
+  max-width: 640px;
   margin: 0 auto;
   padding: 16px 14px 40px;
 }
@@ -119,6 +119,29 @@ body {
   background: #fff;
   color: var(--text);
 }
+/* 天数按钮组 */
+.days-group {
+  display: flex;
+  flex: 1;
+  gap: 6px;
+}
+.days-btn {
+  flex: 1;
+  padding: 9px 0;
+  font-size: 13px;
+  color: var(--text);
+  background: #fdf5ef;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.days-btn.active {
+  background: linear-gradient(135deg, var(--coral), var(--sun));
+  border-color: var(--coral);
+  color: #fff;
+  font-weight: 600;
+}
 #query-btn {
   padding: 9px 22px;
   font-size: 15px;
@@ -169,7 +192,7 @@ body {
 .day-horizon.warn { background: var(--warn-bg); color: var(--warn-text); }
 .day-horizon.far { background: #f1ede9; color: var(--muted); }
 
-.day-icon { font-size: 26px; flex: 0 0 34px; text-align: center; }
+.day-icon { font-size: 32px; flex: 0 0 38px; text-align: center; }
 .day-mid { flex: 1; }
 .day-desc { font-size: 15px; font-weight: 600; }
 .day-temp { font-size: 13px; color: var(--muted); }
@@ -231,4 +254,83 @@ body {
 @media (max-width: 380px) {
   .day-left { flex-basis: 74px; }
   .day-right { font-size: 11px; }
+}
+
+/* ===== v2：云量条 + 蓝海徽章 + 分时段 ===== */
+
+/* 云量行 */
+.day-cloud {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.cloud-label {
+  font-size: 12px;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+.cloud-bar {
+  flex: 1;
+  height: 10px;
+  background: #f0ece7;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.cloud-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.cloud-pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 0 0 38px;
+  text-align: right;
+}
+
+/* 蓝海徽章 */
+.sea-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.sea-great { background: #d9f0ff; color: #0b6fb8; }
+.sea-ok    { background: #e8f4fd; color: #2a7fb8; }
+.sea-mid   { background: #f0ede8; color: #7d746a; }
+.sea-bad   { background: #e3e0db; color: #5f5a54; }
+
+/* 分时段折叠区 */
+.slots {
+  margin-top: 8px;
+  font-size: 13px;
+}
+.slots summary {
+  cursor: pointer;
+  color: var(--coral-dark);
+  font-weight: 600;
+  padding: 4px 0;
+  user-select: none;
+}
+.slot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 6px;
+}
+.slot { background: #faf5f0; border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+.slot-label { font-size: 11px; color: var(--muted); }
+.slot-main { font-size: 13px; font-weight: 600; margin: 1px 0; }
+.slot-meta { font-size: 11px; color: var(--muted); }
+
+/* 较宽屏幕：分时段 4 列 */
+@media (min-width: 480px) {
+  .slot-grid { grid-template-columns: repeat(4, 1fr); }
 }

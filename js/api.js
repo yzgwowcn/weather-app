@@ -8,13 +8,15 @@ const API = (() => {
   const HOURLY = [
     'temperature_2m', 'apparent_temperature', 'precipitation',
     'precipitation_probability', 'rain', 'showers', 'weather_code',
-    'wind_speed_10m', 'wind_gusts_10m', 'cloud_cover', 'visibility',
+    'wind_speed_10m', 'wind_gusts_10m', 'cloud_cover', 'cloud_cover_low',
+    'visibility',
   ].join(',');
-  // 陆地：日级
+  // 陆地：日级（含云量均值/最大/最小）
   const DAILY = [
     'weather_code', 'temperature_2m_max', 'temperature_2m_min',
     'precipitation_sum', 'precipitation_probability_max',
     'wind_speed_10m_max', 'wind_gusts_10m_max', 'sunrise', 'sunset',
+    'cloud_cover_mean', 'cloud_cover_max', 'cloud_cover_min',
   ].join(',');
   // 海洋：小时级（波高/涌浪/周期/方向）
   const MARINE_HOURLY = [

@@ -6,7 +6,7 @@
 
   // DOM 引用
   const destListEl = document.getElementById('dest-list');
-  const daysSelectEl = document.getElementById('days-select');
+  const daysGroupEl = document.getElementById('days-group');
   const queryBtnEl = document.getElementById('query-btn');
   const resultEl = document.getElementById('result');
   const loadingEl = document.getElementById('loading');
@@ -44,7 +44,7 @@
   // 查询主流程
   async function query() {
     const { lat, lon, marine, name } = state.dest;
-    const days = Number(daysSelectEl.value);
+    const days = state.days;
     const start = dateStr(0);
     const end = dateStr(days - 1);
 
@@ -67,7 +67,13 @@
   // 初始化
   function init() {
     renderDestButtons();
-    daysSelectEl.value = String(DEFAULT_DAYS);
+    // 天数按钮组：点击切换天数并高亮
+    daysGroupEl.querySelectorAll('.days-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.days = Number(btn.dataset.days);
+        daysGroupEl.querySelectorAll('.days-btn').forEach((b) => b.classList.toggle('active', b === btn));
+      });
+    });
     queryBtnEl.addEventListener('click', query);
     query(); // 首次加载即查询默认目的地
   }

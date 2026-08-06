@@ -13,3 +13,11 @@ const DEFAULT_DAYS = 7;
 
 // 受众全在中国，统一使用上海时区
 const TIMEZONE = 'Asia/Shanghai';
+
+// 分时段定义（hour 为当天相对小时；夜间跨午夜用 end=30 表示次日 6 点）
+const TIME_SLOTS = [
+  { key: 'morning',   label: '🌅 上午', start: 6,  end: 12 },
+  { key: 'afternoon', label: '☀️ 下午', start: 12, end: 18 },
+  { key: 'evening',   label: '🌇 傍晚', start: 18, end: 22 },
+  { key: 'night',     label: '🌙 夜间', start: 22, end: 30 }, // 22:00 → 次日 06:00
+];

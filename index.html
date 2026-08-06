@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="海南旅游目的地天气与近海海况查询——基于 Open-Meteo 模式数据">
-  <title>🌤️ 海南天气旅行查询</title>
+  <title>🌤️ 海南天气旅行查询 · 蓝海可见吗？</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <div class="page">
     <header class="header">
       <h1>🌤️ 海南天气旅行查询</h1>
-      <p class="subtitle">三亚 · 陵水 · 万宁 · 近海海况</p>
+      <p class="subtitle">云量 · 蓝海可见度 · 每日分时段 · 三亚/陵水/万宁/近海海况</p>
     </header>
 
     <main>
@@ -24,12 +24,12 @@
       <!-- 查询控制 -->
       <section class="panel">
         <div class="control-row">
-          <label for="days-select">预报范围</label>
-          <select id="days-select">
-            <option value="3">未来 3 天（较确定）</option>
-            <option value="7" selected>未来 7 天（可能有变）</option>
-            <option value="14">未来 14 天（趋势参考）</option>
-          </select>
+          <label>预报范围</label>
+          <div id="days-group" class="days-group">
+            <button type="button" class="days-btn" data-days="3">3 天</button>
+            <button type="button" class="days-btn active" data-days="7">7 天</button>
+            <button type="button" class="days-btn" data-days="14">14 天</button>
+          </div>
           <button id="query-btn" type="button">查询</button>
         </div>
       </section>
