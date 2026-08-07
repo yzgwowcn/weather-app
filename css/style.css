@@ -79,6 +79,13 @@ body[data-cloud="partly"]::before {
     radial-gradient(125% 95% at 50% -10%, rgba(135, 175, 225, .38), transparent 63%);
 }
 body::after { opacity: 0; }
+/* 非晴 mood：压低暖金基底（透明度 42%），让云/雨/雷的冷灰蓝氛围层透出 */
+body[data-mood="cloudy"]::before,
+body[data-mood="rain"]::before,
+body[data-mood="storm"]::before,
+body[data-mood="thunder"]::before {
+  opacity: .42;
+}
 
 /* ---- sunny：光斑呼吸（晴底默认态）；云量低时光斑更强 */
 body[data-mood="sunny"]::after {
@@ -97,13 +104,13 @@ body[data-mood="sunny"][data-cloud="clear"]::after {
 @keyframes sun-drift { from { transform: translate3d(-1.5%, 0, 0) scale(1); } to { transform: translate3d(1.5%, -1%, 0) scale(1.04); } }
 @keyframes sun-breathe { from { opacity: .55; } to { opacity: 1; } }
 
-/* ---- cloudy：暖光晴底 + 冷灰蓝雾化云影 ---- */
+/* ---- cloudy：冷灰蓝雾化云影（暖金基底已压低，云影视觉权重提升） ---- */
 body[data-mood="cloudy"]::after {
   opacity: 1;
   background:
-    radial-gradient(520px 220px at 24% 22%, rgba(200, 212, 226, .18), transparent 70%),
-    radial-gradient(640px 260px at 76% 48%, rgba(190, 204, 220, .14), transparent 70%),
-    radial-gradient(460px 200px at 46% 78%, rgba(210, 220, 232, .12), transparent 70%);
+    radial-gradient(520px 220px at 24% 22%, rgba(178, 196, 218, .32), transparent 70%),
+    radial-gradient(640px 260px at 76% 48%, rgba(168, 188, 210, .24), transparent 70%),
+    radial-gradient(460px 200px at 46% 78%, rgba(188, 204, 222, .20), transparent 70%);
   animation: cloud-drift 34s ease-in-out infinite alternate;
 }
 @keyframes cloud-drift { from { transform: translate3d(-2.5%, 0, 0); } to { transform: translate3d(2.5%, 1.2%, 0); } }
