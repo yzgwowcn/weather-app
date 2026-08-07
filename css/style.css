@@ -225,7 +225,8 @@ button { font: inherit; }
 .ec-verdict { min-width: 0; }
 .verdict-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .verdict-row h2 { margin: 0; font-size: clamp(29px, 4vw, 46px); letter-spacing: -.06em; }
-.weather-symbol { width: 64px; height: 64px; display: inline-block; vertical-align: middle; }
+.weather-symbol { vertical-align: middle; }
+.weather-lottie.weather-symbol { width: 64px; height: 64px; }
 /* 三段式图标槽：标签在上、图标在下 */
 .icon-group { display: inline-flex; align-items: flex-start; gap: 12px; }
 .icon-slot { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; }
@@ -409,7 +410,7 @@ button { font: inherit; }
 .forecast-date { grid-area: date; }
 .forecast-date span, .forecast-condition strong, .forecast-condition span, .forecast-probability small { display: block; }
 .forecast-date span, .forecast-condition strong { font-size: 14px; font-weight: 750; }
-.forecast-symbol { width: 42px; height: 42px; }
+.weather-lottie.forecast-symbol { width: 42px; height: 42px; }
 .forecast-summary .icon-group { grid-area: icons; justify-self: end; align-self: center; gap: 10px; }
 .forecast-condition { grid-area: cond; }
 .forecast-condition span { color: var(--muted); font-size: 13px; }
@@ -478,7 +479,7 @@ button { font: inherit; }
   .forecast-probability b, .forecast-probability small { display: inline; margin-right: 5px; }
   .forecast-probability b { font-size: 15px; }
   .forecast-summary .icon-group { gap: 6px; }
-  .forecast-symbol { width: 30px; height: 30px; }
+  .weather-lottie.forecast-symbol { width: 30px; height: 30px; }
   .forecast-summary .icon-period { font-size: 10px; }
   .forecast-detail { grid-template-columns: repeat(3, 1fr); padding: 0 10px 15px; }
   .forecast-detail b { font-size: 14px; }
