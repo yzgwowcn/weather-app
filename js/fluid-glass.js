@@ -18,7 +18,7 @@ import htm from 'htm';
 
 const html = htm.bind(React.createElement);
 
-const PARAMS = { ior: 1.1, thickness: 5, anisotropy: 0.01, chromaticAberration: 0.1, samples: 6, pointerStrength: 1.0, pointerOffset: 1.2, smoothTime: 0.15 };
+const PARAMS = { ior: 1.15, thickness: 5, anisotropy: 0.01, chromaticAberration: 0.1, samples: 6, pointerStrength: 1.0, pointerOffset: 1.2, smoothTime: 0.15 };
 const PANEL_SELECTOR = '.workspace, .ec-hero, .metric-grid, .cross-stat, .date-chip';
 
 // ---- FluidTransmissionMaterial：fork drei MeshTransmissionMaterialImpl（MIT © drei 作者）
@@ -260,23 +260,37 @@ class FluidTransmissionMaterial extends THREE.MeshPhysicalMaterial {
 }
 extend({ FluidTransmissionMaterial });
 
-// ---- 明亮背景世界资源（消除 v1.6 深色"黑影"）----
-function makeGradientTexture() {
+// ---- 背景世界资源（随天气状态变化：渐变 + 光斑配色按 body[data-mood] 切换）----
+// 饱和但不过亮（v1.7 明亮渐变导致面板发白，改为深蓝紫等中饱和基调）
+const MOOD_BG = {
+  sunny: { stops: ['#2a4a78', '#5f8fd0', '#f2c063'], blobs: ['rgba(140, 195, 255, 0.7)', 'rgba(255, 205, 120, 0.65)', 'rgba(120, 225, 190, 0.6)', 'rgba(195, 168, 255, 0.6)', 'rgba(255, 165, 150, 0.5)'] },
+  cloudy: { stops: ['#3a4658', '#7d8fa8', '#a8b8cc'], blobs: ['rgba(160, 185, 215, 0.6)', 'rgba(200, 210, 225, 0.5)', 'rgba(130, 160, 195, 0.55)', 'rgba(180, 170, 200, 0.5)', 'rgba(150, 175, 205, 0.45)'] },
+  windy: { stops: ['#2f4a5e', '#5aa0b8', '#8fd0c9'], blobs: ['rgba(120, 200, 225, 0.6)', 'rgba(140, 220, 200, 0.55)', 'rgba(100, 170, 210, 0.55)', 'rgba(170, 225, 235, 0.5)', 'rgba(110, 190, 215, 0.45)'] },
+  rain: { stops: ['#22324a', '#4a6a8a', '#7d9dbb'], blobs: ['rgba(120, 165, 215, 0.6)', 'rgba(100, 140, 195, 0.55)', 'rgba(150, 190, 230, 0.5)', 'rgba(110, 130, 180, 0.5)', 'rgba(140, 170, 210, 0.45)'] },
+  storm: { stops: ['#1e2c42', '#40587a', '#6d86a6'], blobs: ['rgba(110, 155, 210, 0.6)', 'rgba(90, 130, 185, 0.55)', 'rgba(140, 180, 225, 0.5)', 'rgba(100, 120, 170, 0.5)', 'rgba(130, 160, 200, 0.45)'] },
+  thunder: { stops: ['#2c2450', '#5a4a8a', '#f2c063'], blobs: ['rgba(170, 150, 255, 0.65)', 'rgba(255, 205, 120, 0.6)', 'rgba(130, 110, 220, 0.55)', 'rgba(220, 180, 255, 0.5)', 'rgba(255, 165, 150, 0.45)'] },
+  neutral: { stops: ['#26204a', '#4a3d7a', '#8a7dbb'], blobs: ['rgba(150, 130, 230, 0.6)', 'rgba(190, 170, 255, 0.55)', 'rgba(120, 100, 200, 0.55)', 'rgba(210, 190, 255, 0.5)', 'rgba(160, 140, 220, 0.45)'] },
+};
+function moodKey() {
+  const mood = document.body.dataset.mood;
+  return MOOD_BG[mood] ? mood : 'neutral';
+}
+function makeGradientTexture(stops) {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
   const g = ctx.createLinearGradient(0, 512, 512, 0);
-  g.addColorStop(0, '#3d5c8c');   // 深蓝（底部，衬托面板）
-  g.addColorStop(0.42, '#7db4ff'); // 明亮天蓝
-  g.addColorStop(0.75, '#ffd98a'); // 暖金
-  g.addColorStop(1, '#c9b8ff');   // 淡紫
+  g.addColorStop(0, stops[0]);
+  g.addColorStop(0.6, stops[1]);
+  g.addColorStop(1, stops[2]);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 512, 512);
+  // 顶部柔和光晕（衬托玻璃高光，不刺眼）
   const glow = ctx.createRadialGradient(380, 60, 0, 380, 60, 420);
-  glow.addColorStop(0, 'rgba(255, 226, 160, 0.85)');
-  glow.addColorStop(0.55, 'rgba(255, 226, 160, 0.25)');
-  glow.addColorStop(1, 'rgba(255, 226, 160, 0)');
+  glow.addColorStop(0, 'rgba(255, 235, 200, 0.35)');
+  glow.addColorStop(0.6, 'rgba(255, 235, 200, 0.12)');
+  glow.addColorStop(1, 'rgba(255, 235, 200, 0)');
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, 512, 512);
   const tex = new THREE.CanvasTexture(canvas);
@@ -299,13 +313,13 @@ function makeBlobTexture(color) {
   return tex;
 }
 
-// 明亮光斑（比 v1.6 更亮更大，折射内容丰富）
-const BLOBS = [
-  { color: 'rgba(140, 195, 255, 0.95)', fx: 0.2, fy: 0.24, z: 1.5, s: 3.8, amp: 0.9, speed: 0.12, phase: 0 },
-  { color: 'rgba(255, 215, 130, 0.9)', fx: 0.8, fy: 0.3, z: 2.2, s: 3.0, amp: 1.2, speed: 0.09, phase: 2.1 },
-  { color: 'rgba(120, 225, 190, 0.85)', fx: 0.6, fy: 0.76, z: 1.8, s: 4.2, amp: 0.7, speed: 0.14, phase: 4.2 },
-  { color: 'rgba(195, 168, 255, 0.85)', fx: 0.1, fy: 0.82, z: 2.6, s: 2.6, amp: 1.0, speed: 0.11, phase: 1.3 },
-  { color: 'rgba(255, 165, 150, 0.75)', fx: 0.42, fy: 0.5, z: 3.2, s: 2.0, amp: 1.4, speed: 0.16, phase: 3.0 },
+// 光斑配置（位置/大小固定，颜色随 mood）：
+const BLOB_SPOTS = [
+  { fx: 0.2, fy: 0.24, z: 1.5, s: 3.8, amp: 0.9, speed: 0.12, phase: 0 },
+  { fx: 0.8, fy: 0.3, z: 2.2, s: 3.0, amp: 1.2, speed: 0.09, phase: 2.1 },
+  { fx: 0.6, fy: 0.76, z: 1.8, s: 4.2, amp: 0.7, speed: 0.14, phase: 4.2 },
+  { fx: 0.1, fy: 0.82, z: 2.6, s: 2.6, amp: 1.0, speed: 0.11, phase: 1.3 },
+  { fx: 0.42, fy: 0.5, z: 3.2, s: 2.0, amp: 1.4, speed: 0.16, phase: 3.0 },
 ];
 
 // ---- 面板几何 ----
@@ -389,11 +403,12 @@ function PanelMesh({ el, buffer }) {
     </mesh>`;
 }
 
-// ---- 背景世界（明亮渐变 + 漂移光斑），渲染进独立 scene 作为折射内容 ----
-function BackgroundWorld() {
+// ---- 背景世界（渐变 + 光斑配色随 body[data-mood] 切换），渲染进独立 scene 作为折射内容 ----
+function BackgroundWorld({ mood }) {
   const viewport = useThree((s) => s.viewport);
-  const gradient = useMemo(makeGradientTexture, []);
-  const blobTexs = useMemo(() => BLOBS.map((b) => makeBlobTexture(b.color)), []);
+  const palette = MOOD_BG[mood] || MOOD_BG.neutral;
+  const gradient = useMemo(() => makeGradientTexture(palette.stops), [palette]);
+  const blobTexs = useMemo(() => palette.blobs.map(makeBlobTexture), [palette]);
   const blobRefs = useRef([]);
 
   useFrame((state) => {
@@ -402,7 +417,7 @@ function BackgroundWorld() {
     const vh = state.viewport.height;
     blobRefs.current.forEach((ref, i) => {
       if (!ref) return;
-      const b = BLOBS[i];
+      const b = BLOB_SPOTS[i];
       ref.position.x = (b.fx - 0.5) * vw + Math.sin(t * b.speed + b.phase) * b.amp;
       ref.position.y = (b.fy - 0.5) * vh + Math.cos(t * b.speed * 0.8 + b.phase) * b.amp;
     });
@@ -414,7 +429,7 @@ function BackgroundWorld() {
         <planeGeometry />
         <meshBasicMaterial map=${gradient} />
       </mesh>
-      ${BLOBS.map((b, i) => html`
+      ${BLOB_SPOTS.map((b, i) => html`
         <mesh ref=${(ref) => { blobRefs.current[i] = ref; }} position=${[(b.fx - 0.5) * viewport.width, (b.fy - 0.5) * viewport.height, b.z]} scale=${[b.s, b.s, 1]}>
           <circleGeometry args=${[1, 64]} />
           <meshBasicMaterial map=${blobTexs[i]} transparent=${true} depthWrite=${false} />
@@ -428,6 +443,7 @@ function GlassWorld() {
   const bgScene = useMemo(() => new THREE.Scene(), []);
   const fbo = useFBO();
   const [panels, setPanels] = useState([]);
+  const [mood, setMood] = useState(moodKey());
 
   // 面板收集：renderResult 重渲染（MutationObserver）与初始扫描
   useEffect(() => {
@@ -435,6 +451,15 @@ function GlassWorld() {
     collect();
     const mo = new MutationObserver(collect);
     mo.observe(document.body, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, []);
+
+  // 背景世界配色随天气状态（body[data-mood]）变化
+  useEffect(() => {
+    const update = () => setMood(moodKey());
+    update();
+    const mo = new MutationObserver(update);
+    mo.observe(document.body, { attributes: true, attributeFilter: ['data-mood'] });
     return () => mo.disconnect();
   }, []);
 
@@ -446,7 +471,7 @@ function GlassWorld() {
   });
 
   return [
-    createPortal(html`<${BackgroundWorld} />`, bgScene),
+    createPortal(html`<${BackgroundWorld} mood=${mood} />`, bgScene),
     ...panels.map((el) => html`<${PanelMesh} key=${el} el=${el} buffer=${fbo.texture} />`),
   ];
 }

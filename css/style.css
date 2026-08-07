@@ -15,12 +15,12 @@
   --amber: #f2c063;
   --red: #ff8f87;
   --purple: #b79cff;
-  --shadow: 0 18px 44px rgba(3, 9, 20, .38);
+  --shadow: 0 10px 28px rgba(3, 9, 20, .22);
   --r-lg: 22px;
   --r-md: 15px;
   --r-sm: 10px;
-  /* Liquid Glass：玻璃渐变描边（padding-box 底 + border-box 亮边） */
-  --glass-border: linear-gradient(rgba(255, 255, 255, .06), rgba(255, 255, 255, .035)) padding-box,
+  /* Liquid Glass：玻璃渐变描边（padding-box 底 + border-box 亮边），底更透明让折射层透出 */
+  --glass-border: linear-gradient(rgba(255, 255, 255, .035), rgba(255, 255, 255, .02)) padding-box,
                   linear-gradient(165deg, rgba(255, 255, 255, .34), rgba(255, 255, 255, .05) 38%, rgba(255, 255, 255, .18)) border-box;
   /* 顶部内高光（Liquid Glass 边缘反光） */
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, .16);
@@ -130,10 +130,9 @@ body[data-mood="storm"]::after {
 
 button { font: inherit; }
 .page-shell { width: min(1180px, calc(100% - 40px)); margin: auto; position: relative; z-index: 2; }
-/* 折射面板文字对比度补偿：无 backdrop-filter 后，光斑可能让局部背景变亮，
-   轻量文字阴影保证小字可读性（对白底 active 态影响可忽略） */
+/* 折射面板文字对比度补偿：光斑可能让局部背景变亮，轻量文字阴影保证小字可读性 */
 .workspace, .ec-hero, .metric-grid, .cross-stat, .date-chip {
-  text-shadow: 0 1px 2px rgba(6, 12, 24, .4);
+  text-shadow: 0 1px 2px rgba(6, 12, 24, .28);
 }
 
 /* ---- 顶栏 ---- */
@@ -235,7 +234,11 @@ button { font: inherit; }
 .ec-verdict { min-width: 0; }
 .verdict-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .verdict-row h2 { margin: 0; font-size: clamp(29px, 4vw, 46px); letter-spacing: -.06em; }
-.weather-symbol { width: 44px; height: 44px; display: inline-block; vertical-align: middle; }
+.weather-symbol { width: 64px; height: 64px; display: inline-block; vertical-align: middle; }
+.icon-sep {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; color: rgba(222, 230, 238, .55); font-size: 14px; line-height: 1;
+}
 .thunder-icon { width: 14px; height: 14px; margin-right: 5px; vertical-align: -2px; }
 .verdict-badge {
   padding: 5px 11px; border-radius: 99px; font-size: 12.5px; font-weight: 750;
@@ -405,14 +408,16 @@ button { font: inherit; }
 .forecast-list { border-top: 1px solid var(--line); }
 .forecast-card { border-bottom: 1px solid var(--line); }
 .forecast-summary {
-  display: grid; grid-template-columns: 150px 45px 1fr auto; gap: 12px; align-items: center;
+  display: grid; grid-template-columns: 150px auto 1fr auto; gap: 12px; align-items: center;
   width: 100%; padding: 17px 5px; border: 0; background: transparent; color: var(--ink);
   text-align: left; cursor: pointer; transition: background .18s ease;
 }
 .forecast-summary:hover { background: rgba(125, 180, 255, .06); }
 .forecast-date span, .forecast-condition strong, .forecast-condition span, .forecast-probability small { display: block; }
 .forecast-date span, .forecast-condition strong { font-size: 14px; font-weight: 750; }
-.forecast-symbol { width: 30px; height: 30px; justify-self: center; align-self: center; }
+.forecast-symbol { width: 42px; height: 42px; justify-self: center; align-self: center; }
+.forecast-symbol + .icon-sep, .icon-sep + .forecast-symbol { }
+.forecast-summary .icon-sep { font-size: 12px; width: 14px; }
 .forecast-condition span { color: var(--muted); font-size: 13px; }
 .forecast-probability { text-align: right; }
 .forecast-probability b { color: var(--blue); font-size: 20px; letter-spacing: -.05em; }
@@ -474,7 +479,7 @@ button { font: inherit; }
   .cross-stat { padding: 12px; }
   .sky-heading { align-items: flex-start; }
   .sky-view-btn { padding: 5px 11px; }
-  .forecast-summary { grid-template-columns: 82px 33px 1fr; gap: 8px; padding: 14px 2px; }
+  .forecast-summary { grid-template-columns: 82px auto 1fr; gap: 8px; padding: 14px 2px; }
   .forecast-probability { grid-column: 3; grid-row: 2; text-align: left; }
   .forecast-probability b, .forecast-probability small { display: inline; margin-right: 5px; }
   .forecast-probability b { font-size: 15px; }

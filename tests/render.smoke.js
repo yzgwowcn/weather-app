@@ -95,8 +95,42 @@ for (const c of ['verdict-badge good', '13:00–15:00 有雷阵雨，注意避�
 }
 if (!htmlT.includes('data-mood="thunder"')) { console.error('THUNDER MOOD FAIL'); process.exit(1); }
 // 天气图标：meteocons Lottie 容器（js/icons.js 播放），hero 与逐日卡片均使用
-for (const c of ['data-lottie="clear-day"', 'data-lottie="cloudy"', 'data-lottie="rain"', 'weather-lottie weather-symbol', 'weather-lottie forecast-symbol']) {
+for (const c of ['data-lottie="clear-day"', 'weather-lottie weather-symbol', 'weather-lottie forecast-symbol']) {
   if (!htmlT.includes(c)) { console.error('ICON FAIL:', c); process.exit(1); }
 }
+// 图标序列：日间（08–17）小时码分段 → 多图标 + 箭头分隔；适合出行时毛毛雨映射为"晴间多云伴零星阵雨"
+const seqBundle = {
+  ...bundle,
+  forecast: {
+    ...bundle.forecast,
+    hourly: {
+      ...bundle.forecast.hourly,
+      time: [
+        `${DAYS[0]}T08:00`, `${DAYS[0]}T09:00`, `${DAYS[0]}T10:00`, `${DAYS[0]}T11:00`, `${DAYS[0]}T12:00`, `${DAYS[0]}T13:00`, `${DAYS[0]}T14:00`, `${DAYS[0]}T15:00`, `${DAYS[0]}T16:00`, `${DAYS[0]}T17:00`,
+        `${DAYS[1]}T08:00`, `${DAYS[1]}T09:00`, `${DAYS[1]}T10:00`, `${DAYS[1]}T11:00`, `${DAYS[1]}T12:00`, `${DAYS[1]}T13:00`, `${DAYS[1]}T14:00`, `${DAYS[1]}T15:00`, `${DAYS[1]}T16:00`, `${DAYS[1]}T17:00`,
+        `${DAYS[2]}T08:00`, `${DAYS[2]}T09:00`, `${DAYS[2]}T10:00`, `${DAYS[2]}T11:00`, `${DAYS[2]}T12:00`, `${DAYS[2]}T13:00`, `${DAYS[2]}T14:00`, `${DAYS[2]}T15:00`, `${DAYS[2]}T16:00`, `${DAYS[2]}T17:00`,
+      ],
+      weather_code: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 51, 51, 51, 51, 51, 51, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95],
+    },
+  },
+  deterministic: {
+    ...bundle.deterministic,
+    // EC 数据扩展到 3 天：DAY1 毛毛雨（适合出行）、DAY2 雷阵雨
+    'ECMWF IFS': { hourly: (() => {
+      const days3 = [allDay(DAYS[0], 0), allDay(DAYS[1], 51), allDay(DAYS[2], 95)];
+      const merged = {};
+      Object.keys(days3[0]).forEach((key) => { merged[key] = days3.flatMap((d) => d[key]); });
+      return merged;
+    })() },
+  },
+};
+const htmlSeq = renderWeatherApp(seqBundle, dest, 3, null, {});
+for (const c of ['data-lottie="clear-day"', 'data-lottie="partly-cloudy-day-drizzle"', 'data-lottie="thunderstorms"', 'icon-sep']) {
+  if (!htmlSeq.includes(c)) { console.error('SEQ FAIL:', c); process.exit(1); }
+}
+// 卡片限制 2 个图标
+const cardHtml = htmlSeq.slice(htmlSeq.indexOf('forecast-summary'), htmlSeq.indexOf('forecast-list') + 500);
+const cardIcons = (cardHtml.match(/data-lottie=/g) || []).length;
+if (cardIcons > 2) { console.error('CARD ICON LIMIT FAIL:', cardIcons); process.exit(1); }
 
 console.log('render smoke OK; html length', html.length);

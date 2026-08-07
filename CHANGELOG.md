@@ -1,5 +1,15 @@
 # 更新日志
 
+## v1.8（2026-08-07）
+
+### 变更
+- **框体质感重做（参考 React Bits FluidGlass 官方组件）**：材质参数对齐官方配置（ior 1.15 / thickness 5 / chromaticAberration 0.1 / anisotropy 0.01）；**背景世界配色随天气状态变化**（sunny 暖金蓝 / cloudy 灰蓝 / windy 蓝绿 / rain·storm 深蓝灰 / thunder 紫金 / neutral 深蓝紫，MutationObserver 监听 `body[data-mood]` 热更新），面板折射不再发白（v1.7 明亮渐变导致）；面板白色底调低（`--glass-border`）、重投影减轻（`--shadow 0 18px 44px → 0 10px 28px`）、文字阴影减弱
+- **天气图标序列**：hero 与逐日卡片按日间（08–17）小时天气码分段生成图标序列（最多 3 个/卡片 2 个，箭头分隔），展示"晴天转阵雨"等日内变化；**适合出行时**优先晴天/晴间多云，毛毛雨映射为"晴间多云伴零星阵雨"（`partly-cloudy-day-drizzle`）、阴天映射为晴间多云；新增 4 个组合 Lottie 图标（`assets/lottie/`）
+- **图标放大**：hero 天气图标 44→64px、卡片 30→42px，卡片图标列改自适应
+
+### 测试
+- `tests/render.smoke.js`：新增图标序列断言（多图标 + 箭头 + 适合出行映射 + 卡片 ≤2 限制）
+
 ## v1.7（2026-08-07）
 
 ### 新增
