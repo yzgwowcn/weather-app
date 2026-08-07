@@ -1,257 +1,298 @@
-// 渲染层 v2：云量可视化 + 蓝海判断 + 每日分时段聚合
-// 所有函数返回 HTML 字符串，由 app.js 插入 DOM
-
-// WMO weather_code → emoji + 中文（Open-Meteo 官方码表）
+// 渲染层：消费 Metrics 输出的结构化日级结果（ec / crossModel / cloudSeries / weatherMood），
+// 输出静态 HTML 与原生 SVG 图表。不持有请求细节，交互由 app.js 事件委托驱动。
 const WEATHER_META = {
-  0:  { emoji: '☀️', label: '晴' },
-  1:  { emoji: '🌤️', label: '少云' },
-  2:  { emoji: '⛅', label: '多云' },
-  3:  { emoji: '☁️', label: '阴' },
-  45: { emoji: '🌫️', label: '雾' },
-  48: { emoji: '🌫️', label: '雾凇' },
-  51: { emoji: '🌦️', label: '毛毛雨' },
-  53: { emoji: '🌦️', label: '毛毛雨' },
-  55: { emoji: '🌧️', label: '强毛毛雨' },
-  56: { emoji: '🌧️', label: '冻毛毛雨' },
-  57: { emoji: '🌧️', label: '强冻毛毛雨' },
-  61: { emoji: '🌦️', label: '小雨' },
-  63: { emoji: '🌧️', label: '中雨' },
-  65: { emoji: '🌧️', label: '大雨' },
-  66: { emoji: '🌧️', label: '冻雨' },
-  67: { emoji: '🌧️', label: '强冻雨' },
-  71: { emoji: '🌨️', label: '小雪' },
-  73: { emoji: '🌨️', label: '中雪' },
-  75: { emoji: '❄️', label: '大雪' },
-  77: { emoji: '🌨️', label: '米雪' },
-  80: { emoji: '🌦️', label: '阵雨' },
-  81: { emoji: '🌧️', label: '强阵雨' },
-  82: { emoji: '⛈️', label: '暴雨' },
-  85: { emoji: '🌨️', label: '阵雪' },
-  86: { emoji: '🌨️', label: '强阵雪' },
-  95: { emoji: '⛈️', label: '雷阵雨' },
-  96: { emoji: '⛈️', label: '雷阵雨+冰雹' },
-  99: { emoji: '⛈️', label: '强雷阵雨+冰雹' },
+  0: ['晴', '☀'], 1: ['晴间多云', '◐'], 2: ['多云', '◒'], 3: ['阴', '☁'],
+  45: ['雾', '≋'], 48: ['雾', '≋'], 51: ['毛毛雨', '◌'], 53: ['毛毛雨', '◌'], 55: ['毛毛雨', '◌'],
+  61: ['小雨', '☂'], 63: ['中雨', '☂'], 65: ['大雨', '☂'], 80: ['阵雨', '☂'], 81: ['强阵雨', '☂'], 82: ['暴雨', '☂'],
+  95: ['雷阵雨', 'ϟ'], 96: ['雷阵雨', 'ϟ'], 99: ['强雷阵雨', 'ϟ'],
 };
 
-// 降水类天气码（用于时段主导天气码优先显示）
-const RAIN_CODES = new Set([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99]);
+const SKY_LAYERS = [
+  { key: 'low', cls: 'low', label: '低云' },
+  { key: 'mid', cls: 'mid', label: '中云' },
+  { key: 'high', cls: 'high', label: '高云' },
+];
 
-// 时效分层（按 skill：0-72h 较确定 / 4-7 天可能有变 / 8-16 天仅趋势参考）
-function horizonLabel(daysFromNow) {
-  if (daysFromNow <= 3) return { text: '较确定', cls: 'ok' };
-  if (daysFromNow <= 7) return { text: '可能有变', cls: 'warn' };
-  return { text: '趋势参考', cls: 'far' };
+function weatherMeta(code) { return WEATHER_META[code] || ['天气变化', '○']; }
+function weekdayCN(date) { return ['日', '一', '二', '三', '四', '五', '六'][new Date(`${date}T00:00:00Z`).getUTCDay()]; }
+function dateLabel(date) { return `${date.slice(5, 7)}.${date.slice(8, 10)} · 周${weekdayCN(date)}`; }
+function horizonText(index) { return index <= 2 ? '近期判断' : index <= 6 ? '留意变化' : '趋势参考'; }
+function probabilityWord(value) {
+  if (value == null) return '晴好率待补充';
+  if (value >= 75) return '晴好把握大';
+  if (value >= 50) return '有晴好窗口';
+  if (value >= 25) return '晴好不稳定';
+  return '晴好机会低';
 }
-
-// 计算某日期（YYYY-MM-DD）距离今天的天数（UTC 解析避免时区偏移）
-function daysFromNow(dateStr) {
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const a = new Date(todayStr + 'T00:00:00Z');
-  const b = new Date(dateStr + 'T00:00:00Z');
-  return Math.round((b - a) / 86400000);
+function cloudWord(cloud) {
+  if (cloud == null) return '—';
+  if (cloud < 25) return '开阔少云';
+  if (cloud < 45) return '云量适中';
+  if (cloud < 70) return '云量偏多';
+  return '厚云覆盖';
 }
-
-// 云量 → 蓝海可见度判断（读者最关心）
-function blueSeaLabel(cloudPct) {
-  if (cloudPct < 25) return { text: '☀️ 云量低，蓝海绝佳', cls: 'sea-great' };
-  if (cloudPct < 50) return { text: '🌤️ 间或有云，蓝海可见', cls: 'sea-ok' };
-  if (cloudPct < 75) return { text: '⛅ 多云，海景一般', cls: 'sea-mid' };
-  return { text: '☁️ 阴天，海景受限', cls: 'sea-bad' };
-}
-
-// 云量可视化条（0-30% 蓝 → 60%+ 深灰，颜色随云量由蓝转灰）
-function cloudBar(percent) {
-  const p = Math.max(0, Math.min(100, Math.round(percent)));
-  const hue = 200 - p * 1.2;
-  const sat = Math.max(8, 100 - p * 0.6);
-  const light = 72 - p * 0.25;
-  return `<div class="cloud-bar"><div class="cloud-fill" style="width:${p}%;background:hsl(${hue},${sat}%,${light}%);"></div></div><span class="cloud-pct">${p}%</span>`;
-}
-
-// 分时段聚合：hourly 为 API 返回的小时数组，dayOffset 为第几天（0=今天）
-// 夜间时段（22→30）跨午夜：h>=24 时取次日对应小时；数据不足的时段自动跳过
-function aggregateSlot(hourly, dayOffset, slot) {
-  const time = hourly.time;
-  const reads = [];
-  for (let h = slot.start; h < slot.end; h++) {
-    const abs = dayOffset * 24 + h;
-    if (abs >= time.length) continue;
-    reads.push(abs);
-  }
-  if (reads.length === 0) return null;
-
-  let cloudSum = 0, cloudCount = 0;
-  let tempMin = Infinity, tempMax = -Infinity;
-  let probMax = 0, rainSum = 0;
-  const codeCount = {};
-  for (const i of reads) {
-    const c = hourly.cloud_cover[i];
-    if (c != null) { cloudSum += c; cloudCount++; }
-    const t = hourly.temperature_2m[i];
-    if (t != null) { tempMin = Math.min(tempMin, t); tempMax = Math.max(tempMax, t); }
-    const p = hourly.precipitation_probability[i];
-    if (p != null) probMax = Math.max(probMax, p);
-    rainSum += hourly.rain[i] || 0;
-    const wc = hourly.weather_code[i];
-    if (wc != null) codeCount[wc] = (codeCount[wc] || 0) + 1;
-  }
-  if (cloudCount === 0) return null;
-
-  // 主导天气码：降水码优先（哪怕出现 1 次），其次取最频繁
-  let rainCode = null, rainCnt = 0;
-  let anyCode = null, anyCnt = 0;
-  for (const [code, cnt] of Object.entries(codeCount)) {
-    const c = Number(code);
-    if (RAIN_CODES.has(c) && cnt > rainCnt) { rainCnt = cnt; rainCode = c; }
-    if (cnt > anyCnt) { anyCnt = cnt; anyCode = c; }
-  }
-  const domCode = rainCode != null ? rainCode : anyCode;
-  const meta = WEATHER_META[domCode] || { emoji: '❓', label: '未知' };
-  const cloudAvg = Math.round(cloudSum / cloudCount);
-
-  let desc = meta.label;
-  if (RAIN_CODES.has(domCode)) {
-    // 有雨时段：显示降水概率与雨量
-    desc += ` ${Math.round(probMax)}%`;
-    if (rainSum >= 0.1) desc += ` ${rainSum.toFixed(1)}mm`;
-  } else if (probMax >= 30) {
-    // 无雨时段：仅当降水概率较高时才提示
-    desc += ` 降水${Math.round(probMax)}%`;
-  }
-
+function dailyData(forecast, index) {
+  const daily = forecast.daily;
   return {
-    label: slot.label,
-    emoji: meta.emoji,
-    desc,
-    cloudAvg,
-    tempMin: Math.round(tempMin),
-    tempMax: Math.round(tempMax),
+    date: daily.time[index], code: daily.weather_code[index], cloud: daily.cloud_cover_mean[index], rain: daily.precipitation_sum[index],
+    rainProbability: daily.precipitation_probability_max[index], wind: daily.wind_speed_10m_max[index], gust: daily.wind_gusts_10m_max[index],
+    low: daily.temperature_2m_min[index], high: daily.temperature_2m_max[index],
   };
 }
+function metricTile(label, value, note, tone = '') {
+  return `<div class="metric-tile ${tone}"><span>${label}</span><strong>${value}</strong><small>${note}</small></div>`;
+}
 
-// 每日天气卡片（含云量条、蓝海判断、分时段折叠区）
-function renderDailyCards(forecast, destName) {
-  if (!forecast || forecast.error) {
-    return `<p class="error">${forecast ? forecast.error : '无天气数据'}</p>`;
-  }
-  const daily = forecast.daily;
-  const hourly = forecast.hourly;
-  if (!daily || !daily.time || daily.time.length === 0) {
-    return '<p class="error">未返回天气数据</p>';
-  }
-  const cards = daily.time.map((d, i) => {
-    const meta = WEATHER_META[daily.weather_code[i]] || { emoji: '❓', label: '未知' };
-    const cloudMean = daily.cloud_cover_mean[i];
-    const sea = cloudMean != null ? blueSeaLabel(cloudMean) : null;
-    const horizon = horizonLabel(daysFromNow(d));
-    const prob = daily.precipitation_probability_max[i];
-    const rainSum = daily.precipitation_sum[i];
-    const probText = prob == null ? '—' : `${Math.round(prob)}%`;
-    const rainText = rainSum == null ? '—' : `${rainSum.toFixed(1)} mm`;
+// ---- SVG 天空剖面 ---------------------------------------------------------
 
-    // 分时段（当天夜间跨午夜需要次日数据，最后一天自动截断）
-    let slotsHtml = '';
-    if (hourly && hourly.time) {
-      const slots = TIME_SLOTS
-        .map((s) => aggregateSlot(hourly, i, s))
-        .filter(Boolean);
-      if (slots.length) {
-        slotsHtml = `
-        <details class="slots" ${i <= 1 ? 'open' : ''}>
-          <summary>分时段详情</summary>
-          <div class="slot-grid">
-            ${slots.map((s) => `
-              <div class="slot">
-                <div class="slot-label">${s.label}</div>
-                <div class="slot-main">${s.emoji} ${s.desc}</div>
-                <div class="slot-meta">云 ${s.cloudAvg}% · ${s.tempMin}°~${s.tempMax}°</div>
-              </div>`).join('')}
-          </div>
-        </details>`;
-      }
+// Catmull-Rom 转三次贝塞尔的光滑曲线路径
+function smoothPath(points) {
+  if (!points.length) return '';
+  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
+// 图表几何：小时精度时间轴，横轴为预报期内全部小时；8px/小时，宽画布横向滚动。
+function skyGeometry(dates) {
+  const H = 250;
+  const PAD = { top: 16, right: 16, bottom: 32, left: 46 };
+  const STEP = 8;
+  const totalHours = dates.length * 24;
+  const plotW = totalHours * STEP;
+  const W = plotW + PAD.left + PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+  const x = (i) => PAD.left + i * STEP;
+  const y = (v) => PAD.top + (100 - v) / 100 * plotH;
+  return { H, PAD, STEP, totalHours, plotW, W, plotH, x, y };
+}
+
+function renderSkyChart(series, dates, skyIndex) {
+  const g = skyGeometry(dates);
+  const { H, PAD, W, plotH, x, y } = g;
+  const parts = [];
+
+  // 网格与 y 轴刻度
+  [0, 25, 50, 75, 100].forEach((tick) => {
+    parts.push(`<line class="sky-grid" x1="${PAD.left}" y1="${y(tick)}" x2="${W - PAD.right}" y2="${y(tick)}" />`);
+    parts.push(`<text class="sky-axis" x="${PAD.left - 7}" y="${y(tick) + 3.5}">${tick}%</text>`);
+  });
+
+  // 白天时段浅色带（08:00–18:00）、日界线与日期标签
+  dates.forEach((date, di) => {
+    parts.push(`<rect class="sky-dayband" x="${x(di * 24 + 8)}" y="${PAD.top}" width="${10 * g.STEP}" height="${plotH}" />`);
+    if (di > 0) parts.push(`<line class="sky-dateline" x1="${x(di * 24)}" y1="${PAD.top}" x2="${x(di * 24)}" y2="${PAD.top + plotH}" />`);
+    parts.push(`<text class="sky-datelabel" x="${x(di * 24)}" y="${H - 8}">${date.slice(5).replace('-', '.')} 周${weekdayCN(date)}</text>`);
+  });
+
+  // 三层云曲线（高云虚线）
+  const dots = [];
+  SKY_LAYERS.forEach((layer) => {
+    const segments = [[]];
+    dates.forEach((date, di) => {
+      const day = series.days[date];
+      if (!day) return;
+      day.points.forEach((p, hi) => {
+        const v = p[layer.key];
+        if (v == null) { segments.push([]); return; }
+        segments[segments.length - 1].push({ x: x(di * 24 + hi), y: y(v) });
+      });
+    });
+    segments.forEach((segment) => {
+      if (segment.length > 1) parts.push(`<path class="sky-line ${layer.cls}" d="${smoothPath(segment)}" />`);
+      if (segment.length === 1) dots.push(`<circle class="sky-dot ${layer.cls}" cx="${segment[0].x.toFixed(1)}" cy="${segment[0].y.toFixed(1)}" r="2.5" />`);
+    });
+  });
+  parts.push(dots.join(''));
+
+  // 选中时刻准星（跨渲染保留）
+  if (skyIndex != null) {
+    const di = Math.floor(skyIndex / 24);
+    const hi = skyIndex % 24;
+    const day = series.days[dates[di]];
+    if (day && day.points[hi]) {
+      const px = x(skyIndex);
+      parts.push(`<line class="sky-crosshair-line" x1="${px}" y1="${PAD.top}" x2="${px}" y2="${PAD.top + plotH}" />`);
+      SKY_LAYERS.forEach((layer) => {
+        const v = day.points[hi][layer.key];
+        if (v != null) parts.push(`<circle class="sky-dot ${layer.cls}" cx="${px}" cy="${y(v)}" r="3.5" />`);
+      });
     }
-
-    return `
-      <div class="day-card">
-        <div class="day-head">
-          <div class="day-left">
-            <div class="day-date">${d.slice(5)} <span class="weekday">${weekdayCN(d)}</span></div>
-            <span class="day-horizon ${horizon.cls}">${horizon.text}</span>
-          </div>
-          <div class="day-icon">${meta.emoji}</div>
-          <div class="day-mid">
-            <div class="day-desc">${meta.label}</div>
-            <div class="day-temp">${Math.round(daily.temperature_2m_min[i])}° ~ ${Math.round(daily.temperature_2m_max[i])}°</div>
-          </div>
-          <div class="day-right">
-            <div class="day-rain" title="降水概率 / 降水量">💧 ${probText} / ${rainText}</div>
-            <div class="day-wind" title="最大风速 / 阵风 (km/h)">💨 ${Math.round(daily.wind_speed_10m_max[i])} / ${Math.round(daily.wind_gusts_10m_max[i])}</div>
-          </div>
-        </div>
-        ${cloudMean != null ? `
-        <div class="day-cloud">
-          <span class="cloud-label">云量</span>
-          ${cloudBar(cloudMean)}
-          ${sea ? `<span class="sea-badge ${sea.cls}">${sea.text}</span>` : ''}
-        </div>` : ''}
-        ${slotsHtml}
-      </div>`;
-  }).join('');
-
-  return `
-    <div class="section">
-      <h3>📍 ${destName} · 未来 ${daily.time.length} 天</h3>
-      ${cards}
-    </div>`;
-}
-
-// 近海海况卡片（海洋网格模式指导）
-function renderMarineCards(marine, destName) {
-  if (!marine || marine.error) {
-    return `<div class="section marine"><h3>🌊 海况</h3><p class="error">${marine ? marine.error : '无海况数据'}</p></div>`;
   }
-  const daily = marine.daily;
-  if (!daily || !daily.time || daily.time.length === 0) return '';
-  const cards = daily.time.map((d, i) => {
-    const wave = daily.wave_height_max[i];
-    if (wave == null) return '';
-    const seaState = seaStateLabel(wave);
-    return `
-      <div class="day-card marine-card">
-        <div class="day-left">
-          <div class="day-date">${d.slice(5)} <span class="weekday">${weekdayCN(d)}</span></div>
+
+  // 不可见命中区：每个小时一条透明竖条，事件委托读取 dataset
+  dates.forEach((date, di) => {
+    const day = series.days[date];
+    if (!day) return;
+    day.points.forEach((p, hi) => {
+      const i = di * 24 + hi;
+      parts.push(`<line class="sky-hit" data-index="${i}" data-x="${x(i)}" data-time="${p.time}" data-hour="${p.hour}"
+        data-low="${p.low ?? ''}" data-mid="${p.mid ?? ''}" data-high="${p.high ?? ''}"
+        data-mask="${p.mask == null ? '' : p.mask.toFixed(1)}"
+        data-precip="${p.precipitation == null ? '' : p.precipitation.toFixed(1)}"
+        data-wind="${p.wind ?? ''}" x1="${x(i)}" y1="${PAD.top}" x2="${x(i)}" y2="${PAD.top + plotH}" />`);
+    });
+  });
+
+  return `<svg class="sky-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="三层云量小时剖面图">${parts.join('')}</svg>`;
+}
+
+function renderSkySection(cloudSeries, dates, skyView, skyIndex) {
+  const views = [
+    { key: 'ec', label: 'EC', title: 'ECMWF IFS 确定性', series: cloudSeries.ec },
+    { key: 'forecast', label: '综合预报', title: 'Open-Meteo 综合预报', series: cloudSeries.forecast },
+  ];
+  const panes = views.map((view) => `
+    <div class="sky-view-pane" data-sky-view="${view.key}"${view.key !== skyView ? ' hidden' : ''}>
+      <div class="sky-scroll">
+        <div class="sky-chart" data-sky-chart tabindex="0" role="application" aria-label="${view.title}三层云量图，左右方向键移动准星">
+          ${renderSkyChart(view.series, dates, view.key === skyView ? skyIndex : null)}
+          <div class="sky-crosshair" aria-hidden="true"></div>
+          <div class="sky-tooltip" role="status"></div>
         </div>
-        <div class="day-icon">🌊</div>
-        <div class="day-mid">
-          <div class="day-desc">${seaState}</div>
-          <div class="day-temp">浪高 ${wave.toFixed(2)} m</div>
-        </div>
-        <div class="day-right">
-          <div class="day-rain">周期 ${daily.wave_period_max[i] == null ? '—' : daily.wave_period_max[i].toFixed(1) + ' s'}</div>
-          <div class="day-rain">涌浪 ${daily.swell_wave_height_max[i] == null ? '—' : daily.swell_wave_height_max[i].toFixed(2) + ' m'}</div>
-        </div>
-      </div>`;
-  }).filter(Boolean).join('');
-  if (!cards) return '';
+      </div>
+      <p class="sky-source">${view.title} · 每小时一个数据点，横向滚动查看全部时段</p>
+    </div>`).join('');
+  const buttons = views.map((view) => `
+    <button type="button" class="sky-view-btn ${view.key === skyView ? 'active' : ''}" data-sky-view="${view.key}" aria-pressed="${view.key === skyView}">${view.label}</button>`).join('');
   return `
-    <div class="section marine">
-      <h3>🌊 ${destName} 近海海况</h3>
-      ${cards}
-      <p class="footnote">海洋数据为模式指导，非港口通告；乘船/浮潜/潜水请以当天码头与景区通知为准。</p>
-    </div>`;
+  <section class="sky-section" aria-label="EC 天空剖面">
+    <div class="section-heading sky-heading">
+      <div><p class="section-kicker">EC SKY PROFILE</p><h2>天空剖面</h2></div>
+      <div class="sky-switch" role="group" aria-label="云图数据源切换">${buttons}</div>
+    </div>
+    <p class="sky-note"><span class="legend low">低云</span><span class="legend mid">中云</span><span class="legend high">高云</span> · 遮蔽云量 = 低云×60% + 中云×40%，悬停查看；高云仅供参考，不参与晴好率扣分。浅色带为 08:00–18:00 白天时段。</p>
+    ${panes}
+  </section>`;
 }
 
-// 海况等级（近岸简化标准，仅供参考）
-function seaStateLabel(wave) {
-  if (wave < 0.5) return '平静';
-  if (wave < 1.25) return '轻浪';
-  if (wave < 2.5) return '中浪';
-  return '大浪';
+// ---- 首屏各区块 -----------------------------------------------------------
+
+function renderEcHero(day, assessment, destination) {
+  const main = assessment.ec.main;
+  const [condition, symbol] = weatherMeta(day.code);
+  const verdict = main
+    ? (main.suitable ? { text: '适合出行', cls: 'good' } : { text: '不建议出行', cls: 'bad' })
+    : { text: '数据待补充', cls: 'none' };
+  const basis = main
+    ? `加权遮蔽云量 ${Math.round(main.maskMean)}% · 累计降水 ${main.precipitationSum.toFixed(1)} mm · 最大风速 ${Math.round(main.windMax)} km/h`
+    : 'EC 主运行暂未返回，页面依据综合预报示意。';
+  const consistency = assessment.ec.memberConsistency;
+  return `
+  <section class="ec-hero" data-mood="${assessment.weatherMood.mood}">
+    <div class="ec-verdict">
+      <p class="section-kicker">ECMWF 主运行 · 08:00–18:00 · ${destination.name}</p>
+      <div class="verdict-row"><span class="weather-symbol" aria-hidden="true">${symbol}</span><h2>${verdict.text}</h2><span class="verdict-badge ${verdict.cls}">${verdict.text}</span></div>
+      <p class="verdict-basis">${basis}。${condition}，${cloudWord(day.cloud)}。</p>
+    </div>
+    <div class="ec-probability">
+      <div class="probability-orb ${assessment.probability == null ? 'unavailable' : ''}" style="--probability:${Math.round(assessment.probability || 0)}">
+        <span>EC 集合晴好率</span><strong>${Metrics.formatPercent(assessment.probability)}</strong>
+        <small>${assessment.ec.ensemble ? `${assessment.ec.ensemble.suitable}/${assessment.ec.ensemble.total} 成员满足` : '成员数据暂缺'}</small>
+      </div>
+      <span class="confidence-pill ${consistency.level}">${consistency.text}</span>
+      <p class="consistency-desc">${consistency.description}</p>
+    </div>
+  </section>`;
 }
 
-// 星期中文
-function weekdayCN(dateStr) {
-  const names = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-  return names[new Date(dateStr + 'T00:00:00Z').getUTCDay()];
+function renderEcMetrics(assessment) {
+  const main = assessment.ec.main;
+  if (!main) {
+    return `<section class="metric-grid" aria-label="判断依据"><div class="metric-tile"><span>加权遮蔽云量</span><strong>—</strong><small>EC 主运行暂缺</small></div></section>`;
+  }
+  return `<section class="metric-grid" aria-label="EC 主结论判断依据">
+    ${metricTile('加权遮蔽云量', `${Math.round(main.maskMean)}%`, '低云×60% + 中云×40% · 阈值 <50%', 'cloud')}
+    ${metricTile('累计降水', `${main.precipitationSum.toFixed(1)} mm`, '日间累计 · 阈值 <1 mm')}
+    ${metricTile('最大风速', `${Math.round(main.windMax)} km/h`, '日间最大 · 阈值 <30')}
+    ${metricTile('高云参考', main.highMean == null ? '—' : `${Math.round(main.highMean)}%`, '薄云与霞光参考，不参与扣分', 'high-cloud')}
+  </section>`;
+}
+
+function renderCrossModel(assessment) {
+  const { support, oppose, missing, direction, note } = assessment.crossModel;
+  const models = assessment.deterministic;
+  const rows = ['NOAA GFS', 'JMA GSM', 'CMA GRAPES'].map((name) => {
+    const model = models.find((item) => item.name === name);
+    if (!model) {
+      const failed = assessment.missingSources.includes(name);
+      return `<li><span>${name}</span><b class="caution">${failed ? '请求失败' : '数据不足'}</b><small>未参与验证</small></li>`;
+    }
+    const agree = direction != null && model.suitable === direction;
+    return `<li><span>${name}</span><b class="${agree ? 'support' : 'caution'}">${agree ? '支持 EC' : '与 EC 分歧'}</b><small>遮蔽 ${Math.round(model.maskMean)}% · 雨 ${model.precipitationSum.toFixed(1)} mm · 风 ${Math.round(model.windMax)} km/h</small></li>`;
+  }).join('');
+  return `
+  <section class="cross-section" aria-label="外部模型验证">
+    <div class="section-heading"><p class="section-kicker">CROSS-CHECK</p><h2>外部模型验证</h2></div>
+    <p class="cross-note">GFS、JMA、CMA 对 EC 主方向的交叉验证。这是模型分歧提示，不是历史准确率证明。</p>
+    <div class="cross-stats">
+      <div class="cross-stat support"><span>支持</span><b>${support}</b><small>与 EC 方向一致</small></div>
+      <div class="cross-stat oppose"><span>反对</span><b>${oppose}</b><small>与 EC 方向相反</small></div>
+      <div class="cross-stat missing"><span>缺失</span><b>${missing.length}</b><small>未返回或数据不足</small></div>
+    </div>
+    <ul class="cross-list">${rows}</ul>
+    ${note ? `<p class="cross-warn">${note}</p>` : ''}
+  </section>`;
+}
+
+function renderDayRail(days, selectedDate) {
+  return `<nav class="date-rail" aria-label="选择查看日期">${days.map((day, index) => `
+    <button type="button" class="date-chip ${day.date === selectedDate ? 'active' : ''}" data-select-date="${day.date}" aria-pressed="${day.date === selectedDate}">
+      <span>${index === 0 ? '今天' : `周${weekdayCN(day.date)}`}</span><strong>${day.date.slice(5)}</strong><small>${Metrics.formatPercent(day.assessment.probability)}</small>
+    </button>`).join('')}</nav>`;
+}
+
+function renderForecastCards(days, selectedDate) {
+  return `<section class="forecast-section"><div class="section-heading"><p class="section-kicker">OUTLOOK</p><h2>逐日判断</h2></div>
+    <div class="forecast-list">${days.map((day, index) => {
+      const [condition, symbol] = weatherMeta(day.code);
+      const active = day.date === selectedDate;
+      const consistency = day.assessment.ec.memberConsistency;
+      return `<article class="forecast-card ${active ? 'selected' : ''}">
+        <button type="button" class="forecast-summary" data-select-date="${day.date}" aria-label="查看 ${dateLabel(day.date)} 的判断">
+          <div class="forecast-date"><span>${index === 0 ? '今天' : dateLabel(day.date)}</span><small>${horizonText(index)}</small></div>
+          <span class="forecast-symbol" aria-hidden="true">${symbol}</span>
+          <div class="forecast-condition"><strong>${probabilityWord(day.assessment.probability)}</strong><span>${condition} · ${Math.round(day.low)}°–${Math.round(day.high)}°</span></div>
+          <div class="forecast-probability"><b>${Metrics.formatPercent(day.assessment.probability)}</b><small>${consistency.text}</small></div>
+        </button>
+        ${active ? `<div class="forecast-detail"><div><span>遮蔽云量</span><b>${day.assessment.ec.main ? `${Math.round(day.assessment.ec.main.maskMean)}%` : '—'}</b></div><div><span>降水</span><b>${day.rain == null ? '—' : `${day.rain.toFixed(1)} mm`}</b></div><div><span>风速</span><b>${day.wind == null ? '—' : `${Math.round(day.wind)} km/h`}</b></div><p>${consistency.description}</p></div>` : ''}
+      </article>`;
+    }).join('')}</div></section>`;
+}
+
+function renderMarineCards(marine, destination) {
+  if (!marine || marine.error || !marine.daily?.time?.length) return '';
+  const cards = marine.daily.time.map((date, index) => {
+    const wave = marine.daily.wave_height_max[index];
+    if (wave == null) return '';
+    const state = wave < 0.5 ? '平静' : wave < 1.25 ? '轻浪' : wave < 2.5 ? '中浪' : '大浪';
+    return `<div class="marine-item"><span>${dateLabel(date)}</span><strong>${state}</strong><b>${wave.toFixed(1)} m</b></div>`;
+  }).join('');
+  return cards ? `<section class="marine-section"><div class="section-heading"><p class="section-kicker">NEARSHORE</p><h2>近海海况</h2></div><div class="marine-list">${cards}</div><p class="section-note">海况是海洋网格模式指导，乘船、潜水与浮潜请以当天码头和景区通知为准。</p></section>` : '';
+}
+
+// ---- 主入口：EC 主结论 → EC 晴好率与成员一致性 → 天空剖面 → 外部模型验证 → 逐日判断与海况 ----
+function renderWeatherApp(bundle, destination, requestedDays, selectedDate, ui = {}) {
+  const forecast = bundle?.forecast;
+  if (!forecast || forecast.error || !forecast.daily?.time?.length) return `<div class="error-card"><strong>暂时无法生成旅行判断</strong><p>${forecast?.error || '未返回综合预报数据，请稍后重试。'}</p></div>`;
+  const dates = forecast.daily.time;
+  const assessments = Metrics.buildAssessment(bundle.ensembles, bundle.deterministic, dates);
+  const cloudSeries = Metrics.buildCloudSeries(bundle.deterministic['ECMWF IFS'], forecast, dates);
+  const days = dates.map((date, index) => ({ ...dailyData(forecast, index), assessment: assessments[date] }));
+  const currentDate = days.some((day) => day.date === selectedDate) ? selectedDate : days[0].date;
+  const selected = days.find((day) => day.date === currentDate);
+  const skyView = ui.skyView === 'forecast' ? 'forecast' : 'ec';
+  const skyIndex = ui.skyIndex;
+  const farNotice = requestedDays > 7 ? '<p class="notice">第 8 天及以后仅适合作趋势参考，临近出行请再次更新。</p>' : '';
+  return `${farNotice}${renderEcHero(selected, selected.assessment, destination)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderDayRail(days, currentDate)}${renderForecastCards(days, currentDate)}${renderMarineCards(bundle.marine, destination)}`;
 }

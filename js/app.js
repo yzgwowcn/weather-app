@@ -1,82 +1,142 @@
-// 主控制器：目的地选择 → 查询 → 渲染
+// 主控制器：维护选择状态与图表交互，协调多源请求，将归一化结果交给渲染层，
+// 并把渲染层输出的 weatherMood 应用到页面背景状态机。
 (() => {
   'use strict';
-
-  const state = { dest: DESTINATIONS[0], days: DEFAULT_DAYS };
-
-  // DOM 引用
+  const state = { dest: DESTINATIONS[0], days: DEFAULT_DAYS, bundle: null, selectedDate: null, skyView: 'ec', skyIndex: null };
   const destListEl = document.getElementById('dest-list');
   const daysGroupEl = document.getElementById('days-group');
   const queryBtnEl = document.getElementById('query-btn');
   const resultEl = document.getElementById('result');
   const loadingEl = document.getElementById('loading');
 
-  // YYYY-MM-DD（本地时区；受众为国内用户即北京时间）
   function dateStr(offsetDays) {
-    const d = new Date();
-    d.setDate(d.getDate() + offsetDays);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const date = new Date();
+    date.setDate(date.getDate() + offsetDays);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }
-
-  // 渲染目的地选择按钮
   function renderDestButtons() {
-    destListEl.innerHTML = DESTINATIONS.map((d) => `
-      <button type="button" class="dest-btn ${d.id === state.dest.id ? 'active' : ''}" data-id="${d.id}">
-        <span class="dest-name">${d.name}</span>
-        ${d.marine ? '<span class="dest-tag">含海况</span>' : ''}
+    destListEl.innerHTML = DESTINATIONS.map((dest) => `
+      <button type="button" class="dest-btn ${dest.id === state.dest.id ? 'active' : ''}" data-id="${dest.id}" aria-pressed="${dest.id === state.dest.id}">
+        <span>${dest.name}</span>${dest.marine ? '<span class="dest-tag">近海</span>' : ''}
       </button>`).join('');
-    destListEl.querySelectorAll('.dest-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        state.dest = DESTINATIONS.find((d) => d.id === btn.dataset.id);
-        renderDestButtons();
-      });
-    });
+    destListEl.querySelectorAll('.dest-btn').forEach((button) => button.addEventListener('click', () => {
+      state.dest = DESTINATIONS.find((dest) => dest.id === button.dataset.id);
+      renderDestButtons();
+    }));
   }
-
-  // 时效警告条（按 skill：8 天以上仅趋势参考）
-  function renderHorizonWarning(days) {
-    if (days > 7) {
-      return `<div class="notice warn">⚠️ 查询范围超过 7 天：8 天及以后属远期预报，仅作趋势参考，出行前请复核最新预报与官方预警。</div>`;
-    }
-    return `<div class="notice info">ℹ️ 数据为 Open-Meteo 模式指导（约 0-16 天时效），非官方预警；4 天及以后的降雨窗口可能变动。</div>`;
+  function renderResult() {
+    const oldScroll = resultEl.querySelector('.sky-scroll');
+    const scrollLeft = oldScroll ? oldScroll.scrollLeft : 0;
+    resultEl.innerHTML = renderWeatherApp(state.bundle, state.dest, state.days, state.selectedDate, { skyView: state.skyView, skyIndex: state.skyIndex });
+    const mood = resultEl.querySelector('[data-mood]')?.dataset.mood || 'neutral';
+    document.body.dataset.mood = mood;
+    const newScroll = resultEl.querySelector('.sky-scroll');
+    if (newScroll) newScroll.scrollLeft = scrollLeft;
   }
-
-  // 查询主流程
+  // 悬停/触控提示：更新图表准星与数值卡，不触发整页重渲染
+  function updateSkyCursor(chart, hit) {
+    const crosshair = chart.querySelector('.sky-crosshair');
+    const tooltip = chart.querySelector('.sky-tooltip');
+    if (!crosshair || !tooltip) return;
+    const x = Number(hit.dataset.x);
+    const d = hit.dataset;
+    crosshair.style.transform = `translateX(${x}px)`;
+    crosshair.classList.add('visible');
+    const fmt = (value, unit) => (value === '' ? '—' : `${value}${unit}`);
+    tooltip.innerHTML = `
+      <strong>${d.time}</strong>
+      <span>低云 <b>${fmt(d.low, '%')}</b></span>
+      <span>中云 <b>${fmt(d.mid, '%')}</b></span>
+      <span>高云 <b>${fmt(d.high, '%')}</b></span>
+      <span>遮蔽 <b>${fmt(d.mask, '%')}</b></span>
+      <span>降水 <b>${fmt(d.precip, ' mm')}</b></span>
+      <span>风速 <b>${fmt(d.wind, ' km/h')}</b></span>`;
+    const chartRect = chart.getBoundingClientRect();
+    const tooltipWidth = tooltip.offsetWidth;
+    const left = Math.min(Math.max(x, tooltipWidth / 2 + 6), chartRect.width - tooltipWidth / 2 - 6);
+    tooltip.style.left = `${left}px`;
+    tooltip.classList.add('visible');
+  }
+  function hideSkyCursor(chart) {
+    chart.querySelector('.sky-crosshair')?.classList.remove('visible');
+    chart.querySelector('.sky-tooltip')?.classList.remove('visible');
+  }
   async function query() {
-    const { lat, lon, marine, name } = state.dest;
-    const days = state.days;
     const start = dateStr(0);
-    const end = dateStr(days - 1);
-
-    resultEl.innerHTML = '';
+    const end = dateStr(state.days - 1);
+    queryBtnEl.disabled = true;
     loadingEl.classList.remove('hidden');
-
-    // 并行请求陆地 + 海况（如适用）
-    const [forecast, marineData] = await Promise.all([
-      API.fetchForecast(lat, lon, start, end),
-      marine ? API.fetchMarine(lat, lon, start, end) : Promise.resolve(null),
-    ]);
-
+    resultEl.setAttribute('aria-busy', 'true');
+    state.bundle = await API.fetchBundle(state.dest, start, end);
+    state.selectedDate = null;
+    state.skyIndex = null;
     loadingEl.classList.add('hidden');
-    resultEl.innerHTML =
-      renderHorizonWarning(days) +
-      renderDailyCards(forecast, name) +
-      (marine ? renderMarineCards(marineData, name) : '');
+    queryBtnEl.disabled = false;
+    resultEl.removeAttribute('aria-busy');
+    renderResult();
   }
-
-  // 初始化
   function init() {
     renderDestButtons();
-    // 天数按钮组：点击切换天数并高亮
-    daysGroupEl.querySelectorAll('.days-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        state.days = Number(btn.dataset.days);
-        daysGroupEl.querySelectorAll('.days-btn').forEach((b) => b.classList.toggle('active', b === btn));
-      });
-    });
+    daysGroupEl.querySelectorAll('.days-btn').forEach((button) => button.addEventListener('click', () => {
+      state.days = Number(button.dataset.days);
+      daysGroupEl.querySelectorAll('.days-btn').forEach((item) => item.classList.toggle('active', item === button));
+    }));
     queryBtnEl.addEventListener('click', query);
-    query(); // 首次加载即查询默认目的地
-  }
 
+    // 点击委托：日期选择与天空剖面视图切换
+    resultEl.addEventListener('click', (event) => {
+      const viewBtn = event.target.closest('[data-sky-view]');
+      if (viewBtn) {
+        state.skyView = viewBtn.dataset.skyView;
+        renderResult();
+        return;
+      }
+      const target = event.target.closest('[data-select-date]');
+      if (!target || !state.bundle) return;
+      state.selectedDate = target.dataset.selectDate;
+      renderResult();
+    });
+
+    // 悬停提示（鼠标移动不重渲染）
+    resultEl.addEventListener('pointermove', (event) => {
+      const hit = event.target.closest('.sky-hit');
+      if (!hit) return;
+      updateSkyCursor(hit.closest('[data-sky-chart]'), hit);
+    });
+    // 离开图表隐藏提示（pointerout 冒泡，relatedTarget 判断）
+    resultEl.addEventListener('pointerout', (event) => {
+      const chart = event.target.closest('[data-sky-chart]');
+      if (chart && (!event.relatedTarget || !chart.contains(event.relatedTarget))) hideSkyCursor(chart);
+    });
+    // 触控/点击选中时刻：持久化准星
+    resultEl.addEventListener('pointerdown', (event) => {
+      const hit = event.target.closest('.sky-hit');
+      if (!hit || !state.bundle) return;
+      state.skyIndex = Number(hit.dataset.index);
+      renderResult();
+    });
+    // 键盘焦点：左右方向键在小时刻度间移动
+    resultEl.addEventListener('keydown', (event) => {
+      const chart = event.target.closest('[data-sky-chart]');
+      if (!chart || !state.bundle) return;
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      event.preventDefault();
+      const hits = chart.querySelectorAll('.sky-hit');
+      if (!hits.length) return;
+      const current = state.skyIndex == null ? 0 : state.skyIndex;
+      const next = event.key === 'ArrowRight' ? Math.min(hits.length - 1, current + 1) : Math.max(0, current - 1);
+      state.skyIndex = next;
+      renderResult();
+      const newChart = resultEl.querySelector('[data-sky-chart]');
+      newChart?.focus();
+      const newHits = newChart?.querySelectorAll('.sky-hit') || [];
+      if (newHits[next]) {
+        const scroll = newChart.closest('.sky-scroll');
+        if (scroll) scroll.scrollLeft = Math.max(0, Number(newHits[next].dataset.x) - scroll.clientWidth / 2);
+      }
+    });
+
+    query();
+  }
   document.addEventListener('DOMContentLoaded', init);
 })();

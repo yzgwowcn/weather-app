@@ -3,53 +3,54 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="海南旅游目的地天气与近海海况查询——基于 Open-Meteo 模式数据">
-  <title>🌤️ 海南天气旅行查询 · 蓝海可见吗？</title>
+  <meta name="description" content="海南海边旅行 EC 主判断：EC 集合晴好率、分层云图与多模型交叉验证查询">
+  <meta name="theme-color" content="#0c1626">
+  <title>晴海 · 海南旅行天气判断</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
-  <div class="page">
-    <header class="header">
-      <h1>🌤️ 海南天气旅行查询</h1>
-      <p class="subtitle">云量 · 蓝海可见度 · 每日分时段 · 三亚/陵水/万宁/近海海况</p>
+<body data-mood="neutral">
+  <div class="page-shell">
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="晴海首页"><span class="brand-mark">◐</span>晴海</a>
+      <p class="header-note">海南旅行天气判断 / Open-Meteo</p>
     </header>
 
-    <main>
-      <!-- 目的地选择 -->
-      <section class="panel">
-        <h2>📍 选择目的地</h2>
-        <div id="dest-list" class="dest-list"></div>
+    <main id="top">
+      <section class="intro">
+        <p class="eyebrow">WEATHER INTELLIGENCE · HAINAN</p>
+        <h1>看见晴天，<br><em>再出发。</em></h1>
+        <p class="intro-copy">以日间云量为主，结合降水、风力与多模型分歧，为海边行程判断晴好窗口。</p>
       </section>
 
-      <!-- 查询控制 -->
-      <section class="panel">
-        <div class="control-row">
-          <label>预报范围</label>
-          <div id="days-group" class="days-group">
+      <section class="workspace" aria-label="查询控制">
+        <div class="workspace-section destination-field">
+          <span class="field-label">目的地</span>
+          <div id="dest-list" class="dest-list" role="group" aria-label="选择目的地"></div>
+        </div>
+        <div class="workspace-section horizon-field">
+          <span class="field-label">预报范围</span>
+          <div id="days-group" class="days-group" role="group" aria-label="选择预报范围">
             <button type="button" class="days-btn" data-days="3">3 天</button>
             <button type="button" class="days-btn active" data-days="7">7 天</button>
             <button type="button" class="days-btn" data-days="14">14 天</button>
           </div>
-          <button id="query-btn" type="button">查询</button>
         </div>
+        <button id="query-btn" class="query-btn" type="button">更新判断 <span aria-hidden="true">↗</span></button>
       </section>
 
-      <!-- 结果区 -->
+      <div id="loading" class="loading hidden" role="status"><span class="spinner"></span>正在汇集最新模型数据</div>
       <section id="result" class="result" aria-live="polite"></section>
-
-      <div id="loading" class="loading hidden">
-        <span class="spinner"></span> 正在获取最新模式数据…
-      </div>
     </main>
 
     <footer class="footer">
-      <p>数据来源：<a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> 模式指导（非官方预警）。</p>
-      <p>出行请以当地气象台、码头与景区通知为准。</p>
+      <p>数据来自 <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>。以 ECMWF（EC）为主判断：EC 集合晴好率是 51 个成员满足页面条件的比例，GFS、JMA、CMA 仅作交叉验证，模型分歧不是历史准确率证明。</p>
+      <p>台风、大风、暴雨、乘船与涉海活动，请以当地气象台、码头和景区通知为准。</p>
     </footer>
   </div>
 
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/metrics.js"></script>
   <script src="js/render.js"></script>
   <script src="js/app.js"></script>
 </body>
