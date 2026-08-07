@@ -202,7 +202,7 @@ function renderEcHero(day, assessment, destination) {
       <div class="verdict-row"><span class="weather-symbol" aria-hidden="true">${symbol}</span><h2>${verdict.text}</h2><span class="verdict-badge ${verdict.cls}">${verdict.text}</span></div>
       <p class="verdict-basis">${basis}。${condition}，${cloudWord(day.cloud)}。</p>
       ${thunder}
-      <p class="sea-sky-tip">海边天色重点看低云与中云（低云×60% + 中云×40% 加权）影响最大，高云仅供参考。</p>
+      <p class="sea-sky-tip">海边天色重点看低云与中云影响最大，高云仅供参考。</p>
     </div>
     <div class="ec-probability">
       <div class="probability-orb ${assessment.probability == null ? 'unavailable' : ''}" style="--probability:${Math.round(assessment.probability || 0)}">
