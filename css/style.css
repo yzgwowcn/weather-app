@@ -3,8 +3,8 @@
    面板统一为半透明玻璃 + backdrop-filter 模糊 + 细白描边 + 层次阴影；
    文字与数据保持高对比；动效全部 CSS 完成并遵守 prefers-reduced-motion。 */
 :root {
-  --ink: #eef2f6;
-  --muted: rgba(220, 228, 236, .62);
+  --ink: #f2f5f9;
+  --muted: rgba(222, 230, 238, .74);
   --line: rgba(255, 255, 255, .13);
   --glass: rgba(255, 255, 255, .055);
   --glass-strong: rgba(255, 255, 255, .085);
@@ -15,9 +15,14 @@
   --red: #ff8f87;
   --purple: #b79cff;
   --shadow: 0 18px 44px rgba(3, 9, 20, .38);
-  --r-lg: 20px;
-  --r-md: 13px;
-  --r-sm: 9px;
+  --r-lg: 22px;
+  --r-md: 15px;
+  --r-sm: 10px;
+  /* Liquid Glass：玻璃渐变描边（padding-box 底 + border-box 亮边） */
+  --glass-border: linear-gradient(rgba(255, 255, 255, .06), rgba(255, 255, 255, .035)) padding-box,
+                  linear-gradient(165deg, rgba(255, 255, 255, .34), rgba(255, 255, 255, .05) 38%, rgba(255, 255, 255, .18)) border-box;
+  /* 顶部内高光（Liquid Glass 边缘反光） */
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, .16);
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -132,11 +137,24 @@ button { font: inherit; }
   box-shadow: 0 4px 14px rgba(80, 140, 240, .4);
 }
 .header-note, .field-label, .section-kicker, .metric-tile span, .forecast-detail span,
-.forecast-date small, .forecast-probability small { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.forecast-date small, .forecast-probability small { color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.header-right { display: flex; align-items: center; gap: 16px; }
+/* 小红书主页链接（玻璃胶囊 + 品牌红渐变，融入毛玻璃风格） */
+.xhs-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 99px; text-decoration: none;
+  background: linear-gradient(135deg, #ff4d5e, #e62e4d);
+  color: #fff; font-size: 12.5px; font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, .28);
+  box-shadow: 0 6px 18px rgba(230, 46, 77, .35), inset 0 1px 0 rgba(255, 255, 255, .4);
+  transition: transform .18s ease, filter .18s ease;
+}
+.xhs-link:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.xhs-link:focus-visible { outline: 2px solid rgba(255, 255, 255, .7); outline-offset: 2px; }
 
 /* ---- 首屏标语 ---- */
 .intro { padding: 74px 0 40px; max-width: 760px; }
-.eyebrow, .section-kicker { margin: 0 0 12px; color: var(--blue); font-size: 11px; font-weight: 800; letter-spacing: .13em; }
+.eyebrow, .section-kicker { margin: 0 0 12px; color: var(--blue); font-size: 12px; font-weight: 800; letter-spacing: .13em; }
 .intro h1 { margin: 0; font-size: clamp(50px, 8vw, 102px); letter-spacing: -.085em; line-height: .91; font-weight: 800; }
 .intro h1 em { color: var(--blue); font-style: normal; text-shadow: 0 0 34px rgba(125, 180, 255, .35); }
 .intro-copy { max-width: 510px; margin: 27px 0 0; color: rgba(226, 233, 240, .72); font-size: 16px; }
@@ -144,11 +162,11 @@ button { font: inherit; }
 /* ---- 查询面板（玻璃） ---- */
 .workspace {
   display: grid; grid-template-columns: 1fr auto; gap: 14px 0;
-  padding: 16px; border: 1px solid var(--line); border-radius: var(--r-lg);
-  background: var(--glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: var(--shadow);
+  padding: 16px; border: 1px solid transparent; border-radius: var(--r-lg);
+  background: var(--glass-border);
+  backdrop-filter: blur(16px) saturate(1.5);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  box-shadow: var(--shadow), var(--glass-highlight);
 }
 .workspace-section { padding: 0 2px; }
 .destination-field {
@@ -194,11 +212,11 @@ button { font: inherit; }
 .ec-hero {
   display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: center;
   min-height: 250px; padding: 34px 40px;
-  border: 1px solid var(--line); border-radius: var(--r-lg);
-  background: linear-gradient(135deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .04));
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  box-shadow: var(--shadow);
+  border: 1px solid transparent; border-radius: var(--r-lg);
+  background: var(--glass-border);
+  backdrop-filter: blur(18px) saturate(1.5);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  box-shadow: var(--shadow), var(--glass-highlight);
 }
 .ec-hero .section-kicker { color: var(--blue); }
 .ec-verdict { min-width: 0; }
@@ -212,13 +230,13 @@ button { font: inherit; }
 .verdict-badge.good { background: rgba(111, 216, 180, .16); color: #8ff0cd; border-color: rgba(111, 216, 180, .45); }
 .verdict-badge.bad { background: rgba(255, 143, 135, .14); color: #ffb3ac; border-color: rgba(255, 143, 135, .42); }
 .verdict-badge.none { background: rgba(255, 255, 255, .08); color: var(--muted); }
-.verdict-basis { max-width: 520px; margin: 14px 0 0; color: rgba(224, 231, 238, .78); font-size: 14px; }
+.verdict-basis { max-width: 520px; margin: 14px 0 0; color: rgba(230, 236, 242, .86); font-size: 14px; }
 .thunder-window {
   display: inline-block; margin: 12px 0 0; padding: 6px 12px; border-radius: 99px;
   background: rgba(183, 156, 255, .14); border: 1px solid rgba(183, 156, 255, .42);
   color: #d6c6ff; font-size: 12.5px; font-weight: 700;
 }
-.sea-sky-tip { margin: 10px 0 0; max-width: 560px; color: rgba(220, 228, 236, .6); font-size: 12px; }
+.sea-sky-tip { margin: 10px 0 0; max-width: 560px; color: rgba(226, 233, 240, .68); font-size: 13px; }
 .ec-probability { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .probability-orb {
   --p: calc(var(--probability) * 1%);
@@ -230,29 +248,29 @@ button { font: inherit; }
   box-shadow: 0 10px 30px rgba(0, 0, 0, .3), inset 0 0 26px rgba(125, 180, 255, .12);
 }
 .probability-orb.unavailable { background: radial-gradient(circle, rgba(13, 22, 36, .92) 56%, transparent 57%), conic-gradient(rgba(255, 255, 255, .12) 0 100%); }
-.probability-orb span, .probability-orb small { color: var(--muted); font-size: 11px; }
+.probability-orb span, .probability-orb small { color: var(--muted); font-size: 12px; }
 .probability-orb strong { font-size: 37px; letter-spacing: -.07em; line-height: 1.05; }
 .confidence-pill {
-  display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: 12px; font-weight: 700;
+  display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: 13px; font-weight: 700;
   background: rgba(255, 255, 255, .07); color: #dfe6ee; border: 1px solid rgba(255, 255, 255, .16);
 }
 .confidence-pill.high { background: rgba(111, 216, 180, .15); color: #8ff0cd; border-color: rgba(111, 216, 180, .4); }
 .confidence-pill.medium { background: rgba(242, 192, 99, .13); color: #f6d9a3; border-color: rgba(242, 192, 99, .38); }
 .confidence-pill.low { background: rgba(255, 143, 135, .14); color: #ffb3ac; border-color: rgba(255, 143, 135, .4); }
 .confidence-pill.unavailable { background: rgba(255, 255, 255, .07); color: var(--muted); }
-.consistency-desc { margin: 2px 0 0; max-width: 230px; color: var(--muted); font-size: 12px; text-align: center; }
+.consistency-desc { margin: 2px 0 0; max-width: 230px; color: var(--muted); font-size: 13px; text-align: center; }
 
 /* ---- 判断依据 tiles ---- */
 .metric-grid {
   display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 14px;
-  border: 1px solid var(--line); border-radius: var(--r-md);
-  background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  overflow: hidden; box-shadow: 0 12px 30px rgba(3, 9, 20, .25);
+  border: 1px solid transparent; border-radius: var(--r-md);
+  background: var(--glass-border); backdrop-filter: blur(14px) saturate(1.5); -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  overflow: hidden; box-shadow: 0 12px 30px rgba(3, 9, 20, .25), var(--glass-highlight);
 }
 .metric-tile { min-height: 112px; padding: 19px; border-right: 1px solid var(--line); background: rgba(255, 255, 255, .02); }
 .metric-tile:last-child { border: 0; }
 .metric-tile strong { display: block; margin: 5px 0; font-size: 23px; letter-spacing: -.06em; }
-.metric-tile small { display: block; color: var(--muted); font-size: 11px; line-height: 1.35; }
+.metric-tile small { display: block; color: var(--muted); font-size: 12px; line-height: 1.4; }
 .metric-tile.cloud strong { color: var(--blue); }
 .metric-tile.high-cloud strong { color: var(--purple); }
 .metric-tile.high strong { color: var(--green); }
@@ -275,7 +293,7 @@ button { font: inherit; }
 }
 .sky-view-btn:hover { color: var(--ink); }
 .sky-view-btn.active { background: rgba(238, 242, 246, .92); color: #101c2c; }
-.sky-note { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
+.sky-note { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
 .legend { display: inline-block; margin-right: 14px; }
 .legend::before { content: ''; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; border-radius: 2px; }
 .legend.low::before { background: #7db4ff; }
@@ -287,10 +305,10 @@ button { font: inherit; }
 .sky-chart:focus-visible { box-shadow: 0 0 0 2px rgba(125, 180, 255, .55); }
 .sky-svg { display: block; border: 1px solid var(--line); border-radius: var(--r-md); background: rgba(8, 16, 28, .45); }
 .sky-grid { stroke: rgba(255, 255, 255, .09); stroke-width: 1; }
-.sky-axis { fill: rgba(220, 228, 236, .55); font-size: 10px; text-anchor: end; }
+.sky-axis { fill: rgba(224, 232, 240, .7); font-size: 10.5px; text-anchor: end; }
 .sky-dayband { fill: rgba(255, 255, 255, .055); }
 .sky-dateline { stroke: rgba(255, 255, 255, .16); stroke-width: 1; stroke-dasharray: 3 4; }
-.sky-datelabel { fill: rgba(220, 228, 236, .6); font-size: 10.5px; }
+.sky-datelabel { fill: rgba(224, 232, 240, .72); font-size: 11.5px; }
 .sky-line { fill: none; stroke-width: 2; stroke-linecap: round; }
 .sky-line.low { stroke: #7db4ff; }
 .sky-line.mid { stroke: #4fd8c4; }
@@ -310,7 +328,7 @@ button { font: inherit; }
   position: absolute; top: 6px; left: 0; z-index: 4; min-width: 158px; padding: 10px 12px;
   border-radius: 11px; background: rgba(9, 17, 30, .86); border: 1px solid rgba(255, 255, 255, .18);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  color: var(--ink); font-size: 12px; line-height: 1.75;
+  color: var(--ink); font-size: 13px; line-height: 1.8;
   opacity: 0; pointer-events: none; transform: translateX(-50%);
   transition: opacity .12s ease; box-shadow: var(--shadow);
 }
@@ -325,10 +343,11 @@ button { font: inherit; }
 .cross-note { margin: -4px 0 14px; max-width: 640px; color: var(--muted); font-size: 12.5px; }
 .cross-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
 .cross-stat {
-  padding: 15px 18px; border: 1px solid var(--line); border-radius: var(--r-md);
-  background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  padding: 15px 18px; border: 1px solid transparent; border-radius: var(--r-md);
+  background: var(--glass-border); backdrop-filter: blur(12px) saturate(1.4); -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  box-shadow: var(--glass-highlight);
 }
-.cross-stat span, .cross-stat small { display: block; color: var(--muted); font-size: 11px; }
+.cross-stat span, .cross-stat small { display: block; color: var(--muted); font-size: 12px; }
 .cross-stat b { display: block; margin: 2px 0; font-size: 27px; letter-spacing: -.05em; }
 .cross-stat.support b { color: var(--green); }
 .cross-stat.oppose b { color: var(--red); }
@@ -341,25 +360,26 @@ button { font: inherit; }
   border: 1px solid var(--line); border-radius: var(--r-sm); background: rgba(255, 255, 255, .03);
 }
 .cross-list li span { font-weight: 650; font-size: 13px; }
-.cross-list li small { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
-.cross-list b { font-size: 12px; }
+.cross-list li small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.cross-list b { font-size: 13px; }
 .cross-list b.support { color: var(--green); }
 .cross-list b.caution { color: var(--red); }
-.cross-warn { margin: 10px 0 0; color: var(--amber); font-size: 12px; }
+.cross-warn { margin: 10px 0 0; color: var(--amber); font-size: 13px; }
 
 /* ---- 日期条与逐日判断 ---- */
-.date-rail { display: flex; gap: 7px; overflow-x: auto; padding: 24px 1px 12px; margin-bottom: 14px; scrollbar-width: thin; }
+.date-rail { display: flex; gap: 7px; overflow-x: auto; padding: 24px 1px 12px; margin-bottom: 14px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .25) transparent; }
 .date-chip {
-  flex: 0 0 100px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px;
-  background: var(--glass); color: var(--muted); text-align: left; cursor: pointer;
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  transition: border-color .18s ease, background .18s ease;
+  flex: 0 0 100px; padding: 11px 12px; border: 1px solid transparent; border-radius: 12px;
+  background: var(--glass-border); color: var(--muted); text-align: left; cursor: pointer;
+  backdrop-filter: blur(10px) saturate(1.4); -webkit-backdrop-filter: blur(10px) saturate(1.4);
+  box-shadow: var(--glass-highlight);
+  transition: box-shadow .18s ease, background .18s ease;
 }
-.date-chip:hover, .date-chip:focus-visible { border-color: var(--blue); outline: none; }
-.date-chip span, .date-chip small { display: block; font-size: 11px; }
+.date-chip:hover, .date-chip:focus-visible { box-shadow: 0 0 0 1px var(--blue), var(--glass-highlight); outline: none; }
+.date-chip span, .date-chip small { display: block; font-size: 12px; }
 .date-chip strong { display: block; color: var(--ink); font-size: 15px; }
 .date-chip small { color: var(--blue); }
-.date-chip.active { border-color: rgba(238, 242, 246, .9); background: rgba(238, 242, 246, .92); }
+.date-chip.active { background: rgba(238, 242, 246, .94); box-shadow: 0 0 0 1px rgba(238, 242, 246, .65), inset 0 1px 0 rgba(255, 255, 255, .9); }
 .date-chip.active strong { color: #101c2c; }
 .date-chip.active span { color: #4a5a6c; }
 .date-chip.active small { color: #2f6fd6; }
@@ -375,7 +395,7 @@ button { font: inherit; }
 .forecast-date span, .forecast-condition strong, .forecast-condition span, .forecast-probability small { display: block; }
 .forecast-date span, .forecast-condition strong { font-size: 14px; font-weight: 750; }
 .forecast-symbol { color: var(--blue); font-size: 24px; text-align: center; }
-.forecast-condition span { color: var(--muted); font-size: 12px; }
+.forecast-condition span { color: var(--muted); font-size: 13px; }
 .forecast-probability { text-align: right; }
 .forecast-probability b { color: var(--blue); font-size: 20px; letter-spacing: -.05em; }
 .forecast-card.selected .forecast-summary { background: var(--blue-soft); }
@@ -385,7 +405,7 @@ button { font: inherit; }
 }
 .forecast-detail div { padding-top: 4px; }
 .forecast-detail b { display: block; font-size: 16px; }
-.forecast-detail p { margin: 2px 0 0; color: rgba(222, 230, 238, .75); font-size: 12px; }
+.forecast-detail p { margin: 2px 0 0; color: rgba(226, 233, 240, .8); font-size: 13px; }
 
 /* ---- 海况 ---- */
 .marine-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 8px; }
@@ -394,10 +414,10 @@ button { font: inherit; }
   background: rgba(125, 180, 255, .08);
 }
 .marine-item span, .marine-item strong, .marine-item b { display: block; }
-.marine-item span { color: var(--muted); font-size: 11px; }
+.marine-item span { color: var(--muted); font-size: 12px; }
 .marine-item strong { margin-top: 6px; color: #9cc4f5; }
 .marine-item b { color: var(--blue); font-size: 19px; }
-.section-note { color: var(--muted); font-size: 12px; }
+.section-note { color: var(--muted); font-size: 13px; }
 
 /* ---- 错误与页脚 ---- */
 .error-card {
@@ -405,7 +425,7 @@ button { font: inherit; }
   background: rgba(255, 143, 135, .08); color: #ffc9c4;
 }
 .error-card p { margin-bottom: 0; font-size: 13px; }
-.footer { padding: 54px 0 30px; color: var(--muted); font-size: 12px; }
+.footer { padding: 54px 0 30px; color: var(--muted); font-size: 13px; }
 .footer p { max-width: 760px; margin: 4px 0; }
 .footer a { color: var(--blue); }
 
@@ -442,6 +462,6 @@ button { font: inherit; }
   .forecast-probability b { font-size: 15px; }
   .forecast-detail { grid-template-columns: repeat(3, 1fr); padding: 0 10px 15px; }
   .forecast-detail b { font-size: 14px; }
-  .forecast-detail p { font-size: 11px; }
+  .forecast-detail p { font-size: 12px; }
   .section-heading h2 { font-size: 26px; }
 }

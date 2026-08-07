@@ -5,6 +5,13 @@ Thumbs.db
 # Node
 node_modules/
 npm-debug.log*
+*.log
+
+# 环境与备份
+.env
+.env.local
+*.bak
+*.tmp
 
 # Vercel 本地缓存（如使用 vercel CLI）
 .vercel

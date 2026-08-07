@@ -28,6 +28,9 @@ const server = http.createServer((req, res) => {
   await page.goto('http://127.0.0.1:8123/', { waitUntil: 'networkidle', timeout: 60000 });
 
   check('页面标题', (await page.title()).includes('晴海'));
+  const xhsHref = await page.getAttribute('.xhs-link', 'href');
+  check('小红书主页链接', xhsHref === 'https://xhslink.cn/m/4BS8N8iCK3F', xhsHref);
+  check('小红书新标签打开', (await page.getAttribute('.xhs-link', 'target')) === '_blank');
   check('EC 主结论徽章', await page.locator('.verdict-badge').count() === 1);
   const verdict = await page.locator('.verdict-badge').textContent();
   check('EC 主结论为适合/不适合', /适合出行|不建议出行|数据待补充/.test(verdict), verdict);
@@ -96,6 +99,23 @@ const server = http.createServer((req, res) => {
   });
   check('移动端图表可横向滚动', scrollable && scrollable.scrollWidth > scrollable.clientWidth, JSON.stringify(scrollable));
   check('移动端 ec-hero 单列', await mobile.evaluate(() => getComputedStyle(document.querySelector('.ec-hero')).gridTemplateColumns.split(' ').length === 1));
+
+  // 日期条：滚动到右侧后点击远端日期，滚动位置不回零且选中 chip 可见
+  await mobile.evaluate(() => { const rail = document.querySelector('.date-rail'); rail.scrollLeft = rail.scrollWidth; });
+  const railBefore = await mobile.evaluate(() => document.querySelector('.date-rail').scrollLeft);
+  await mobile.locator('.date-chip').nth(6).click();
+  await mobile.waitForTimeout(150);
+  const railAfter = await mobile.evaluate(() => document.querySelector('.date-rail').scrollLeft);
+  check('日期滚动位置不回零', railBefore > 0 && railAfter > 0, `before=${railBefore} after=${railAfter}`);
+  const chipVisible = await mobile.evaluate(() => {
+    const chip = document.querySelector('.date-chip.active');
+    if (!chip) return false;
+    const rail = document.querySelector('.date-rail');
+    const cr = rail.getBoundingClientRect();
+    const cc = chip.getBoundingClientRect();
+    return cc.left >= cr.left - 1 && cc.right <= cr.right + 1;
+  });
+  check('选中日期 chip 保持可见', chipVisible);
   await mobile.close();
 
   // reduced-motion

@@ -11,6 +11,12 @@ for (const m of moods) {
 }
 if (!css.includes('#rain-layer')) { console.error('rain-layer style MISSING'); process.exit(1); }
 if (!css.includes('pointer-events: none')) { console.error('rain-layer pointer-events missing'); process.exit(1); }
+// Liquid Glass：渐变描边、顶部内高光、饱和度增强
+for (const key of ['--glass-border', '--glass-highlight', 'padding-box', 'border-box', 'saturate(1.5)', 'inset 0 1px 0']) {
+  if (!css.includes(key)) { console.error('Liquid Glass missing:', key); process.exit(1); }
+}
+// 可读性：主内容区不应再有 11px 小字
+if (css.includes('font-size: 11px')) { console.error('11px font remains'); process.exit(1); }
 // CSS 雨线/闪电关键帧应已移除（由 Canvas 接管）
 for (const gone of ['rain-fall', 'storm-fall', 'lightning-flash']) {
   if (css.includes(`@keyframes ${gone}`)) { console.error('CSS keyframes should be removed:', gone); process.exit(1); }

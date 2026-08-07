@@ -27,6 +27,8 @@
   function renderResult() {
     const oldScroll = resultEl.querySelector('.sky-scroll');
     const scrollLeft = oldScroll ? oldScroll.scrollLeft : 0;
+    const oldRail = resultEl.querySelector('.date-rail');
+    const railLeft = oldRail ? oldRail.scrollLeft : 0;
     resultEl.innerHTML = renderWeatherApp(state.bundle, state.dest, state.days, state.selectedDate, { skyView: state.skyView, skyIndex: state.skyIndex });
     const mood = resultEl.querySelector('[data-mood]')?.dataset.mood || 'neutral';
     document.body.dataset.mood = mood;
@@ -38,6 +40,15 @@
     }
     const newScroll = resultEl.querySelector('.sky-scroll');
     if (newScroll) newScroll.scrollLeft = scrollLeft;
+    const newRail = resultEl.querySelector('.date-rail');
+    if (newRail) {
+      // 恢复日期条滚动位置；选中日期时将其滚动到可视区域（居中），避免回到最左
+      newRail.scrollLeft = railLeft;
+      if (state.selectedDate) {
+        const chip = newRail.querySelector(`[data-select-date="${state.selectedDate}"]`);
+        chip?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' });
+      }
+    }
   }
   // 悬停/触控提示：更新图表准星与数值卡，不触发整页重渲染
   function updateSkyCursor(chart, hit) {

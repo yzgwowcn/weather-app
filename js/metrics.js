@@ -144,19 +144,19 @@ const Metrics = (() => {
   // EC 成员一致性：集合晴好率是否集中于高/低区间，以及主运行方向是否一致
   function memberConsistency(ecEnsemble, ecMain) {
     if (!ecEnsemble) {
-      return { level: 'unavailable', text: '成员数据暂缺', description: 'EC 集合未返回，无法评估成员一致性，请稍后重试。' };
+      return { level: 'unavailable', text: '成员数据缺失', description: 'EC 成员数据没拿到，暂时无法判断大家看法是否一致，请稍后重试。' };
     }
     const p = ecEnsemble.probability;
     const highZone = p >= ZONES.high;
     const lowZone = p <= ZONES.low;
     if (highZone || lowZone) {
-      if (!ecMain) return { level: 'medium', text: '主运行暂缺', description: highZone ? 'EC 集合晴好率集中在高概率区间，但主运行数据缺失，建议稍后复核。' : 'EC 集合晴好率集中在低概率区间，但主运行数据缺失，建议稍后复核。' };
+      if (!ecMain) return { level: 'medium', text: '主运行缺失', description: highZone ? '多数 EC 成员看好晴好，但主运行数据没拿到，建议稍后复核。' : '多数 EC 成员不看好晴好，但主运行数据没拿到，建议稍后复核。' };
       if ((highZone && ecMain.suitable) || (lowZone && !ecMain.suitable)) {
-        return { level: 'high', text: '成员一致', description: highZone ? 'EC 集合晴好率集中在高概率区间，EC 主运行同样适合出行。' : 'EC 集合晴好率集中在低概率区间，EC 主运行同样不建议出行。' };
+        return { level: 'high', text: 'EC 内部一致', description: highZone ? '多数 EC 成员都看好晴好，主运行也给出同样方向。' : '多数 EC 成员都不看好晴好，主运行方向一致。' };
       }
-      return { level: 'low', text: '主运行反向', description: highZone ? 'EC 集合倾向晴好，但 EC 主运行给出相反结论，建议以保守为准。' : 'EC 集合不看好晴好，但 EC 主运行给出适合结论，建议临近复核。' };
+      return { level: 'low', text: '主运行与集合相反', description: highZone ? 'EC 成员大多看好晴好，但主运行看法相反，建议按保守判断。' : 'EC 成员大多不看好，但主运行给出适合结论，建议临近再确认。' };
     }
-    return { level: 'medium', text: '集合分散', description: 'EC 集合晴好率处于中间区间，成员分歧较大，主运行仅作参考。' };
+    return { level: 'medium', text: 'EC 内部有分歧', description: 'EC 成员看法分歧较大，晴好与否还不确定，建议临近出行再确认。' };
   }
   // 外部模型验证：GFS / JMA / CMA 对 EC 主方向的支持数、反对数与缺失来源。
   // 这是模型分歧提示，不是历史准确率证明。

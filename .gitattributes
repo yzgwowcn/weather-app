@@ -1,0 +1,10 @@
+# 统一换行符为 LF（消除 Windows 下 CRLF 提交警告，保证跨平台 diff 干净）
+* text=auto eol=lf
+
+# 二进制文件不转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
