@@ -32,9 +32,11 @@
     resultEl.innerHTML = renderWeatherApp(state.bundle, state.dest, state.days, state.selectedDate, { skyView: state.skyView, skyIndex: state.skyIndex });
     const mood = resultEl.querySelector('[data-mood]')?.dataset.mood || 'neutral';
     document.body.dataset.mood = mood;
-    // 雨滴特效：rain/storm/thunder 启动（thunder 额外开闪电），其余停止；reduced-motion 不启动
+    // 雨滴特效：rain/storm/thunder 启动（thunder 额外开闪电，强度随雷暴数据）；reduced-motion 不启动
     if (mood === 'rain' || mood === 'storm' || mood === 'thunder') {
-      RainFX.start({ lightning: mood === 'thunder' });
+      const heroEl = resultEl.querySelector('[data-mood]');
+      const intensity = Number(heroEl?.dataset.thunderIntensity);
+      RainFX.start({ lightning: mood === 'thunder', intensity: Number.isFinite(intensity) ? intensity : 0.5 });
     } else {
       RainFX.stop();
     }

@@ -244,5 +244,16 @@ const Metrics = (() => {
     };
   }
   function formatPercent(value) { return value == null ? '—' : `${Math.round(value)}%`; }
-  return { THRESHOLDS, buildAssessment, buildCloudSeries, formatPercent };
+  // 雷暴强度 0–1：决定闪电频率与质感（晴天短时雷雨低、阴雨长雷暴高）。
+  // 由雷雨窗口覆盖小时数、遮蔽云量、累计降水与天气码加权合成。
+  function thunderIntensity(day, main) {
+    if (!main || !main.thunderWindows || !main.thunderWindows.length) return 0;
+    const hours = main.thunderWindows.reduce((sum, [start, end]) => sum + (end - start + 1), 0);
+    const lengthFactor = Math.min(1, hours / 8);
+    const cloudFactor = main.maskMean == null ? 0.5 : Math.min(1, Math.max(0.3, main.maskMean / 75));
+    const rainFactor = main.precipitationSum == null ? 0.5 : Math.min(1, Math.max(0.4, main.precipitationSum / 10));
+    const codeFactor = day.code >= 99 ? 1 : day.code >= 96 ? 0.9 : 0.75;
+    return Math.min(1, lengthFactor * 0.55 + cloudFactor * 0.25 + rainFactor * 0.1 + codeFactor * 0.1);
+  }
+  return { THRESHOLDS, buildAssessment, buildCloudSeries, formatPercent, thunderIntensity };
 })();

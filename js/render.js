@@ -1,13 +1,15 @@
 // 渲染层：消费 Metrics 输出的结构化日级结果（ec / crossModel / cloudSeries / weatherMood），
 // 输出静态 HTML 与原生 SVG 图表。不持有请求细节，交互由 app.js 事件委托驱动。
-// 天气图标统一使用 meteocons fill 风格（assets/icons/*.svg，本地化，MIT）。
+// 天气图标统一使用 meteocons Lottie 动画（assets/lottie/*.json，由 js/icons.js 播放）；
+// 雷雨徽章（14px 小图标）保持静态 SVG。
 const WEATHER_META = {
   0: ['晴', 'clear-day'], 1: ['晴间多云', 'partly-cloudy-day'], 2: ['多云', 'cloudy'], 3: ['阴', 'overcast'],
   45: ['雾', 'fog'], 48: ['雾', 'fog'], 51: ['毛毛雨', 'drizzle'], 53: ['毛毛雨', 'drizzle'], 55: ['毛毛雨', 'drizzle'],
   61: ['小雨', 'rain'], 63: ['中雨', 'rain'], 65: ['大雨', 'rain'], 80: ['阵雨', 'rain'], 81: ['强阵雨', 'rain'], 82: ['暴雨', 'rain'],
   95: ['雷阵雨', 'thunderstorms'], 96: ['雷阵雨', 'thunderstorms'], 99: ['强雷阵雨', 'thunderstorms'],
 };
-function weatherIcon(code) { return `assets/icons/${weatherMeta(code)[1]}.svg`; }
+function weatherIcon(code) { return `assets/lottie/${weatherMeta(code)[1]}.json`; }
+function lottieMarkup(code, cls) { return `<span class="weather-lottie ${cls}" data-lottie="${weatherMeta(code)[1]}" aria-hidden="true"></span>`; }
 
 const SKY_LAYERS = [
   { key: 'low', cls: 'low', label: '低云' },
@@ -198,10 +200,10 @@ function renderEcHero(day, assessment, destination) {
     ? `<p class="thunder-window"><img class="thunder-icon" src="assets/icons/lightning-bolt.svg" alt="" aria-hidden="true">${formatWindows(main.thunderWindows)} 有雷阵雨，注意避雨</p>` : '';
   const consistency = assessment.ec.memberConsistency;
   return `
-  <section class="ec-hero" data-mood="${assessment.weatherMood.mood}">
+  <section class="ec-hero" data-mood="${assessment.weatherMood.mood}" data-thunder-intensity="${Metrics.thunderIntensity(day, main)}">
     <div class="ec-verdict">
       <p class="section-kicker">ECMWF 主运行 · 08:00–18:00 · ${destination.name}</p>
-      <div class="verdict-row"><img class="weather-symbol" src="${weatherIcon(day.code)}" alt="" aria-hidden="true"><h2>${verdict.text}</h2><span class="verdict-badge ${verdict.cls}">${verdict.text}</span></div>
+      <div class="verdict-row">${lottieMarkup(day.code, 'weather-symbol')}<h2>${verdict.text}</h2><span class="verdict-badge ${verdict.cls}">${verdict.text}</span></div>
       <p class="verdict-basis">${basis}。${condition}，${cloudWord(day.cloud)}。</p>
       ${thunder}
       <p class="sea-sky-tip">海边天色重点看低云与中云影响最大，高云仅供参考。</p>
@@ -272,7 +274,7 @@ function renderForecastCards(days, selectedDate) {
       return `<article class="forecast-card ${active ? 'selected' : ''}">
         <button type="button" class="forecast-summary" data-select-date="${day.date}" aria-label="查看 ${dateLabel(day.date)} 的判断">
           <div class="forecast-date"><span>${index === 0 ? '今天' : dateLabel(day.date)}</span><small>${horizonText(index)}</small></div>
-          <img class="forecast-symbol" src="${weatherIcon(day.code)}" alt="" aria-hidden="true">
+          ${lottieMarkup(day.code, 'forecast-symbol')}
           <div class="forecast-condition"><strong>${probabilityWord(day.assessment.probability)}</strong><span>${condition} · ${Math.round(day.low)}°–${Math.round(day.high)}°</span></div>
           <div class="forecast-probability"><b>${Metrics.formatPercent(day.assessment.probability)}</b><small>${consistency.text}</small></div>
         </button>

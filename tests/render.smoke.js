@@ -94,8 +94,8 @@ for (const c of ['verdict-badge good', '13:00–15:00 有雷阵雨，注意避�
   if (!htmlT.includes(c)) { console.error('THUNDER/COPY MISSING:', c); process.exit(1); }
 }
 if (!htmlT.includes('data-mood="thunder"')) { console.error('THUNDER MOOD FAIL'); process.exit(1); }
-// 天气图标：fill 风格 SVG 本地化引用（meteocons），hero 与逐日卡片均使用
-for (const c of ['assets/icons/clear-day.svg', 'assets/icons/cloudy.svg', 'assets/icons/rain.svg', 'class="weather-symbol"', 'class="forecast-symbol"']) {
+// 天气图标：meteocons Lottie 容器（js/icons.js 播放），hero 与逐日卡片均使用
+for (const c of ['data-lottie="clear-day"', 'data-lottie="cloudy"', 'data-lottie="rain"', 'weather-lottie weather-symbol', 'weather-lottie forecast-symbol']) {
   if (!htmlT.includes(c)) { console.error('ICON FAIL:', c); process.exit(1); }
 }
 

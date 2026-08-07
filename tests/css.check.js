@@ -31,6 +31,12 @@ for (const gone of ['rain-fall', 'storm-fall', 'lightning-flash']) {
   if (css.includes(`@keyframes ${gone}`)) { console.error('CSS keyframes should be removed:', gone); process.exit(1); }
 }
 
+// 天空剖面滚动容器：圆角遮罩（滚动到最右也是圆角，深色底随容器裁剪）
+const skyIdx = css.indexOf('.sky-scroll');
+if (skyIdx === -1) { console.error('sky-scroll missing'); process.exit(1); }
+const skyBlock = css.slice(skyIdx, css.indexOf('}', skyIdx));
+if (!skyBlock.includes('border-radius') || !skyBlock.includes('overflow-x: auto')) { console.error('sky-scroll rounded scroll container missing'); process.exit(1); }
+
 const start = css.indexOf('@media (prefers-reduced-motion: reduce)');
 let depth = 0;
 let end = start;

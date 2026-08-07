@@ -14,7 +14,8 @@ const RainFX = (() => {
   let height = 0;
   let drops = [];
   let ripples = [];
-  const lightning = { enabled: false, nextIn: 0, flash: 0, second: 0, secondDelay: 0, bolt: null };
+  const lightning = { enabled: false, nextIn: 0, flash: 0, second: 0, third: 0, secondDelay: 0, thirdDelay: 0, glow: 0, bolt: null, intensity: 0.5 };
+  const clamp01 = (v) => Math.min(1, Math.max(0, Number(v) || 0));
 
   function ensureCanvas() {
     if (canvas) return true;
@@ -96,56 +97,99 @@ const RainFX = (() => {
       ctx.stroke();
     }
   }
-  function makeBolt() {
+  function makeBolt(intensity) {
     const points = [];
     let x = width * (0.15 + Math.random() * 0.7);
     let y = -8;
     const segments = 6 + Math.floor(Math.random() * 4);
     points.push([x, y]);
+    const branches = [];
     for (let i = 0; i < segments; i += 1) {
       x += (Math.random() - 0.5) * 70;
       y += (height * 0.5) / segments;
       points.push([x, y]);
+      // 分支：从主干节点岔出（高强度更多分支）
+      if (i > 1 && i < segments - 1 && Math.random() < 0.35 + intensity * 0.35) {
+        const branch = [[x, y]];
+        let bx = x;
+        let by = y;
+        const blen = 3 + Math.floor(Math.random() * 3);
+        for (let j = 0; j < blen; j += 1) {
+          bx += (Math.random() - 0.5) * 50;
+          by += (height * 0.16) / blen;
+          branch.push([bx, by]);
+        }
+        branches.push(branch);
+      }
     }
-    return points;
+    return { main: points, branches };
   }
-  function drawLightning(strength) {
-    // 整屏泛白
-    ctx.fillStyle = `rgba(226, 238, 255, ${strength * 0.2})`;
-    ctx.fillRect(0, 0, width, height);
-    if (!lightning.bolt) return;
-    // 锯齿主干 + 光晕
-    ctx.save();
-    ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * strength})`;
-    ctx.lineWidth = 2.2;
-    ctx.shadowColor = `rgba(190, 215, 255, ${0.9 * strength})`;
-    ctx.shadowBlur = 12;
+  function strokeBolt(bolt) {
     ctx.beginPath();
-    ctx.moveTo(lightning.bolt[0][0], lightning.bolt[0][1]);
-    for (let i = 1; i < lightning.bolt.length; i += 1) ctx.lineTo(lightning.bolt[i][0], lightning.bolt[i][1]);
+    ctx.moveTo(bolt.main[0][0], bolt.main[0][1]);
+    for (let i = 1; i < bolt.main.length; i += 1) ctx.lineTo(bolt.main[i][0], bolt.main[i][1]);
     ctx.stroke();
+    bolt.branches.forEach((b) => {
+      ctx.beginPath();
+      ctx.moveTo(b[0][0], b[0][1]);
+      for (let i = 1; i < b.length; i += 1) ctx.lineTo(b[i][0], b[i][1]);
+      ctx.stroke();
+    });
+  }
+  function drawLightning(strength, intensity) {
+    // 分层泛白：全屏微亮 + 云层区（顶部 45%）径向渐变更亮
+    ctx.fillStyle = `rgba(226, 238, 255, ${strength * (0.12 + intensity * 0.08)})`;
+    ctx.fillRect(0, 0, width, height);
+    const cloudGrad = ctx.createLinearGradient(0, 0, 0, height * 0.45);
+    cloudGrad.addColorStop(0, `rgba(235, 245, 255, ${strength * (0.26 + intensity * 0.22)})`);
+    cloudGrad.addColorStop(1, 'rgba(235, 245, 255, 0)');
+    ctx.fillStyle = cloudGrad;
+    ctx.fillRect(0, 0, width, height * 0.45);
+    if (!lightning.bolt) return;
+    // 双通道光晕：宽 glow（低不透明度）＋ 细芯（高不透明度）
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = `rgba(185, 212, 255, ${0.38 * strength})`;
+    ctx.lineWidth = 7;
+    ctx.shadowColor = `rgba(170, 205, 255, ${0.8 * strength})`;
+    ctx.shadowBlur = 22;
+    strokeBolt(lightning.bolt);
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * strength})`;
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 8;
+    strokeBolt(lightning.bolt);
     ctx.restore();
   }
   function updateLightning(dt) {
     if (!lightning.enabled) return;
+    const intensity = lightning.intensity;
     lightning.nextIn -= dt;
-    if (lightning.nextIn <= 0 && lightning.flash <= 0 && lightning.second <= 0) {
-      lightning.flash = 0.09; // 主闪
-      lightning.bolt = makeBolt();
-      lightning.secondDelay = 0.09 + Math.random() * 0.08; // 双闪间隔
-      lightning.nextIn = 2.8 + Math.random() * 3.2; // 闪电频率：2.8–6s 随机
+    if (lightning.nextIn <= 0 && lightning.flash <= 0 && lightning.second <= 0 && lightning.third <= 0 && lightning.secondDelay <= 0 && lightning.thirdDelay <= 0 && !lightning.bolt) {
+      lightning.flash = 0.07 + Math.random() * 0.05; // 主闪
+      lightning.bolt = makeBolt(intensity);
+      lightning.secondDelay = 0.08 + Math.random() * 0.08; // 双闪间隔
+      lightning.thirdDelay = intensity > 0.65 ? 0.05 + Math.random() * 0.07 : 0; // 强雷暴三连闪
+      // 频率随强度：晴天短时雷雨 4.5–7s 低频，阴雨强雷暴 1.3–2.5s 高频
+      lightning.nextIn = (5.5 - intensity * 4.2) + Math.random() * (2 - intensity * 1.1);
     }
-    if (lightning.flash > 0) {
-      lightning.flash -= dt;
-      if (lightning.flash <= 0 && lightning.secondDelay > 0) lightning.secondDelay -= dt;
-    } else if (lightning.secondDelay > 0) {
+    // 主闪 → 次闪 → 三闪 推进
+    if (lightning.flash > 0) lightning.flash -= dt;
+    else if (lightning.secondDelay > 0) {
       lightning.secondDelay -= dt;
-      if (lightning.secondDelay <= 0) lightning.second = 0.08; // 次闪
-    } else if (lightning.second > 0) {
-      lightning.second -= dt;
+      if (lightning.secondDelay <= 0) { lightning.secondDelay = 0; lightning.second = 0.06 + Math.random() * 0.04; }
+    } else if (lightning.second > 0) lightning.second -= dt;
+    else if (lightning.thirdDelay > 0) {
+      lightning.thirdDelay -= dt;
+      if (lightning.thirdDelay <= 0) { lightning.thirdDelay = 0; lightning.third = 0.06 + Math.random() * 0.03; }
+    } else if (lightning.third > 0) lightning.third -= dt;
+    // 余辉：全部闪结束后短暂低强度泛白
+    if (lightning.bolt && lightning.flash <= 0 && lightning.second <= 0 && lightning.third <= 0 && lightning.secondDelay <= 0 && lightning.thirdDelay <= 0) {
+      lightning.glow = Math.max(0, (lightning.glow || 0.09) - dt);
+      if (lightning.glow <= 0) { lightning.bolt = null; lightning.glow = 0; }
     }
-    const strength = Math.max(lightning.flash, lightning.second, 0) / 0.09;
-    if (strength > 0) drawLightning(strength);
+    const strength = Math.max(lightning.flash, lightning.second, lightning.third, 0) / 0.09;
+    const afterglow = lightning.glow > 0 ? (lightning.glow / 0.09) * 0.15 : 0;
+    if (strength > 0 || afterglow > 0) drawLightning(Math.min(1, strength + afterglow), intensity);
   }
   function frame(ts) {
     if (!running) return;
@@ -160,11 +204,13 @@ const RainFX = (() => {
   function start(options = {}) {
     if (running) {
       lightning.enabled = Boolean(options.lightning);
+      lightning.intensity = clamp01(options.intensity);
       return;
     }
     if (!ensureCanvas()) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     lightning.enabled = Boolean(options.lightning);
+    lightning.intensity = clamp01(options.intensity);
     lightning.nextIn = 0.6 + Math.random() * 1.2;
     resize();
     window.addEventListener('resize', resize);

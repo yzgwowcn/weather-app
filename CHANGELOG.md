@@ -1,5 +1,21 @@
 # 更新日志
 
+## v1.7（2026-08-07）
+
+### 新增
+- **天气图标 Lottie 化**：hero 与逐日卡片图标改用 meteocons Lottie 动画（`assets/lottie/*.json`，9 个），`lottie-web` 本地化（`vendor/lottie.min.js`），新增 `js/icons.js` 播放器（重渲染同步、reduced-motion 静态首帧）；雷雨徽章保持静态 SVG
+
+### 变更（大修）
+- **FluidGlass 采用官方技术栈重构**：`js/fluid-glass.js` 改为 React 19 + @react-three/fiber + @react-three/drei + maath + htm（esm.sh CDN import map，three 0.180 同源统一版本，消除双实例）；折射内容改为**明亮网站配色**（天蓝/暖金/淡紫渐变 + 亮色光斑），消除 v1.6 深色背景的"黑影"感；面板折射随鼠标流动改为采样位置偏移（`pos + uPointerTilt`），效果明显可见
+- **天空剖面圆角遮罩**：`.sky-scroll` 滚动容器自带圆角 + 深色底（从 `.sky-svg` 迁移），滚动到最右也是圆角
+- **雷阵雨闪电质感与频率**：多分支主干、分层泛白（全屏 + 云层区渐变）、双通道光晕、强雷暴三连闪、闪后余辉；闪电频率随雷暴强度变化——`Metrics.thunderIntensity`（雷雨窗口小时数/云量/降水/天气码加权）经 `data-thunder-intensity` 传给 `RainFX`，晴天短时雷雨 4.5–7s 低频、阴雨强雷暴 1.3–2.5s 高频
+
+### 依赖
+- `vendor/` 精简为仅 `lottie.min.js`（three 走 esm.sh）；`assets/icons/` 仅保留雷雨徽章 SVG
+
+### 测试
+- `tests/render.smoke.js`：图标断言改为 Lottie 容器（`data-lottie`）；`tests/css.check.js`：新增 sky-scroll 圆角断言
+
 ## v1.6（2026-08-07）
 
 ### 变更（可读性优化）

@@ -314,10 +314,15 @@ button { font: inherit; }
 .legend.mid::before { background: #4fd8c4; }
 .legend.high::before { background: #b79cff; }
 .sky-view-pane { position: relative; }
-.sky-scroll { overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .25) transparent; }
+.sky-scroll {
+  overflow-x: auto; padding-bottom: 8px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: rgba(8, 16, 28, .45); /* 深色底随容器圆角裁剪，滚动到最右也是圆角 */
+  scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .25) transparent;
+}
 .sky-chart { position: relative; width: max-content; min-width: 100%; outline: none; border-radius: var(--r-md); }
 .sky-chart:focus-visible { box-shadow: 0 0 0 2px rgba(125, 180, 255, .55); }
-.sky-svg { display: block; border: 1px solid var(--line); border-radius: var(--r-md); background: rgba(8, 16, 28, .45); }
+.sky-svg { display: block; }
 .sky-grid { stroke: rgba(255, 255, 255, .09); stroke-width: 1; }
 .sky-axis { fill: rgba(224, 232, 240, .7); font-size: 10.5px; text-anchor: end; }
 .sky-dayband { fill: rgba(255, 255, 255, .055); }

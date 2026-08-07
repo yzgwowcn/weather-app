@@ -1,40 +1,33 @@
-// 流体玻璃面板：把页面玻璃框体做成 FluidGlass 折射效果（vanilla three.js）。
-// 演进：v1.5 为跟随鼠标的透镜 + 全屏背景 quad（遮挡天气背景、干扰阅读），
-// 本版（v1.6）改为：
-//   1) canvas 透明背景，恢复 body[data-mood] 天气背景（阳光/云影/气流/雨+闪电）；
-//   2) 页面玻璃面板（.workspace/.ec-hero/.metric-grid/.cross-stat/.date-chip）每个
-//      渲染为一个圆角矩形折射 mesh（FluidTransmissionMaterial，ior/色散参数与
-//      reactbits FluidGlass demo 一致），折射采样网站暖金蓝渐变 + 漂移光斑的 FBO；
-//   3) 折射方向随鼠标位置轻微流动（uPointerTilt uniform，指数阻尼）——没有透镜、
-//      不遮挡内容，玻璃质感来自面板本身；
-//   4) prefers-reduced-motion：静态渲染单帧，无鼠标响应、光斑不漂移。
+// 流体玻璃面板 — React + @react-three/fiber + @react-three/drei 技术栈。
+// 对应 reactbits.dev FluidGlass（lens 模式）的官方实现方案：
+//   Canvas（fov 58 / z 20 / alpha 透明）→ 背景世界（明亮网站配色渐变 + 光斑）
+//   createPortal 渲染到独立 scene → useFBO 每帧渲染为折射采样源；
+//   页面玻璃面板（.workspace/.ec-hero/.metric-grid/.cross-stat/.date-chip）每个渲染为
+//   圆角 mesh，材质为 fork 自 drei 的 MeshTransmissionMaterial（ior 1.1 / thickness 5 /
+//   chromaticAberration 0.1，与 demo 参数一致；samples 6 控性能）。
+// 保留 v1.6 已确认的交互：折射随鼠标轻微流动（uPointerTilt + maath damp3），无透镜。
+// 折射内容为明亮网站配色（天蓝/暖金/淡紫），消除 v1.6 深色背景的"黑影"感。
+// prefers-reduced-motion：frameloop=demand，静态渲染一帧。
 import * as THREE from 'three';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
+import { Canvas, createPortal, useFrame, useThree, extend } from '@react-three/fiber';
+import { useFBO } from '@react-three/drei';
+import { easing } from 'maath';
+import htm from 'htm';
 
-const PARAMS = {
-  ior: 1.1,
-  thickness: 5,
-  anisotropy: 0.01,
-  chromaticAberration: 0.1,
-  samples: 6,          // 折射采样数（demo 10，面板多时降为 6 控性能）
-  fov: 58,             // 宽视角让面板折射有入射角
-  cameraZ: 20,
-  pointerStrength: 0.07, // 鼠标对折射法线扰动的最大幅度（世界单位）
-  smoothTime: 0.15,      // 指数阻尼时间（等价 maath damp3）
-};
+const html = htm.bind(React.createElement);
 
-// 参与折射的玻璃面板（与 css/style.css 的玻璃样式一致）
+const PARAMS = { ior: 1.1, thickness: 5, anisotropy: 0.01, chromaticAberration: 0.1, samples: 6, pointerStrength: 1.0, pointerOffset: 1.2, smoothTime: 0.15 };
 const PANEL_SELECTOR = '.workspace, .ec-hero, .metric-grid, .cross-stat, .date-chip';
 
-// ---- FluidTransmissionMaterial：drei MeshTransmissionMaterialImpl 的 vanilla 移植 ----
-// shader 注入与 drei 逐字一致（MIT © drei 作者），仅去掉 React 包装并新增
-// uPointerTilt（折射法线随鼠标轻微倾斜，产生玻璃流动感）。
+// ---- FluidTransmissionMaterial：fork drei MeshTransmissionMaterialImpl（MIT © drei 作者）
+// 在 drei 的 shader 注入基础上新增 uPointerTilt（折射法线随鼠标轻微倾斜）。
 class FluidTransmissionMaterial extends THREE.MeshPhysicalMaterial {
   constructor(samples = PARAMS.samples) {
     super();
     this.uniforms = {
       chromaticAberration: { value: 0.05 },
-      // transmission 必须保持 0，否则 three 渲染器会执行额外内置 transmission pass；
-      // 用 _transmission 代替（原因同 drei 注释）
       transmission: { value: 0 },
       _transmission: { value: 1 },
       transmissionMap: { value: null },
@@ -53,10 +46,8 @@ class FluidTransmissionMaterial extends THREE.MeshPhysicalMaterial {
     };
     this.onBeforeCompile = (shader) => {
       shader.uniforms = { ...shader.uniforms, ...this.uniforms };
-      // 强制启用 transmission 块（three 不会为 transmission=0 注入 define）
       shader.defines.USE_TRANSMISSION = '';
 
-      // Head：uniforms + 噪声/扰动函数
       shader.fragmentShader = `uniform float chromaticAberration;
       uniform float anisotropicBlur;
       uniform float time;
@@ -143,7 +134,6 @@ class FluidTransmissionMaterial extends THREE.MeshPhysicalMaterial {
               +0.0666667* snoise(8.0*m);
       }\n` + shader.fragmentShader;
 
-      // transmission_pars_fragment：以 buffer 为折射采样源
       shader.fragmentShader = shader.fragmentShader.replace('#include <transmission_pars_fragment>', `
         #ifdef USE_TRANSMISSION
           uniform float _transmission;
@@ -210,7 +200,6 @@ class FluidTransmissionMaterial extends THREE.MeshPhysicalMaterial {
           }
         #endif\n`);
 
-      // transmission_fragment：折射采样主循环（含三通道 chromatic aberration + 鼠标流动）
       shader.fragmentShader = shader.fragmentShader.replace('#include <transmission_fragment>', `
         material.transmission = _transmission;
         material.transmissionAlpha = 1.0;
@@ -224,7 +213,7 @@ class FluidTransmissionMaterial extends THREE.MeshPhysicalMaterial {
           material.thickness *= texture2D( thicknessMap, vUv ).g;
         #endif
 
-        vec3 pos = vWorldPosition;
+        vec3 pos = vWorldPosition + uPointerTilt * ${PARAMS.pointerOffset.toFixed(1)};
         float runningSeed = 0.0;
         vec3 v = normalize( cameraPosition - pos );
         vec3 n = inverseTransformDirection( normal, viewMatrix );
@@ -269,22 +258,25 @@ class FluidTransmissionMaterial extends THREE.MeshPhysicalMaterial {
     });
   }
 }
+extend({ FluidTransmissionMaterial });
 
-// ---- 背景渐变纹理（与 body 背景同款：暖金阳光基调）----
-function makeBackgroundTexture() {
+// ---- 明亮背景世界资源（消除 v1.6 深色"黑影"）----
+function makeGradientTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
-  const g = ctx.createLinearGradient(0, 512, 180, 0);
-  g.addColorStop(0, '#1b2338');
-  g.addColorStop(0.55, '#2a3348');
-  g.addColorStop(1, '#192131');
+  const g = ctx.createLinearGradient(0, 512, 512, 0);
+  g.addColorStop(0, '#3d5c8c');   // 深蓝（底部，衬托面板）
+  g.addColorStop(0.42, '#7db4ff'); // 明亮天蓝
+  g.addColorStop(0.75, '#ffd98a'); // 暖金
+  g.addColorStop(1, '#c9b8ff');   // 淡紫
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 512, 512);
-  const glow = ctx.createRadialGradient(348, 40, 0, 348, 40, 460);
-  glow.addColorStop(0, 'rgba(255, 196, 96, 0.38)');
-  glow.addColorStop(0.6, 'rgba(255, 196, 96, 0)');
+  const glow = ctx.createRadialGradient(380, 60, 0, 380, 60, 420);
+  glow.addColorStop(0, 'rgba(255, 226, 160, 0.85)');
+  glow.addColorStop(0.55, 'rgba(255, 226, 160, 0.25)');
+  glow.addColorStop(1, 'rgba(255, 226, 160, 0)');
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, 512, 512);
   const tex = new THREE.CanvasTexture(canvas);
@@ -292,7 +284,6 @@ function makeBackgroundTexture() {
   return tex;
 }
 
-// ---- 柔和光斑纹理（径向渐变，折射可见性来源）----
 function makeBlobTexture(color) {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
@@ -308,79 +299,22 @@ function makeBlobTexture(color) {
   return tex;
 }
 
-const BLOB_COLORS = ['rgba(125, 180, 255, 0.9)', 'rgba(242, 192, 99, 0.75)', 'rgba(111, 216, 180, 0.7)', 'rgba(183, 156, 255, 0.7)', 'rgba(255, 143, 135, 0.55)'];
+// 明亮光斑（比 v1.6 更亮更大，折射内容丰富）
+const BLOBS = [
+  { color: 'rgba(140, 195, 255, 0.95)', fx: 0.2, fy: 0.24, z: 1.5, s: 3.8, amp: 0.9, speed: 0.12, phase: 0 },
+  { color: 'rgba(255, 215, 130, 0.9)', fx: 0.8, fy: 0.3, z: 2.2, s: 3.0, amp: 1.2, speed: 0.09, phase: 2.1 },
+  { color: 'rgba(120, 225, 190, 0.85)', fx: 0.6, fy: 0.76, z: 1.8, s: 4.2, amp: 0.7, speed: 0.14, phase: 4.2 },
+  { color: 'rgba(195, 168, 255, 0.85)', fx: 0.1, fy: 0.82, z: 2.6, s: 2.6, amp: 1.0, speed: 0.11, phase: 1.3 },
+  { color: 'rgba(255, 165, 150, 0.75)', fx: 0.42, fy: 0.5, z: 3.2, s: 2.0, amp: 1.4, speed: 0.16, phase: 3.0 },
+];
 
-// ---- 状态 ----
-let renderer = null;
-let scene = null;
-let camera = null;
-let bgScene = null;
-let fbo = null;
-let bgPlane = null;
-let blobs = [];
-let clock = null;
-let started = false;
-let reducedMotion = false;
-const pointer = { x: 0, y: 0 };
-const blobBases = [];
-// 面板折射系统：el → { el, mesh, material, w, h }（w/h 为当前几何尺寸，单位 px）
-const panels = new Map();
-let unit = 1; // 世界单位/像素（z=0 平面）
-
-function viewportAt(distance) {
-  const height = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * distance;
-  return { width: height * camera.aspect, height };
-}
-
-function buildBgScene() {
-  bgScene = new THREE.Scene();
-  bgPlane = new THREE.Mesh(
-    new THREE.PlaneGeometry(1, 1),
-    new THREE.MeshBasicMaterial({ map: makeBackgroundTexture() }),
-  );
-  const v0 = viewportAt(PARAMS.cameraZ);
-  bgPlane.scale.set(v0.width, v0.height, 1);
-  bgScene.add(bgPlane);
-  const texs = BLOB_COLORS.map(makeBlobTexture);
-  BLOB_COLORS.forEach((_, i) => {
-    const blob = new THREE.Mesh(
-      new THREE.CircleGeometry(1, 64),
-      new THREE.MeshBasicMaterial({ map: texs[i], transparent: true, depthWrite: false }),
-    );
-    const spots = [
-      { fx: 0.22, fy: 0.26, z: 1.5, s: 3.4, amp: 0.8, speed: 0.12, phase: 0 },
-      { fx: 0.78, fy: 0.32, z: 2.2, s: 2.6, amp: 1.1, speed: 0.09, phase: 2.1 },
-      { fx: 0.62, fy: 0.74, z: 1.8, s: 3.9, amp: 0.6, speed: 0.14, phase: 4.2 },
-      { fx: 0.12, fy: 0.8, z: 2.6, s: 2.2, amp: 0.9, speed: 0.11, phase: 1.3 },
-      { fx: 0.42, fy: 0.55, z: 3.2, s: 1.7, amp: 1.3, speed: 0.16, phase: 3.0 },
-    ][i];
-    blob.scale.setScalar(spots.s);
-    blob.position.z = spots.z;
-    blobBases.push({ ...spots, mesh: blob });
-    bgScene.add(blob);
-  });
-  placeBlobs();
-}
-
-function placeBlobs() {
-  const v0 = viewportAt(PARAMS.cameraZ);
-  blobBases.forEach((b) => {
-    b.mesh.position.x = (b.fx - 0.5) * v0.width;
-    b.mesh.position.y = (b.fy - 0.5) * v0.height;
-  });
-}
-
-// ---- 面板折射系统 ----
-
-// 读取元素圆角（px）
+// ---- 面板几何 ----
 function readRadius(el) {
   const css = getComputedStyle(el).borderRadius;
   if (!css || css === '0px') return 0;
   const m = css.match(/([\d.]+)px/);
   return m ? Number(m[1]) : 0;
 }
-
-// 圆角矩形 Shape（中心在原点，单位：世界单位）
 function roundedRectShape(w, h, r) {
   const r2 = Math.max(0, Math.min(r, w / 2, h / 2));
   const s = new THREE.Shape();
@@ -396,173 +330,153 @@ function roundedRectShape(w, h, r) {
   return s;
 }
 
-function makePanelEntry(el, radiusPx) {
-  const material = new FluidTransmissionMaterial(PARAMS.samples);
-  material.buffer = fbo.texture;
-  material.ior = PARAMS.ior;
-  material.thickness = PARAMS.thickness;
-  material.anisotropy = PARAMS.anisotropy;
-  material.chromaticAberration = PARAMS.chromaticAberration;
-  material.anisotropicBlur = PARAMS.anisotropy;
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
-  mesh.position.z = 0.5;
-  scene.add(mesh);
-  const entry = { el, mesh, material, radius: radiusPx * unit, w: 0, h: 0 };
-  panels.set(el, entry);
-  return entry;
-}
+// ---- 单个面板：位置/尺寸/圆角同步 + 折射流动 ----
+const pointerRef = { x: 0, y: 0 };
+window.addEventListener('pointermove', (e) => {
+  pointerRef.x = (e.clientX / window.innerWidth) * 2 - 1;
+  pointerRef.y = -(e.clientY / window.innerHeight) * 2 + 1;
+}, { passive: true });
 
-function refreshPanels() {
-  document.querySelectorAll(PANEL_SELECTOR).forEach((el) => {
-    if (!panels.has(el)) makePanelEntry(el, readRadius(el));
-  });
-  panels.forEach((entry, el) => {
-    if (!el.isConnected) {
-      scene.remove(entry.mesh);
-      entry.mesh.geometry.dispose();
-      entry.material.dispose();
-      panels.delete(el);
-    }
-  });
-}
+function PanelMesh({ el, buffer }) {
+  const mesh = useRef();
+  const mat = useRef();
+  const { size } = useThree();
+  const radiusPx = useMemo(() => readRadius(el), [el]);
+  const geomW = useRef(0);
+  const geomH = useRef(0);
 
-function syncPanels() {
-  unit = viewportAt(PARAMS.cameraZ).height / window.innerHeight;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  panels.forEach((entry) => {
-    const rect = entry.el.getBoundingClientRect();
-    const visible = rect.bottom > 0 && rect.top < vh && rect.right > 0 && rect.left < vw;
-    entry.mesh.visible = visible && rect.width > 0 && rect.height > 0;
-    if (!entry.mesh.visible) return;
-    const cx = (rect.left + rect.width / 2 - vw / 2) * unit;
-    const cy = -(rect.top + rect.height / 2 - vh / 2) * unit;
-    entry.mesh.position.set(cx, cy, 0.5);
+  useFrame((state, delta) => {
+    const m = mesh.current;
+    if (!m) return;
+    const rect = el.getBoundingClientRect();
+    const inView = rect.bottom > 0 && rect.top < size.height && rect.right > 0 && rect.left < size.width;
+    m.visible = inView && rect.width > 0 && rect.height > 0;
+    if (!m.visible) return;
+    const unit = state.viewport.height / size.height;
+    m.position.set((rect.left + rect.width / 2 - size.width / 2) * unit, -(rect.top + rect.height / 2 - size.height / 2) * unit, 0.5);
     const w = rect.width * unit;
     const h = rect.height * unit;
-    if (Math.abs(w - entry.w) > unit || Math.abs(h - entry.h) > unit) {
-      entry.mesh.geometry.dispose();
-      entry.mesh.geometry = new THREE.ShapeGeometry(roundedRectShape(w, h, entry.radius), 8);
-      entry.w = w;
-      entry.h = h;
+    if (Math.abs(w - geomW.current) > unit || Math.abs(h - geomH.current) > unit) {
+      m.geometry.dispose();
+      m.geometry = new THREE.ShapeGeometry(roundedRectShape(w, h, radiusPx * unit), 8);
+      geomW.current = w;
+      geomH.current = h;
+    }
+    // 折射随鼠标流动（maath damp3，等价 demo 的 easing 用法；指针来自 window 监听，
+    // 因为 canvas pointer-events: none，R3F 的 state.pointer 不会更新）
+    if (mat.current) {
+      const mx = (pointerRef.x * state.viewport.width) / 2;
+      const my = (pointerRef.y * state.viewport.height) / 2;
+      const dx = mx - m.position.x;
+      const dy = my - m.position.y;
+      const len = Math.hypot(dx, dy) || 1;
+      easing.damp3(mat.current.uPointerTilt, [(dx / len) * PARAMS.pointerStrength, (dy / len) * PARAMS.pointerStrength, 0], PARAMS.smoothTime, delta);
     }
   });
+
+  return html`
+    <mesh ref=${mesh} frustumCulled=${false}>
+      <fluidTransmissionMaterial
+        ref=${mat}
+        buffer=${buffer}
+        ior=${PARAMS.ior}
+        thickness=${PARAMS.thickness}
+        anisotropy=${PARAMS.anisotropy}
+        chromaticAberration=${PARAMS.chromaticAberration}
+        anisotropicBlur=${PARAMS.anisotropy}
+        transmission=${0}
+      />
+    </mesh>`;
 }
 
-function updatePointerTilt(delta) {
-  const v0 = viewportAt(PARAMS.cameraZ);
-  const mx = (pointer.x * v0.width) / 2;
-  const my = (pointer.y * v0.height) / 2;
-  const k = 1 - Math.exp((-delta * 2) / PARAMS.smoothTime);
-  panels.forEach((entry) => {
-    if (!entry.mesh.visible) return;
-    const dx = mx - entry.mesh.position.x;
-    const dy = my - entry.mesh.position.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const tilt = entry.material.uPointerTilt;
-    tilt.x += ((dx / len) * PARAMS.pointerStrength - tilt.x) * k;
-    tilt.y += ((dy / len) * PARAMS.pointerStrength - tilt.y) * k;
-  });
-}
+// ---- 背景世界（明亮渐变 + 漂移光斑），渲染进独立 scene 作为折射内容 ----
+function BackgroundWorld() {
+  const viewport = useThree((s) => s.viewport);
+  const gradient = useMemo(makeGradientTexture, []);
+  const blobTexs = useMemo(() => BLOBS.map((b) => makeBlobTexture(b.color)), []);
+  const blobRefs = useRef([]);
 
-// ---- 初始化与渲染循环 ----
-
-function init() {
-  if (started) return;
-  started = true;
-  try {
-    renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-  } catch (err) {
-    started = false;
-    return; // WebGL 不可用时静默降级为纯 CSS 毛玻璃
-  }
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.setClearColor(0x000000, 0); // 透明背景，露出 body 天气背景
-  const canvas = renderer.domElement;
-  canvas.id = 'fluid-glass';
-  canvas.setAttribute('aria-hidden', 'true');
-  document.body.appendChild(canvas);
-
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(PARAMS.fov, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 0, PARAMS.cameraZ);
-
-  // FBO：背景 scene（渐变 + 光斑）作为面板折射采样源
-  fbo = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { samples: 4 });
-  buildBgScene();
-
-  refreshPanels();
-  // 查询结果重渲染（renderResult）后面板增删
-  const mo = new MutationObserver(() => { refreshPanels(); });
-  mo.observe(document.body, { childList: true, subtree: true });
-
-  if (reducedMotion) {
-    renderFrame(0, true);
-  } else {
-    clock = new THREE.Clock();
-    renderer.setAnimationLoop(animate);
-  }
-
-  window.addEventListener('resize', onResize);
-  window.addEventListener('pointermove', onPointerMove, { passive: true });
-}
-
-function onPointerMove(event) {
-  pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-  pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
-}
-
-function onResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  fbo.setSize(window.innerWidth, window.innerHeight);
-  const v0 = viewportAt(PARAMS.cameraZ);
-  bgPlane.scale.set(v0.width, v0.height, 1);
-  placeBlobs();
-  // 面板几何按新 unit 重建
-  panels.forEach((entry) => { entry.w = 0; entry.h = 0; });
-}
-
-function renderFrame(delta, staticFrame) {
-  syncPanels();
-  if (!staticFrame && clock) {
-    const t = clock.elapsedTime;
-    blobBases.forEach((b) => {
-      b.mesh.position.x = (b.fx - 0.5) * viewportAt(PARAMS.cameraZ).width + Math.sin(t * b.speed + b.phase) * b.amp;
-      b.mesh.position.y = (b.fy - 0.5) * viewportAt(PARAMS.cameraZ).height + Math.cos(t * b.speed * 0.8 + b.phase) * b.amp;
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    const vw = state.viewport.width;
+    const vh = state.viewport.height;
+    blobRefs.current.forEach((ref, i) => {
+      if (!ref) return;
+      const b = BLOBS[i];
+      ref.position.x = (b.fx - 0.5) * vw + Math.sin(t * b.speed + b.phase) * b.amp;
+      ref.position.y = (b.fy - 0.5) * vh + Math.cos(t * b.speed * 0.8 + b.phase) * b.amp;
     });
-    updatePointerTilt(delta);
-  }
-  // 背景 scene → FBO
-  renderer.setRenderTarget(fbo);
-  renderer.clear();
-  renderer.render(bgScene, camera);
-  renderer.setRenderTarget(null);
-  // 主场景（面板折射 mesh，透明背景）
-  renderer.render(scene, camera);
-}
-
-function animate() {
-  renderFrame(clock.getDelta(), false);
-}
-
-// reduced-motion：静态渲染一帧（面板不响应鼠标、光斑不漂移）
-const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-reducedMotion = mq.matches;
-if (mq.addEventListener) {
-  mq.addEventListener('change', (e) => {
-    reducedMotion = e.matches;
-    if (reducedMotion && clock) {
-      renderer.setAnimationLoop(null);
-      renderFrame(0, true);
-    } else if (!reducedMotion && !clock) {
-      clock = new THREE.Clock();
-      renderer.setAnimationLoop(animate);
-    }
   });
+
+  return html`
+    <group>
+      <mesh scale=${[viewport.width, viewport.height, 1]}>
+        <planeGeometry />
+        <meshBasicMaterial map=${gradient} />
+      </mesh>
+      ${BLOBS.map((b, i) => html`
+        <mesh ref=${(ref) => { blobRefs.current[i] = ref; }} position=${[(b.fx - 0.5) * viewport.width, (b.fy - 0.5) * viewport.height, b.z]} scale=${[b.s, b.s, 1]}>
+          <circleGeometry args=${[1, 64]} />
+          <meshBasicMaterial map=${blobTexs[i]} transparent=${true} depthWrite=${false} />
+        </mesh>`)}
+    </group>`;
 }
 
-init();
+// ---- 主世界：背景 → FBO，面板折射渲染 ----
+function GlassWorld() {
+  const { gl, camera } = useThree();
+  const bgScene = useMemo(() => new THREE.Scene(), []);
+  const fbo = useFBO();
+  const [panels, setPanels] = useState([]);
+
+  // 面板收集：renderResult 重渲染（MutationObserver）与初始扫描
+  useEffect(() => {
+    const collect = () => setPanels(Array.from(document.querySelectorAll(PANEL_SELECTOR)));
+    collect();
+    const mo = new MutationObserver(collect);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, []);
+
+  // 背景世界 → FBO（每帧，主渲染之前）
+  useFrame(() => {
+    gl.setRenderTarget(fbo);
+    gl.render(bgScene, camera);
+    gl.setRenderTarget(null);
+  });
+
+  return [
+    createPortal(html`<${BackgroundWorld} />`, bgScene),
+    ...panels.map((el) => html`<${PanelMesh} key=${el} el=${el} buffer=${fbo.texture} />`),
+  ];
+}
+
+function App() {
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return html`
+    <${Canvas}
+      camera=${{ position: [0, 0, 20], fov: 58 }}
+      gl=${{ alpha: true, antialias: true }}
+      frameloop=${reduced ? 'demand' : 'always'}
+      onCreated=${(state) => state.gl.setClearColor(0x000000, 0)}
+      style=${{ width: '100%', height: '100%', display: 'block' }}
+    >
+      <${GlassWorld} />
+    </${Canvas}>`;
+}
+
+// ---- 挂载（透明容器，位于内容之下；CSS #fluid-glass 控制层叠）----
+function init() {
+  if (document.getElementById('fluid-glass')) return;
+  const mount = document.createElement('div');
+  mount.id = 'fluid-glass';
+  mount.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(mount);
+  createRoot(mount).render(html`<${App} />`);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
