@@ -1,5 +1,16 @@
 # 更新日志
 
+## v1.9（2026-08-07）
+
+### 变更
+- **面板回滚为亚克力质感**：移除 FluidGlass 流体折射（`js/fluid-glass.js`、React 全家桶 import map、`#fluid-glass` 层），五个玻璃面板恢复 `backdrop-filter` 亚克力模糊（workspace 16px / ec-hero 18px / metric-grid 14px / cross-stat 12px / date-chip 10px，含 saturate）；`--glass` 底、`--glass-border` 描边、`--shadow` 投影恢复 v1.4 Liquid Glass 数值；移除面板 `text-shadow`（亚克力模糊已保证可读性）
+- **页面回归零第三方依赖**：不再加载 esm.sh（React/@react-three/drei/three），仅本地 `lottie.min.js` + 业务 JS
+- **天气背景完整可见**：`body[data-mood]` 状态机（sunny 阳光光斑 / cloudy 云影 / windy 气流 / rain·storm 雨 / thunder 雨+闪电）不再被玻璃层遮挡
+
+### 保留（v1.6–v1.8 非质感改进）
+- meteocons Lottie 动态图标与图标序列（适合出行映射、放大 64/42px）
+- sky 滚动容器圆角遮罩、雷阵雨闪电质感与频率随天气
+
 ## v1.8（2026-08-07）
 
 ### 变更

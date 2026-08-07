@@ -9,13 +9,13 @@
 - **EC 天空剖面**：原生 SVG 小时精度图表，低/中/高三条平滑曲线、白天时段浅色带、日界线与选中准星；悬停/触控/键盘查看逐小时三层云、加权遮蔽云量、降水与风速；14 天保持小时精度并可横向滚动；支持 EC / 综合预报视图切换。
 - **两层一致性**：`EC 成员一致性`（集合晴好率是否集中于高/低区间 + 主运行方向是否一致）与 `外部模型验证`（GFS/JMA/CMA 支持数、反对数与缺失来源，明确为模型分歧提示）。
 - **晴雨结合氛围界面**：页面底色恒为暖金阳光基调（晴天阳光偏多），按选中日 EC 数据叠加氛围层——cloudy 云影、windy 气流光带、storm 气流+雨、thunder 雨+闪电；雨滴为**本地 Canvas 特效**（`js/rain.js`，零依赖，参考雨特效 demo 的视觉语言：斜向雨滴 + 头部亮点 + 落地涟漪），雷阵雨闪电 2.8–6s 随机双闪；多层毛玻璃面板、细白描边、低饱和主题色；全部动效遵守 `prefers-reduced-motion`。
-- **流体玻璃面板（官方技术栈）**：`js/fluid-glass.js` 为 reactbits.dev FluidGlass 的 React + @react-three/fiber + @react-three/drei 实现——五个玻璃面板（查询区/EC 主结论/指标/交叉验证/日期条）每个渲染为圆角折射 mesh（`MeshTransmissionMaterial`，ior 1.1 / chromaticAberration 0.1，与 demo 一致），折射内容**配色随天气状态变化**（sunny 暖金蓝 / cloudy 灰蓝 / thunder 紫金等饱和色调，不发白），折射随鼠标轻微流动（无透镜遮挡）；canvas 透明背景，`body[data-mood]` 天气背景（阳光/云影/气流/雨+闪电）完整可见；依赖走 esm.sh CDN（three 0.180 统一版本），`prefers-reduced-motion` 降级为静态单帧。
+- **亚克力面板**：五个玻璃面板（查询区/EC 主结论/指标/交叉验证/日期条）为半透明亚克力质感（`backdrop-filter` 模糊 + 渐变描边 + 内高光），`body[data-mood]` 天气背景（阳光/云影/气流/雨+闪电）透出；无 WebGL/流体折射依赖。
 - **图标 Lottie 动画**：天气图标使用 meteocons Lottie（`assets/lottie/`，lottie-web 本地化，`js/icons.js` 播放），hero/逐日卡片动态播放；图标按日间小时天气分段成序列（最多 3 个，如"晴天转阵雨"），适合出行时优先晴/晴间多云伴零星阵雨；雷雨徽章保持静态 SVG；顶部小红书入口使用官方 logo（`assets/xhs-logo.png`）。
 - **日期先行**：具体日期选择（日期条）位于 EC 主结论上方，先选日期再看判断；预报范围（3/7/14 天）选择位于目的地下方。
 - **近海海况**：保留海洋网格的浪高、周期与涌浪提示。
 
 - 数据源：[Open-Meteo](https://open-meteo.com/)（免费、无需 API Key、支持浏览器 CORS 直连）
-- 技术栈：原生 HTML + CSS + Vanilla JS（图表为原生 SVG，雨效为原生 Canvas，无图表库）；仅引入本地化的 three.js 0.180（`vendor/`，用于流体玻璃背景），无任何第三方网络请求，利于国内访问 Vercel 的加载速度
+- 技术栈：原生 HTML + CSS + Vanilla JS（图表为原生 SVG，雨效为原生 Canvas，无图表库）；仅本地化 lottie-web（`vendor/lottie.min.js`，用于天气图标动画），无任何第三方网络请求，利于国内访问 Vercel 的加载速度
 - 部署方式：GitHub 仓库 → Vercel 导入 → 挂载自定义域名（国内可访问）
 - 数据口径：时区 `Asia/Shanghai`、海洋网格 `cell_selection=sea`、时效分层提示
 
@@ -86,7 +86,7 @@ weather-app/
 │   ├── rain.js         # Canvas 雨滴特效（雨滴/涟漪/闪电，零依赖）
 │   ├── fluid-glass.js  # 流体玻璃背景（reactbits FluidGlass 的 vanilla three.js 移植）
 │   └── app.js          # 主控制器（选择→查询→渲染 + 图表交互 + mood/雨效应用）
-├── vendor/             # 本地化 lottie-web 播放器（lottie.min.js）；three/React 全家桶走 esm.sh CDN
+├── vendor/             # 本地化 lottie-web 播放器（lottie.min.js）
 ├── assets/
 │   ├── lottie/         # meteocons Lottie 天气动画（基础 + 组合：partly-cloudy-day-drizzle 等）
 │   ├── icons/          # 雷雨徽章静态 SVG（lightning-bolt）
