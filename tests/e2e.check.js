@@ -72,6 +72,21 @@ const server = http.createServer((req, res) => {
   const tip = await page.locator('.sky-view-pane:not([hidden]) .sky-tooltip').textContent();
   check('tooltip 含三层云与遮蔽', /低云.*中云.*高云.*遮蔽/.test(tip.replace(/\s+/g, ' ')));
 
+  // 点击显示详情：点击命中区 → 浮层出现；移开鼠标后（已选中）详情保留
+  // 注：.sky-hit 是 SVG line（零面积 bbox），playwright locator.click 判定不可见，改用坐标点击
+  await page.locator('.sky-view-pane:not([hidden])').scrollIntoViewIfNeeded();
+  await page.waitForTimeout(120);
+  const chartBox = await page.locator('.sky-view-pane:not([hidden]) [data-sky-chart]').boundingBox();
+  const hitX = Number(await page.locator('.sky-view-pane:not([hidden]) .sky-hit').nth(15).getAttribute('data-x'));
+  await page.mouse.click(chartBox.x + hitX, chartBox.y + 100);
+  await page.waitForTimeout(100);
+  check('点击显示详情浮层', await page.locator('.sky-view-pane:not([hidden]) .sky-tooltip.visible').count() === 1);
+  const clickTip = await page.locator('.sky-view-pane:not([hidden]) .sky-tooltip').textContent();
+  check('点击浮层含三层云', /低云.*中云.*高云.*遮蔽/.test(clickTip.replace(/\s+/g, ' ')));
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(100);
+  check('点击选中后移开保留详情', await page.locator('.sky-view-pane:not([hidden]) .sky-tooltip.visible').count() === 1);
+
   // 视图切换
   await page.locator('.sky-view-btn[data-sky-view="forecast"]').click();
   await page.waitForTimeout(120);
@@ -116,6 +131,15 @@ const server = http.createServer((req, res) => {
     return cc.left >= cr.left - 1 && cc.right <= cr.right + 1;
   });
   check('选中日期 chip 保持可见', chipVisible);
+
+  // 移动端：tap 命中区 → 详情浮层显示（触屏无 hover，点击即显示）
+  await mobile.locator('.sky-view-pane:not([hidden])').scrollIntoViewIfNeeded();
+  await mobile.waitForTimeout(120);
+  const mChartBox = await mobile.locator('.sky-view-pane:not([hidden]) [data-sky-chart]').boundingBox();
+  const mHitX = Number(await mobile.locator('.sky-view-pane:not([hidden]) .sky-hit').nth(10).getAttribute('data-x'));
+  await mobile.touchscreen.tap(mChartBox.x + mHitX, mChartBox.y + 100);
+  await mobile.waitForTimeout(150);
+  check('移动端点击显示详情', await mobile.locator('.sky-view-pane:not([hidden]) .sky-tooltip.visible').count() === 1, `visible=${await mobile.locator('.sky-view-pane:not([hidden]) .sky-tooltip.visible').count()}`);
   await mobile.close();
 
   // reduced-motion

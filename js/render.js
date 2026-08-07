@@ -235,7 +235,7 @@ function renderSkySection(cloudSeries, dates, skyView, skyIndex) {
       <div><p class="section-kicker">EC SKY PROFILE</p><h2>天空剖面</h2></div>
       <div class="sky-switch" role="group" aria-label="云图数据源切换">${buttons}</div>
     </div>
-    <p class="sky-note"><span class="legend low">低云</span><span class="legend mid">中云</span><span class="legend high">高云</span> · 海边天色重点看低云与中云：遮蔽云量 = 低云×60% + 中云×40%，悬停查看；高云仅供参考，不参与晴好率扣分。浅色带为 08:00–18:00 白天时段。</p>
+    <p class="sky-note"><span class="legend low">低云</span><span class="legend mid">中云</span><span class="legend high">高云</span> · 海边天色重点看低云与中云，点击或悬停图表查看逐小时详情；高云仅供参考，不影响出行判断。浅色带为 08:00–18:00 白天时段。</p>
     ${panes}
   </section>`;
 }
@@ -251,7 +251,7 @@ function renderEcHero(day, assessment, destination) {
     ? (finalSuitable ? { text: '适合出行', cls: 'good' } : { text: '不建议出行', cls: 'bad' })
     : { text: '数据待补充', cls: 'none' };
   const basis = main
-    ? `加权遮蔽云量 ${Math.round(main.maskMean)}% · 累计降水 ${main.precipitationSum.toFixed(1)} mm · 平均风速 ${Math.round(main.windMean)} km/h`
+    ? `遮蔽云量 ${Math.round(main.maskMean)}% · 累计降水 ${main.precipitationSum.toFixed(1)} mm · 平均风速 ${Math.round(main.windMean)} km/h`
     : 'EC 主运行暂未返回，页面依据综合预报示意。';
   const overturnNote = ensembleOverturn
     ? `EC 集合晴好率 ${Metrics.formatPercent(assessment.probability)}，主运行与集合方向相反，以集合晴好率为准。`
@@ -286,12 +286,12 @@ function renderEcHero(day, assessment, destination) {
 function renderEcMetrics(assessment) {
   const main = assessment.ec.main;
   if (!main) {
-    return `<section class="metric-grid" aria-label="判断依据"><div class="metric-tile"><span>加权遮蔽云量</span><strong>—</strong><small>EC 主运行暂缺</small></div></section>`;
+    return `<section class="metric-grid" aria-label="判断依据"><div class="metric-tile"><span>遮蔽云量</span><strong>—</strong><small>EC 主运行暂缺</small></div></section>`;
   }
   return `<section class="metric-grid" aria-label="EC 主结论判断依据">
-    ${metricTile('加权遮蔽云量', `${Math.round(main.maskMean)}%`, '低云×60% + 中云×40% · 阈值 <75%', 'cloud')}
-    ${metricTile('累计降水', `${main.precipitationSum.toFixed(1)} mm`, '日间累计 · 阈值 <1 mm')}
-    ${metricTile('平均风速', `${Math.round(main.windMean)} km/h`, '日间平均 · 阈值 <30')}
+    ${metricTile('遮蔽云量', `${Math.round(main.maskMean)}%`, '低云与中云共同决定，数值越低天色越通透', 'cloud')}
+    ${metricTile('累计降水', `${main.precipitationSum.toFixed(1)} mm`, '日间累计，1 mm 以内为宜')}
+    ${metricTile('平均风速', `${Math.round(main.windMean)} km/h`, '日间平均，30 km/h 以内为宜')}
     ${metricTile('高云参考', main.highMean == null ? '—' : `${Math.round(main.highMean)}%`, '薄云与霞光参考，不参与扣分', 'high-cloud')}
   </section>`;
 }

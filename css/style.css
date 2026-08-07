@@ -4,7 +4,7 @@
    文字与数据保持高对比；动效全部 CSS 完成并遵守 prefers-reduced-motion。 */
 :root {
   --ink: #f2f5f9;
-  --muted: rgba(222, 230, 238, .74);
+  --muted: rgba(222, 230, 238, .78);
   --line: rgba(255, 255, 255, .13);
   /* 亚克力面板底（半透明 + 模糊） */
   --glass: rgba(255, 255, 255, .055);
@@ -196,7 +196,7 @@ button { font: inherit; }
 .eyebrow, .section-kicker { margin: 0 0 12px; color: var(--blue); font-size: 12px; font-weight: 800; letter-spacing: .13em; }
 .intro h1 { margin: 0; font-size: clamp(50px, 8vw, 102px); letter-spacing: -.085em; line-height: .91; font-weight: 800; }
 .intro h1 em { color: var(--blue); font-style: normal; text-shadow: 0 0 34px rgba(125, 180, 255, .35); }
-.intro-copy { max-width: 510px; margin: 27px 0 0; color: rgba(226, 233, 240, .72); font-size: 16px; }
+.intro-copy { max-width: 510px; margin: 27px 0 0; color: rgba(226, 233, 240, .8); font-size: 16px; }
 
 /* ---- 查询面板（亚克力：半透明 + backdrop-filter 模糊） ---- */
 .workspace {
@@ -213,7 +213,7 @@ button { font: inherit; }
   border-right: 0; border-bottom: 1px solid var(--line);
 }
 .horizon-field { align-self: center; }
-.field-label { display: block; margin-bottom: 8px; font-weight: 700; color: rgba(226, 233, 240, .78); }
+.field-label { display: block; margin-bottom: 8px; font-weight: 700; color: rgba(226, 233, 240, .84); }
 .dest-list, .days-group { display: flex; flex-wrap: wrap; gap: 6px; }
 .dest-btn, .days-btn {
   min-height: 34px; padding: 6px 10px; border: 1px solid transparent; border-radius: var(--r-sm);
@@ -222,7 +222,7 @@ button { font: inherit; }
 }
 .dest-btn:hover, .days-btn:hover, .dest-btn:focus-visible, .days-btn:focus-visible { border-color: rgba(125, 180, 255, .55); outline: none; background: rgba(125, 180, 255, .08); }
 .dest-btn.active, .days-btn.active { background: rgba(238, 242, 246, .94); color: #101c2c; font-weight: 700; }
-.dest-tag { margin-left: 5px; color: inherit; font-size: 10px; opacity: .68; }
+.dest-tag { margin-left: 5px; color: inherit; font-size: 10px; opacity: .78; }
 /* 自定义地点按钮：绿色强调，区别于预设暖金色 */
 .dest-btn.custom { border-color: rgba(111, 216, 180, .45); color: var(--green); }
 .dest-btn.custom.active { background: rgba(111, 216, 180, .94); color: #0d1a16; }
@@ -236,7 +236,7 @@ button { font: inherit; }
   color: rgba(222, 230, 238, .92); font-size: 13px;
   transition: background-color .18s ease, border-color .18s ease;
 }
-.location-search-input::placeholder { color: rgba(222, 230, 238, .42); }
+.location-search-input::placeholder { color: rgba(222, 230, 238, .5); }
 .location-search-input:hover, .location-search-input:focus-visible { border-color: rgba(125, 180, 255, .55); outline: none; background-color: rgba(125, 180, 255, .08); }
 .search-results {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
@@ -250,7 +250,7 @@ button { font: inherit; }
 .search-item { display: flex; align-items: baseline; gap: 8px; padding: 7px 10px; border-radius: 7px; cursor: pointer; font-size: 13px; color: rgba(222, 230, 238, .85); }
 .search-item:hover, .search-item:focus-visible { background: rgba(125, 180, 255, .14); color: #fff; }
 .search-item-name { font-weight: 600; }
-.search-item-region { margin-left: auto; padding-left: 12px; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-item-region { margin-left: auto; padding-left: 12px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .search-empty { padding: 8px 10px; color: var(--muted); font-size: 12.5px; }
 .query-btn {
   align-self: center; min-height: 42px; margin-left: 16px; padding: 0 18px; border: 0; border-radius: var(--r-sm);
@@ -320,7 +320,7 @@ button { font: inherit; }
 .overturn-note {
   margin: 10px 0 0; color: var(--blue); font-size: 13px;
 }
-.sea-sky-tip { margin: 10px 0 0; max-width: 560px; color: rgba(226, 233, 240, .68); font-size: 13px; }
+.sea-sky-tip { margin: 10px 0 0; max-width: 560px; color: rgba(226, 233, 240, .78); font-size: 13px; }
 .ec-probability { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .probability-orb {
   --p: calc(var(--probability) * 1%);
@@ -394,10 +394,10 @@ button { font: inherit; }
 .sky-chart:focus-visible { box-shadow: 0 0 0 2px rgba(125, 180, 255, .55); }
 .sky-svg { display: block; }
 .sky-grid { stroke: rgba(255, 255, 255, .09); stroke-width: 1; }
-.sky-axis { fill: rgba(224, 232, 240, .7); font-size: 10.5px; text-anchor: end; }
+.sky-axis { fill: rgba(224, 232, 240, .8); font-size: 10.5px; text-anchor: end; }
 .sky-dayband { fill: rgba(255, 255, 255, .055); }
 .sky-dateline { stroke: rgba(255, 255, 255, .16); stroke-width: 1; stroke-dasharray: 3 4; }
-.sky-datelabel { fill: rgba(224, 232, 240, .72); font-size: 11.5px; }
+.sky-datelabel { fill: rgba(224, 232, 240, .82); font-size: 11.5px; }
 .sky-line { fill: none; stroke-width: 2; stroke-linecap: round; }
 .sky-line.low { stroke: #7db4ff; }
 .sky-line.mid { stroke: #4fd8c4; }
@@ -425,7 +425,7 @@ button { font: inherit; }
 .sky-tooltip strong { display: block; margin-bottom: 3px; color: #fff; font-size: 12.5px; }
 .sky-tooltip span { display: flex; justify-content: space-between; gap: 14px; color: var(--muted); }
 .sky-tooltip b { color: var(--ink); font-weight: 700; }
-.sky-source { margin: 8px 0 0; color: var(--muted); font-size: 11.5px; }
+.sky-source { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
 
 /* ---- 外部模型验证 ---- */
 .cross-section { padding-top: 46px; }
@@ -518,8 +518,8 @@ button { font: inherit; }
   background: rgba(255, 143, 135, .08); color: #ffc9c4;
 }
 .error-card p { margin-bottom: 0; font-size: 13px; }
-.footer { padding: 54px 0 30px; color: var(--muted); font-size: 13px; }
-.footer p { max-width: 760px; margin: 4px 0; }
+.footer { padding: 54px 0 30px; color: var(--muted); font-size: 13px; text-align: center; }
+.footer p { max-width: 760px; margin: 4px auto; }
 .footer a { color: var(--blue); }
 
 /* ---- 响应式 ---- */

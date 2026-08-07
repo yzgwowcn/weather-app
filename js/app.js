@@ -97,6 +97,12 @@
         chip?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' });
       }
     }
+    // 恢复持久选中时刻的详情浮层（点击/键盘选中后跨重渲染保留）
+    if (state.skyIndex != null) {
+      const chart = resultEl.querySelector('.sky-view-pane:not([hidden]) [data-sky-chart]');
+      const hit = chart?.querySelector(`.sky-hit[data-index="${state.skyIndex}"]`);
+      if (hit) updateSkyCursor(chart, hit);
+    }
   }
   // 悬停/触控提示：更新图表准星与数值卡，不触发整页重渲染
   function updateSkyCursor(chart, hit) {
@@ -185,17 +191,17 @@
       if (!hit) return;
       updateSkyCursor(hit.closest('[data-sky-chart]'), hit);
     });
-    // 离开图表隐藏提示（pointerout 冒泡，relatedTarget 判断）
+    // 离开图表隐藏提示（未点击选中时隐藏；点击选中后详情保留，直到切换日期/视图）
     resultEl.addEventListener('pointerout', (event) => {
       const chart = event.target.closest('[data-sky-chart]');
-      if (chart && (!event.relatedTarget || !chart.contains(event.relatedTarget))) hideSkyCursor(chart);
+      if (chart && state.skyIndex == null && (!event.relatedTarget || !chart.contains(event.relatedTarget))) hideSkyCursor(chart);
     });
-    // 触控/点击选中时刻：持久化准星
+    // 触控/点击选中时刻：持久化准星并直接显示详情（不整页重渲染，移动端点击即见）
     resultEl.addEventListener('pointerdown', (event) => {
       const hit = event.target.closest('.sky-hit');
       if (!hit || !state.bundle) return;
       state.skyIndex = Number(hit.dataset.index);
-      renderResult();
+      updateSkyCursor(hit.closest('[data-sky-chart]'), hit);
     });
     // 键盘焦点：左右方向键在小时刻度间移动
     resultEl.addEventListener('keydown', (event) => {
