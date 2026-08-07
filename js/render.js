@@ -31,6 +31,11 @@ function cloudWord(cloud) {
   if (cloud < 70) return '云量偏多';
   return '厚云覆盖';
 }
+// 雷雨时段格式：[[13,15]] → "13:00–15:00"；[[8,8]] → "08:00"
+function formatWindows(windows) {
+  const pad = (hour) => String(hour).padStart(2, '0');
+  return windows.map(([start, end]) => (start === end ? `${pad(start)}:00` : `${pad(start)}:00–${pad(end)}:00`)).join('、');
+}
 function dailyData(forecast, index) {
   const daily = forecast.daily;
   return {
@@ -171,7 +176,7 @@ function renderSkySection(cloudSeries, dates, skyView, skyIndex) {
       <div><p class="section-kicker">EC SKY PROFILE</p><h2>天空剖面</h2></div>
       <div class="sky-switch" role="group" aria-label="云图数据源切换">${buttons}</div>
     </div>
-    <p class="sky-note"><span class="legend low">低云</span><span class="legend mid">中云</span><span class="legend high">高云</span> · 遮蔽云量 = 低云×60% + 中云×40%，悬停查看；高云仅供参考，不参与晴好率扣分。浅色带为 08:00–18:00 白天时段。</p>
+    <p class="sky-note"><span class="legend low">低云</span><span class="legend mid">中云</span><span class="legend high">高云</span> · 海边天色重点看低云与中云：遮蔽云量 = 低云×60% + 中云×40%，悬停查看；高云仅供参考，不参与晴好率扣分。浅色带为 08:00–18:00 白天时段。</p>
     ${panes}
   </section>`;
 }
@@ -187,6 +192,8 @@ function renderEcHero(day, assessment, destination) {
   const basis = main
     ? `加权遮蔽云量 ${Math.round(main.maskMean)}% · 累计降水 ${main.precipitationSum.toFixed(1)} mm · 最大风速 ${Math.round(main.windMax)} km/h`
     : 'EC 主运行暂未返回，页面依据综合预报示意。';
+  const thunder = main && main.thunderWindows.length
+    ? `<p class="thunder-window">⚡ ${formatWindows(main.thunderWindows)} 有雷阵雨，注意避雨</p>` : '';
   const consistency = assessment.ec.memberConsistency;
   return `
   <section class="ec-hero" data-mood="${assessment.weatherMood.mood}">
@@ -194,6 +201,8 @@ function renderEcHero(day, assessment, destination) {
       <p class="section-kicker">ECMWF 主运行 · 08:00–18:00 · ${destination.name}</p>
       <div class="verdict-row"><span class="weather-symbol" aria-hidden="true">${symbol}</span><h2>${verdict.text}</h2><span class="verdict-badge ${verdict.cls}">${verdict.text}</span></div>
       <p class="verdict-basis">${basis}。${condition}，${cloudWord(day.cloud)}。</p>
+      ${thunder}
+      <p class="sea-sky-tip">海边天色重点看低云与中云（低云×60% + 中云×40% 加权）影响最大，高云仅供参考。</p>
     </div>
     <div class="ec-probability">
       <div class="probability-orb ${assessment.probability == null ? 'unavailable' : ''}" style="--probability:${Math.round(assessment.probability || 0)}">
@@ -212,7 +221,7 @@ function renderEcMetrics(assessment) {
     return `<section class="metric-grid" aria-label="判断依据"><div class="metric-tile"><span>加权遮蔽云量</span><strong>—</strong><small>EC 主运行暂缺</small></div></section>`;
   }
   return `<section class="metric-grid" aria-label="EC 主结论判断依据">
-    ${metricTile('加权遮蔽云量', `${Math.round(main.maskMean)}%`, '低云×60% + 中云×40% · 阈值 <50%', 'cloud')}
+    ${metricTile('加权遮蔽云量', `${Math.round(main.maskMean)}%`, '低云×60% + 中云×40% · 阈值 <75%', 'cloud')}
     ${metricTile('累计降水', `${main.precipitationSum.toFixed(1)} mm`, '日间累计 · 阈值 <1 mm')}
     ${metricTile('最大风速', `${Math.round(main.windMax)} km/h`, '日间最大 · 阈值 <30')}
     ${metricTile('高云参考', main.highMean == null ? '—' : `${Math.round(main.highMean)}%`, '薄云与霞光参考，不参与扣分', 'high-cloud')}

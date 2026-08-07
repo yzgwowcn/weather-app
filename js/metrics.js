@@ -1,17 +1,21 @@
 // 晴好指标：以 ECMWF（EC）为主判断来源。
 // 北京时间 08:00–18:00 口径：
-//   - 有效遮蔽云量 = 低云均值 × 60% + 中云均值 × 40%，严格低于 50% 满足天空条件；
-//   - 高云单独聚合与展示，不参与晴好率扣分；
-//   - 日间累计降水严格低于 1 mm、最大风速严格低于 30 km/h 为必要条件；
-//   - EC 晴好率 = EC 集合（控制 + 50 扰动成员）满足条件的比例；
+//   - 出行条件 = 日间无"中雨及以上"时段（61/63/65/80/81/82）且遮蔽云量严格 <75% 且最大风速严格 <30 km/h；
+//   - 遮蔽云量 = 低云均值 × 60% + 中云均值 × 40%（海边天色重点看低云与中云，高云仅供参考）；
+//   - 雷阵雨（95/96/99）不阻断出行，但输出注意时段（合并连续雷雨小时）；
+//   - EC 晴好率 = EC 集合（控制 + 50 扰动成员）按同一口径满足条件的比例；
 //   - EC 主运行单独给出"适合 / 不适合"结论；
 //   - GFS、JMA、CMA 仅作外部模型验证（分歧提示），不再与 EC 等权。
 const Metrics = (() => {
   const DAY_START = 8;
   const DAY_END = 18;
-  const THRESHOLDS = { lowMidCloud: 50, precipitation: 1, wind: 30 };
+  const THRESHOLDS = { lowMidCloud: 75, wind: 30 };
   const LOW_WEIGHT = 0.6;
   const MID_WEIGHT = 0.4;
+  // 中雨及以上（持续降水）：任一小时出现即阻断出行
+  const BLOCKING_CODES = new Set([61, 63, 65, 80, 81, 82]);
+  // 雷阵雨：不阻断，但提示注意时段
+  const THUNDER_CODES = new Set([95, 96, 99]);
   const EXTERNAL_MODELS = ['NOAA GFS', 'JMA GSM', 'CMA GRAPES'];
   const EC_MAIN_NAME = 'ECMWF IFS';
   const EC_ENSEMBLE_NAME = 'ECMWF IFS 集合';
@@ -50,7 +54,23 @@ const Metrics = (() => {
     if (low == null || mid == null) return null;
     return low * LOW_WEIGHT + mid * MID_WEIGHT;
   }
-  // 评估单日单源（控制成员 / 扰动成员 / 确定性运行）：返回晴好结论与分层云聚合。
+  // 将连续小时合并为时段（如 [13,14,15] → [[13,15]]）
+  function mergeHourRanges(hours) {
+    const sorted = [...hours].sort((a, b) => a - b);
+    const ranges = [];
+    let start = null;
+    let prev = null;
+    sorted.forEach((hour) => {
+      if (start == null) { start = hour; prev = hour; return; }
+      if (hour === prev + 1) { prev = hour; return; }
+      ranges.push([start, prev]);
+      start = hour;
+      prev = hour;
+    });
+    if (start != null) ranges.push([start, prev]);
+    return ranges;
+  }
+  // 评估单日单源（控制成员 / 扰动成员 / 确定性运行）：返回晴好结论、天气码判定与分层云聚合。
   function evaluate(values) {
     const low = mean(values.low);
     const mid = mean(values.mid);
@@ -59,6 +79,12 @@ const Metrics = (() => {
     const windMax = max(values.wind);
     if (low == null || mid == null || values.precipitation.filter(Number.isFinite).length < 6 || windMax == null) return null;
     const maskMean = maskOf(low, mid);
+    // 天气码判定：weather_code 缺失时降级为不阻断（仅按云量与风判定）
+    const codes = values.weatherCode.filter(Number.isFinite).map(Number);
+    const blocked = codes.some((code) => BLOCKING_CODES.has(code));
+    const thunderWindows = codes.length
+      ? mergeHourRanges(values.hours.filter((_, index) => THUNDER_CODES.has(codes[index])))
+      : [];
     return {
       lowMean: low,
       midMean: mid,
@@ -66,7 +92,9 @@ const Metrics = (() => {
       maskMean,
       precipitationSum,
       windMax,
-      suitable: maskMean < THRESHOLDS.lowMidCloud && precipitationSum < THRESHOLDS.precipitation && windMax < THRESHOLDS.wind,
+      blocked,
+      thunderWindows,
+      suitable: !blocked && maskMean < THRESHOLDS.lowMidCloud && windMax < THRESHOLDS.wind,
     };
   }
   function valuesForMember(hourly, indexes, suffix = '') {
@@ -77,6 +105,8 @@ const Metrics = (() => {
       high: indexes.map((index) => toNumber(hourly[key('cloud_cover_high')]?.[index])),
       precipitation: indexes.map((index) => toNumber(hourly[key('precipitation')]?.[index])),
       wind: indexes.map((index) => toNumber(hourly[key('wind_speed_10m')]?.[index])),
+      weatherCode: indexes.map((index) => toNumber(hourly[key('weather_code')]?.[index])),
+      hours: indexes.map((index) => hourFromTime(hourly.time[index])),
     };
   }
   // 从响应中推导可用成员后缀：''（控制成员）＋ '_memberNN'（扰动成员）
@@ -146,16 +176,19 @@ const Metrics = (() => {
     });
     return { support, oppose, missing, direction, note: null };
   }
-  // 天气状态机：以选中日的 EC 主运行数据驱动；雨与大风同时满足时优先"风雨"状态。
+  // 天气状态机：以选中日的 EC 主运行数据驱动。页面底色恒为暖光晴底，
+  // 各状态仅决定叠加氛围层；雷阵雨优先（晴雨结合 + 闪电）。
   function moodFor(ecMain) {
     if (!ecMain) return { mood: 'neutral', label: '数据待补充' };
-    const rainy = ecMain.precipitationSum >= THRESHOLDS.precipitation;
+    const thunder = ecMain.thunderWindows.length > 0;
+    const rainy = ecMain.blocked;
     const windy = ecMain.windMax >= THRESHOLDS.wind;
-    if (rainy && windy) return { mood: 'storm', label: '风雨天' };
-    if (rainy) return { mood: 'rainy', label: '雨天' };
-    if (windy) return { mood: 'windy', label: '大风天' };
-    if (ecMain.maskMean < 40) return { mood: 'sunny', label: '晴' };
-    return { mood: 'cloudy', label: '多云' };
+    if (thunder) return { mood: 'thunder', label: '雷阵雨' };
+    if (rainy && windy) return { mood: 'storm', label: '风雨' };
+    if (rainy) return { mood: 'rain', label: '雨' };
+    if (windy) return { mood: 'windy', label: '大风' };
+    if (ecMain.maskMean >= THRESHOLDS.lowMidCloud) return { mood: 'cloudy', label: '多云' };
+    return { mood: 'sunny', label: '晴' };
   }
   function buildAssessment(ensembleResponses, deterministicResponses, dates) {
     const ensembleSources = Object.entries(ensembleResponses).map(([name, response]) => ({ name, ...ensembleDaily(response) }));
@@ -200,7 +233,7 @@ const Metrics = (() => {
           precipitation: toNumber(response.hourly.precipitation?.[index]),
           wind: toNumber(response.hourly.wind_speed_10m?.[index]),
         };
-      }) }
+      }) };
     });
     return { source: response.source, days };
   }

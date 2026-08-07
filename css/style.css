@@ -27,10 +27,14 @@ body {
   color: var(--ink);
   font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   line-height: 1.5;
-  background: linear-gradient(160deg, #0c1626 0%, #14243c 55%, #101d31 100%);
-  transition: background 1.2s ease;
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(255, 196, 96, .38), transparent 60%),
+    linear-gradient(160deg, #1b2338 0%, #2a3348 55%, #192131 100%);
 }
-/* 背景氛围层：光照 / 雾化 / 雨 / 气流光带 */
+/* 背景结构：底色恒为暖金阳光基调（"晴天阳光偏多"）；
+   ::before 固定日照渐层并缓慢漂移；
+   ::after 为氛围叠加层（云影 / 雨线 / 气流光带 / 闪电），按 body[data-mood] 切换，
+   雨天与雷雨即在晴底上叠加雨效，形成晴雨结合。 */
 body::before, body::after {
   content: '';
   position: fixed;
@@ -39,17 +43,15 @@ body::before, body::after {
   pointer-events: none;
   transition: opacity 1.4s ease;
 }
-body::before { background: radial-gradient(120% 90% at 50% -10%, rgba(60, 96, 150, .32), transparent 60%); }
-body::after { opacity: 0; }
-
-/* ---- 天气状态机：sunny ---- */
-body[data-mood="sunny"]::before {
+body::before {
   background:
-    radial-gradient(90% 70% at 68% 8%, rgba(255, 196, 96, .5), transparent 58%),
-    radial-gradient(120% 90% at 50% -10%, rgba(86, 128, 190, .38), transparent 62%),
-    linear-gradient(160deg, #14263c 0%, #1c3a52 60%, #12243a 100%);
+    radial-gradient(90% 70% at 68% 8%, rgba(255, 196, 96, .52), transparent 58%),
+    radial-gradient(120% 90% at 50% -10%, rgba(120, 150, 205, .28), transparent 62%);
   animation: sun-drift 26s ease-in-out infinite alternate;
 }
+body::after { opacity: 0; }
+
+/* ---- sunny：光斑呼吸（晴底默认态） ---- */
 body[data-mood="sunny"]::after {
   opacity: 1;
   background:
@@ -60,41 +62,26 @@ body[data-mood="sunny"]::after {
 @keyframes sun-drift { from { transform: translate3d(-1.5%, 0, 0) scale(1); } to { transform: translate3d(1.5%, -1%, 0) scale(1.04); } }
 @keyframes sun-breathe { from { opacity: .55; } to { opacity: 1; } }
 
-/* ---- cloudy：冷灰蓝雾化 + 浮动云影 ---- */
-body[data-mood="cloudy"]::before {
-  background:
-    radial-gradient(100% 70% at 50% 0%, rgba(138, 156, 178, .30), transparent 62%),
-    linear-gradient(160deg, #16222f 0%, #24333f 55%, #141f2c 100%);
-}
+/* ---- cloudy：暖光晴底 + 冷灰蓝雾化云影 ---- */
 body[data-mood="cloudy"]::after {
   opacity: 1;
   background:
-    radial-gradient(520px 220px at 24% 22%, rgba(200, 212, 226, .16), transparent 70%),
-    radial-gradient(640px 260px at 76% 48%, rgba(190, 204, 220, .12), transparent 70%),
-    radial-gradient(460px 200px at 46% 78%, rgba(210, 220, 232, .10), transparent 70%);
+    radial-gradient(520px 220px at 24% 22%, rgba(200, 212, 226, .18), transparent 70%),
+    radial-gradient(640px 260px at 76% 48%, rgba(190, 204, 220, .14), transparent 70%),
+    radial-gradient(460px 200px at 46% 78%, rgba(210, 220, 232, .12), transparent 70%);
   animation: cloud-drift 34s ease-in-out infinite alternate;
 }
 @keyframes cloud-drift { from { transform: translate3d(-2.5%, 0, 0); } to { transform: translate3d(2.5%, 1.2%, 0); } }
 
-/* ---- rainy：半透明雨线 + 暗蓝玻璃反射 ---- */
-body[data-mood="rainy"]::before {
-  background:
-    radial-gradient(110% 80% at 50% 0%, rgba(72, 96, 128, .36), transparent 60%),
-    linear-gradient(160deg, #0d1626 0%, #16233a 55%, #0f1a2c 100%);
-}
-body[data-mood="rainy"]::after {
+/* ---- rain：晴底 + 半透明雨线（晴雨结合） ---- */
+body[data-mood="rain"]::after {
   opacity: .55;
   background: repeating-linear-gradient(103deg, transparent 0 26px, rgba(190, 212, 240, .20) 26px 27px, transparent 27px 44px);
   animation: rain-fall .9s linear infinite;
 }
 @keyframes rain-fall { from { transform: translate3d(0, -46px, 0); } to { transform: translate3d(0, 46px, 0); } }
 
-/* ---- windy：偏冷背景 + 横向气流光带 ---- */
-body[data-mood="windy"]::before {
-  background:
-    radial-gradient(110% 80% at 30% 0%, rgba(96, 122, 158, .34), transparent 62%),
-    linear-gradient(160deg, #101a28 0%, #1b2a3e 55%, #0f1a29 100%);
-}
+/* ---- windy：晴底 + 横向气流光带 ---- */
 body[data-mood="windy"]::after {
   opacity: .5;
   background:
@@ -105,14 +92,9 @@ body[data-mood="windy"]::after {
 }
 @keyframes wind-sweep { from { background-position: 0% 0, 0% 0; } to { background-position: 100% 0, -100% 0; } }
 
-/* ---- storm：雨 + 大风组合（暗青灰） ---- */
-body[data-mood="storm"]::before {
-  background:
-    radial-gradient(110% 80% at 50% 0%, rgba(66, 84, 112, .42), transparent 60%),
-    linear-gradient(160deg, #0b131f 0%, #15202f 55%, #0d1622 100%);
-}
+/* ---- storm：晴底 + 雨线 + 气流光带（雨大风） ---- */
 body[data-mood="storm"]::after {
-  opacity: .65;
+  opacity: .6;
   background:
     repeating-linear-gradient(103deg, transparent 0 26px, rgba(195, 214, 238, .22) 26px 27px, transparent 27px 44px),
     linear-gradient(100deg, transparent 8%, rgba(150, 186, 224, .2) 32%, transparent 58%);
@@ -121,10 +103,27 @@ body[data-mood="storm"]::after {
 }
 @keyframes storm-fall { from { transform: translate3d(0, -46px, 0); } to { transform: translate3d(0, 46px, 0); } }
 
+/* ---- thunder：晴雨结合 + 闪电闪光（雷阵雨） ---- */
+body[data-mood="thunder"]::after {
+  opacity: .6;
+  background: repeating-linear-gradient(103deg, transparent 0 26px, rgba(200, 216, 240, .24) 26px 27px, transparent 27px 44px);
+  animation: rain-fall .85s linear infinite;
+}
+body[data-mood="thunder"]::before {
+  animation: sun-drift 26s ease-in-out infinite alternate, lightning-flash 7s ease-in-out infinite;
+}
+@keyframes lightning-flash {
+  0%, 84%, 100% { filter: none; }
+  85% { filter: brightness(1.55); }
+  86%, 89% { filter: none; }
+  90% { filter: brightness(1.8); }
+  92%, 100% { filter: none; }
+}
+
 /* ---- 减弱动态偏好：关闭动效，仅保留必要指示 ---- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
-  body::before, body::after { transform: none !important; }
+  body::before, body::after { transform: none !important; filter: none !important; }
   .spinner { animation: spin 1.4s linear infinite !important; }
 }
 
@@ -159,15 +158,19 @@ button { font: inherit; }
 
 /* ---- 查询面板（玻璃） ---- */
 .workspace {
-  display: grid; grid-template-columns: 1fr auto auto; gap: 0;
+  display: grid; grid-template-columns: 1fr auto; gap: 14px 0;
   padding: 16px; border: 1px solid var(--line); border-radius: var(--r-lg);
   background: var(--glass);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow: var(--shadow);
 }
-.workspace-section { padding: 0 18px; border-right: 1px solid var(--line); }
-.workspace-section:first-child { padding-left: 2px; }
+.workspace-section { padding: 0 2px; }
+.destination-field {
+  grid-column: 1 / -1; padding: 0 2px 14px;
+  border-right: 0; border-bottom: 1px solid var(--line);
+}
+.horizon-field { align-self: center; }
 .field-label { display: block; margin-bottom: 8px; font-weight: 700; color: rgba(226, 233, 240, .78); }
 .dest-list, .days-group { display: flex; flex-wrap: wrap; gap: 6px; }
 .dest-btn, .days-btn {
@@ -179,7 +182,7 @@ button { font: inherit; }
 .dest-btn.active, .days-btn.active { background: rgba(238, 242, 246, .94); color: #101c2c; font-weight: 700; }
 .dest-tag { margin-left: 5px; color: inherit; font-size: 10px; opacity: .68; }
 .query-btn {
-  align-self: end; min-height: 42px; margin-left: 16px; padding: 0 18px; border: 0; border-radius: var(--r-sm);
+  align-self: center; min-height: 42px; margin-left: 16px; padding: 0 18px; border: 0; border-radius: var(--r-sm);
   background: linear-gradient(135deg, #5f9cf0, #3c76d6); color: #fff; cursor: pointer; font-weight: 750;
   box-shadow: 0 8px 22px rgba(70, 130, 230, .35);
   transition: filter .18s ease, transform .18s ease;
@@ -225,6 +228,12 @@ button { font: inherit; }
 .verdict-badge.bad { background: rgba(255, 143, 135, .14); color: #ffb3ac; border-color: rgba(255, 143, 135, .42); }
 .verdict-badge.none { background: rgba(255, 255, 255, .08); color: var(--muted); }
 .verdict-basis { max-width: 520px; margin: 14px 0 0; color: rgba(224, 231, 238, .78); font-size: 14px; }
+.thunder-window {
+  display: inline-block; margin: 12px 0 0; padding: 6px 12px; border-radius: 99px;
+  background: rgba(183, 156, 255, .14); border: 1px solid rgba(183, 156, 255, .42);
+  color: #d6c6ff; font-size: 12.5px; font-weight: 700;
+}
+.sea-sky-tip { margin: 10px 0 0; max-width: 560px; color: rgba(220, 228, 236, .6); font-size: 12px; }
 .ec-probability { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .probability-orb {
   --p: calc(var(--probability) * 1%);
@@ -418,8 +427,6 @@ button { font: inherit; }
 /* ---- 响应式 ---- */
 @media (max-width: 800px) {
   .workspace { grid-template-columns: 1fr auto; }
-  .destination-field { grid-column: 1 / -1; padding: 0 2px 14px; margin-bottom: 13px; border-right: 0; border-bottom: 1px solid var(--line); }
-  .horizon-field { padding-left: 2px; }
   .ec-hero { padding: 28px; gap: 26px; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }
   .metric-tile:nth-child(2) { border-right: 0; }
@@ -435,7 +442,7 @@ button { font: inherit; }
   .intro { padding: 48px 0 28px; }
   .intro h1 { font-size: 54px; }
   .workspace { grid-template-columns: 1fr; padding: 13px; }
-  .workspace-section, .horizon-field { padding: 0 2px; border: 0; }
+  .horizon-field { padding: 0 2px; }
   .query-btn { width: 100%; margin: 14px 0 0; }
   .ec-hero { grid-template-columns: 1fr; gap: 22px; min-height: 0; padding: 22px; }
   .probability-orb { width: 138px; }

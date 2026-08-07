@@ -12,10 +12,10 @@ const { renderWeatherApp } = ctx.__out;
 
 const DAYS = ['2026-08-08', '2026-08-09', '2026-08-10'];
 
-function day(d, low = 20, mid = 20, high = 90, precip = 0, wind = 20) {
+function day(d, low = 20, mid = 20, high = 90, precip = 0, wind = 20, codes = 0) {
   const time = Array.from({ length: 24 }, (_, i) => `${d}T${String(i).padStart(2, '0')}:00`);
   const fill = (v) => Array(24).fill(v);
-  return { time, cloud_cover_low: fill(low), cloud_cover_mid: fill(mid), cloud_cover_high: fill(high), precipitation: fill(precip), wind_speed_10m: fill(wind) };
+  return { time, cloud_cover_low: fill(low), cloud_cover_mid: fill(mid), cloud_cover_high: fill(high), precipitation: fill(precip), wind_speed_10m: fill(wind), weather_code: Array.isArray(codes) ? [...codes] : fill(codes) };
 }
 function ens(members) {
   const h = day(DAYS[0]);
@@ -26,12 +26,13 @@ function ens(members) {
     h[`cloud_cover_high${s}`] = Array(24).fill(m.high);
     h[`precipitation${s}`] = Array(24).fill(m.precip);
     h[`wind_speed_10m${s}`] = Array(24).fill(m.wind);
+    h[`weather_code${s}`] = Array(24).fill(m.codes ?? 0);
   });
   return h;
 }
-function allDay(d) {
+function allDay(d, codes = 0) {
   const time = Array.from({ length: 24 }, (_, i) => `${d}T${String(i).padStart(2, '0')}:00`);
-  return { time, cloud_cover_low: Array(24).fill(20), cloud_cover_mid: Array(24).fill(20), cloud_cover_high: Array(24).fill(90), precipitation: Array(24).fill(0), wind_speed_10m: Array(24).fill(20) };
+  return { time, cloud_cover_low: Array(24).fill(20), cloud_cover_mid: Array(24).fill(20), cloud_cover_high: Array(24).fill(90), precipitation: Array(24).fill(0), wind_speed_10m: Array(24).fill(20), weather_code: Array.isArray(codes) ? [...codes] : Array(24).fill(codes) };
 }
 
 const members = Array.from({ length: 51 }, () => ({ low: 20, mid: 20, high: 90, precip: 0, wind: 20 }));
@@ -79,5 +80,19 @@ if (!(iHero < iSky && iSky < iCross && iCross < iRail)) { console.error('ORDER F
 
 const htmlF = renderWeatherApp(bundle, dest, 3, DAYS[2], { skyView: 'forecast', skyIndex: 32 });
 if (!htmlF.includes('data-sky-view="ec" hidden') || !htmlF.includes('sky-crosshair-line')) { console.error('VIEW/SKY FAIL'); process.exit(1); }
+
+// 雷雨日：云量低但有雷阵雨 → 适合出行 + 雷雨注意时段徽章 + 低中云提示文案
+const thunderCodes = Array(24).fill(0);
+thunderCodes[13] = 95; thunderCodes[14] = 95; thunderCodes[15] = 96; // 13:00–15:00
+const thunderBundle = {
+  ...bundle,
+  deterministic: { ...bundle.deterministic, 'ECMWF IFS': { hourly: allDay(DAYS[0], thunderCodes) } },
+  ensembles: { 'ECMWF IFS 集合': { hourly: ens(Array.from({ length: 51 }, () => ({ low: 20, mid: 20, high: 90, precip: 0, wind: 20, codes: thunderCodes }))) }, 'GFS 集合': { hourly: ens(members.slice(0, 3)) } },
+};
+const htmlT = renderWeatherApp(thunderBundle, dest, 3, null, {});
+for (const c of ['verdict-badge good', '⚡ 13:00–15:00 有雷阵雨，注意避雨', '海边天色重点看低云与中云', '阈值 <75%']) {
+  if (!htmlT.includes(c)) { console.error('THUNDER/COPY MISSING:', c); process.exit(1); }
+}
+if (!htmlT.includes('data-mood="thunder"')) { console.error('THUNDER MOOD FAIL'); process.exit(1); }
 
 console.log('render smoke OK; html length', html.length);

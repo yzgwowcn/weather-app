@@ -40,7 +40,12 @@ const server = http.createServer((req, res) => {
   check('外部模型验证统计', await page.locator('.cross-stat').count() === 3);
   const statText = await page.locator('.cross-stats').textContent();
   check('支持/反对/缺失数值', /支持\s*\d+[\s\S]*?反对\s*\d+[\s\S]*?缺失\s*\d+/.test(statText.replace(/\s+/g, ' ')), statText.replace(/\s+/g, ' ').slice(0, 60));
-  check('body mood 已应用', /sunny|cloudy|rainy|windy|storm|neutral/.test(await page.getAttribute('body', 'data-mood')), await page.getAttribute('body', 'data-mood'));
+  check('body mood 已应用', /sunny|cloudy|rain|windy|storm|thunder|neutral/.test(await page.getAttribute('body', 'data-mood')), await page.getAttribute('body', 'data-mood'));
+
+  // 布局：预报范围在目的地选择下方（y 坐标更大）
+  const destBox = await page.locator('.destination-field').boundingBox();
+  const horizonBox = await page.locator('.horizon-field').boundingBox();
+  check('预报范围位于目的地下方', destBox.y + destBox.height < horizonBox.y, `dest y=${Math.round(destBox.y + destBox.height)} horizon y=${Math.round(horizonBox.y)}`);
 
   // 悬停提示（先滚动到图表区域，再 mouse.move 模拟真实指针）
   await page.locator('.sky-view-pane:not([hidden])').scrollIntoViewIfNeeded();
@@ -58,13 +63,15 @@ const server = http.createServer((req, res) => {
   check('切换综合预报视图', await page.locator('.sky-view-pane[data-sky-view="forecast"]').isVisible());
   check('EC 视图隐藏', !(await page.locator('.sky-view-pane[data-sky-view="ec"]').isVisible()));
 
-  // 日期切换联动 mood
+  // 日期切换联动 mood（新值域：thunder/rain 取代 rainy）
   const moods = new Set();
   for (let i = 0; i < 7; i++) {
     const chip = page.locator('.date-chip').nth(i);
     if (await chip.count()) { await chip.click(); await page.waitForTimeout(80); moods.add(await page.getAttribute('body', 'data-mood')); }
   }
-  check('日期切换收集到 mood 变化', moods.size >= 1, [...moods].join(','));
+  check('日期切换收集到 mood 变化', moods.size >= 1 && [...moods].every((m) => /sunny|cloudy|rain|windy|storm|thunder|neutral/.test(m)), [...moods].join(','));
+  const thunderCount = await page.locator('.thunder-window').count();
+  check('雷雨徽章渲染正常（0 或含时段文案）', thunderCount === 0 || /⚡ .*有雷阵雨，注意避雨/.test(await page.locator('.thunder-window').textContent()), `thunder-window=${thunderCount}`);
   await page.close();
 
   // 移动端
