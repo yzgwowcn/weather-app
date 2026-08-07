@@ -72,11 +72,11 @@ const checks = ['ec-hero', 'verdict-badge good', 'EC 集合晴好率', '100%', '
 for (const c of checks) {
   if (!html.includes(c)) { console.error('MISSING:', c); process.exit(1); }
 }
+const iRail = html.indexOf('date-rail');
 const iHero = html.indexOf('ec-hero');
 const iSky = html.indexOf('sky-section');
 const iCross = html.indexOf('cross-section');
-const iRail = html.indexOf('date-rail');
-if (!(iHero < iSky && iSky < iCross && iCross < iRail)) { console.error('ORDER FAIL'); process.exit(1); }
+if (!(iRail < iHero && iHero < iSky && iSky < iCross)) { console.error('ORDER FAIL'); process.exit(1); }
 
 const htmlF = renderWeatherApp(bundle, dest, 3, DAYS[2], { skyView: 'forecast', skyIndex: 32 });
 if (!htmlF.includes('data-sky-view="ec" hidden') || !htmlF.includes('sky-crosshair-line')) { console.error('VIEW/SKY FAIL'); process.exit(1); }

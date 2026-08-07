@@ -30,6 +30,12 @@
     resultEl.innerHTML = renderWeatherApp(state.bundle, state.dest, state.days, state.selectedDate, { skyView: state.skyView, skyIndex: state.skyIndex });
     const mood = resultEl.querySelector('[data-mood]')?.dataset.mood || 'neutral';
     document.body.dataset.mood = mood;
+    // 雨滴特效：rain/storm/thunder 启动（thunder 额外开闪电），其余停止；reduced-motion 不启动
+    if (mood === 'rain' || mood === 'storm' || mood === 'thunder') {
+      RainFX.start({ lightning: mood === 'thunder' });
+    } else {
+      RainFX.stop();
+    }
     const newScroll = resultEl.querySelector('.sky-scroll');
     if (newScroll) newScroll.scrollLeft = scrollLeft;
   }

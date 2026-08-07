@@ -303,5 +303,5 @@ function renderWeatherApp(bundle, destination, requestedDays, selectedDate, ui =
   const skyView = ui.skyView === 'forecast' ? 'forecast' : 'ec';
   const skyIndex = ui.skyIndex;
   const farNotice = requestedDays > 7 ? '<p class="notice">第 8 天及以后仅适合作趋势参考，临近出行请再次更新。</p>' : '';
-  return `${farNotice}${renderEcHero(selected, selected.assessment, destination)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderDayRail(days, currentDate)}${renderForecastCards(days, currentDate)}${renderMarineCards(bundle.marine, destination)}`;
+  return `${farNotice}${renderDayRail(days, currentDate)}${renderEcHero(selected, selected.assessment, destination)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderForecastCards(days, currentDate)}${renderMarineCards(bundle.marine, destination)}`;
 }

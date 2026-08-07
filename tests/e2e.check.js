@@ -42,10 +42,22 @@ const server = http.createServer((req, res) => {
   check('支持/反对/缺失数值', /支持\s*\d+[\s\S]*?反对\s*\d+[\s\S]*?缺失\s*\d+/.test(statText.replace(/\s+/g, ' ')), statText.replace(/\s+/g, ' ').slice(0, 60));
   check('body mood 已应用', /sunny|cloudy|rain|windy|storm|thunder|neutral/.test(await page.getAttribute('body', 'data-mood')), await page.getAttribute('body', 'data-mood'));
 
+  // 雨滴特效：canvas 存在，且 RainFX 随 mood 启停
+  check('雨滴 canvas 存在', await page.locator('#rain-layer').count() === 1);
+  const currentMood = await page.getAttribute('body', 'data-mood');
+  const rainRunning = await page.evaluate(() => typeof RainFX !== 'undefined' && RainFX.running);
+  const shouldRain = ['rain', 'storm', 'thunder'].includes(currentMood);
+  check('雨效随 mood 启停', rainRunning === shouldRain, `mood=${currentMood} running=${rainRunning}`);
+
   // 布局：预报范围在目的地选择下方（y 坐标更大）
   const destBox = await page.locator('.destination-field').boundingBox();
   const horizonBox = await page.locator('.horizon-field').boundingBox();
   check('预报范围位于目的地下方', destBox.y + destBox.height < horizonBox.y, `dest y=${Math.round(destBox.y + destBox.height)} horizon y=${Math.round(horizonBox.y)}`);
+
+  // 布局：日期选择位于 EC 主结论（是否建议出行）上方
+  const railBox = await page.locator('.date-rail').boundingBox();
+  const heroBox = await page.locator('.ec-hero').boundingBox();
+  check('日期选择位于主结论上方', railBox.y + railBox.height < heroBox.y, `rail y=${Math.round(railBox.y + railBox.height)} hero y=${Math.round(heroBox.y)}`);
 
   // 悬停提示（先滚动到图表区域，再 mouse.move 模拟真实指针）
   await page.locator('.sky-view-pane:not([hidden])').scrollIntoViewIfNeeded();
@@ -95,6 +107,8 @@ const server = http.createServer((req, res) => {
     return { beforeAnim: before.animationName, bodyTransition: getComputedStyle(document.body).transitionDuration };
   });
   check('reduced-motion 关闭背景动画', anim.beforeAnim === 'none', anim.beforeAnim);
+  const rmRain = await rm.evaluate(() => typeof RainFX !== 'undefined' && RainFX.running);
+  check('reduced-motion 不启动雨效', rmRain === false, `running=${rmRain}`);
   await rm.close();
 
   await browser.close();
