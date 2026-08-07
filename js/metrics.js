@@ -9,7 +9,7 @@
 const Metrics = (() => {
   const DAY_START = 8;
   const DAY_END = 18;
-  const THRESHOLDS = { lowMidCloud: 75, wind: 30 };
+  const THRESHOLDS = { lowMidCloud: 75, wind: 30, gustAlert: 40 };
   const LOW_WEIGHT = 0.6;
   const MID_WEIGHT = 0.4;
   // 中雨及以上（持续降水）：任一小时出现即阻断出行
@@ -76,8 +76,10 @@ const Metrics = (() => {
     const mid = mean(values.mid);
     const high = mean(values.high);
     const precipitationSum = values.precipitation.filter(Number.isFinite).reduce((sum, value) => sum + value, 0);
+    const windMean = mean(values.wind);
     const windMax = max(values.wind);
-    if (low == null || mid == null || values.precipitation.filter(Number.isFinite).length < 6 || windMax == null) return null;
+    const gustMax = max(values.gusts);
+    if (low == null || mid == null || values.precipitation.filter(Number.isFinite).length < 6 || windMean == null) return null;
     const maskMean = maskOf(low, mid);
     // 天气码判定：weather_code 缺失时降级为不阻断（仅按云量与风判定）
     const codes = values.weatherCode.filter(Number.isFinite).map(Number);
@@ -85,16 +87,23 @@ const Metrics = (() => {
     const thunderWindows = codes.length
       ? mergeHourRanges(values.hours.filter((_, index) => THUNDER_CODES.has(codes[index])))
       : [];
+    // 短时大阵风提醒时段（日间阵风 ≥ 40 km/h 的连续时段，不参与出行判断）
+    const gustWindows = values.gusts.length
+      ? mergeHourRanges(values.hours.filter((_, index) => values.gusts[index] >= THRESHOLDS.gustAlert))
+      : [];
     return {
       lowMean: low,
       midMean: mid,
       highMean: high,
       maskMean,
       precipitationSum,
+      windMean,
       windMax,
+      gustMax,
+      gustWindows,
       blocked,
       thunderWindows,
-      suitable: !blocked && maskMean < THRESHOLDS.lowMidCloud && windMax < THRESHOLDS.wind,
+      suitable: !blocked && maskMean < THRESHOLDS.lowMidCloud && windMean < THRESHOLDS.wind,
     };
   }
   function valuesForMember(hourly, indexes, suffix = '') {
@@ -105,6 +114,7 @@ const Metrics = (() => {
       high: indexes.map((index) => toNumber(hourly[key('cloud_cover_high')]?.[index])),
       precipitation: indexes.map((index) => toNumber(hourly[key('precipitation')]?.[index])),
       wind: indexes.map((index) => toNumber(hourly[key('wind_speed_10m')]?.[index])),
+      gusts: indexes.map((index) => toNumber(hourly[key('wind_gusts_10m')]?.[index])),
       weatherCode: indexes.map((index) => toNumber(hourly[key('weather_code')]?.[index])),
       hours: indexes.map((index) => hourFromTime(hourly.time[index])),
     };
@@ -182,7 +192,7 @@ const Metrics = (() => {
     if (!ecMain) return { mood: 'neutral', label: '数据待补充' };
     const thunder = ecMain.thunderWindows.length > 0;
     const rainy = ecMain.blocked;
-    const windy = ecMain.windMax >= THRESHOLDS.wind;
+    const windy = ecMain.windMean >= THRESHOLDS.wind;
     if (thunder) return { mood: 'thunder', label: '雷阵雨' };
     if (rainy && windy) return { mood: 'storm', label: '风雨' };
     if (rainy) return { mood: 'rain', label: '雨' };
@@ -201,9 +211,12 @@ const Metrics = (() => {
       const ensemble = ensembleSources.filter((source) => source.days[date]).map((source) => ({ name: source.name, ...source.days[date] }));
       const deterministic = modelSources.filter((source) => source.days[date]).map((source) => ({ name: source.name, ...source.days[date] }));
       const probability = ecEnsemble ? ecEnsemble.probability : null;
+      // 集合反超：主运行不适合但 EC 集合晴好率 ≥75% 时依旧建议出行（主运行为少数派）
+      const finalSuitable = ecMain ? (ecMain.suitable || (probability != null && probability >= 75)) : null;
       all[date] = {
         date,
         probability,
+        finalSuitable,
         ec: { main: ecMain, ensemble: ecEnsemble, memberConsistency: memberConsistency(ecEnsemble, ecMain) },
         crossModel: externalVerdict(ecMain, modelSources, date),
         weatherMood: moodFor(ecMain),

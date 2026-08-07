@@ -32,6 +32,9 @@
     resultEl.innerHTML = renderWeatherApp(state.bundle, state.dest, state.days, state.selectedDate, { skyView: state.skyView, skyIndex: state.skyIndex });
     const mood = resultEl.querySelector('[data-mood]')?.dataset.mood || 'neutral';
     document.body.dataset.mood = mood;
+    // 云量分档（clear/partly/cloudy）驱动背景晴蓝视觉
+    const cloudBand = resultEl.querySelector('[data-cloud]')?.dataset.cloud;
+    if (cloudBand) document.body.dataset.cloud = cloudBand;
     // 雨滴特效：rain/storm/thunder 启动（thunder 额外开闪电，强度随雷暴数据）；reduced-motion 不启动
     if (mood === 'rain' || mood === 'storm' || mood === 'thunder') {
       const heroEl = resultEl.querySelector('[data-mood]');

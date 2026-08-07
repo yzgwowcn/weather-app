@@ -244,24 +244,32 @@ function renderSkySection(cloudSeries, dates, skyView, skyIndex) {
 
 function renderEcHero(day, assessment, destination) {
   const main = assessment.ec.main;
-  const suitable = main?.suitable === true;
+  const finalSuitable = assessment.finalSuitable === true;
+  const ensembleOverturn = finalSuitable && main && !main.suitable;
   const [condition] = weatherMeta(day.code);
   const verdict = main
-    ? (main.suitable ? { text: '适合出行', cls: 'good' } : { text: '不建议出行', cls: 'bad' })
+    ? (finalSuitable ? { text: '适合出行', cls: 'good' } : { text: '不建议出行', cls: 'bad' })
     : { text: '数据待补充', cls: 'none' };
   const basis = main
-    ? `加权遮蔽云量 ${Math.round(main.maskMean)}% · 累计降水 ${main.precipitationSum.toFixed(1)} mm · 最大风速 ${Math.round(main.windMax)} km/h`
+    ? `加权遮蔽云量 ${Math.round(main.maskMean)}% · 累计降水 ${main.precipitationSum.toFixed(1)} mm · 平均风速 ${Math.round(main.windMean)} km/h`
     : 'EC 主运行暂未返回，页面依据综合预报示意。';
+  const overturnNote = ensembleOverturn
+    ? `EC 集合晴好率 ${Metrics.formatPercent(assessment.probability)}，主运行与集合方向相反，以集合晴好率为准。`
+    : '';
   const thunder = main && main.thunderWindows.length
     ? `<p class="thunder-window"><img class="thunder-icon" src="assets/icons/lightning-bolt.svg" alt="" aria-hidden="true">${formatWindows(main.thunderWindows)} 有雷阵雨，注意避雨</p>` : '';
+  const gust = main && main.gustWindows && main.gustWindows.length
+    ? `<p class="gust-window">⚠ ${formatWindows(main.gustWindows)} 有短时大阵风（峰值 ${Math.round(main.gustMax)} km/h），注意防风</p>` : '';
   const consistency = assessment.ec.memberConsistency;
   return `
-  <section class="ec-hero" data-mood="${assessment.weatherMood.mood}" data-thunder-intensity="${Metrics.thunderIntensity(day, main)}">
+  <section class="ec-hero" data-mood="${assessment.weatherMood.mood}" data-cloud="${day.cloud < 30 ? 'clear' : day.cloud < 60 ? 'partly' : 'cloudy'}" data-thunder-intensity="${Metrics.thunderIntensity(day, main)}">
     <div class="ec-verdict">
       <p class="section-kicker">ECMWF 主运行 · 08:00–18:00 · ${destination.name}</p>
-      <div class="verdict-row">${lottieMarkup(day.iconCodes ?? [[], [], []], 'weather-symbol', suitable, day.code)}<h2>${verdict.text}</h2><span class="verdict-badge ${verdict.cls}">${verdict.text}</span></div>
+      <div class="verdict-row">${lottieMarkup(day.iconCodes ?? [[], [], []], 'weather-symbol', finalSuitable, day.code)}<h2>${verdict.text}</h2><span class="verdict-badge ${verdict.cls}">${verdict.text}</span></div>
       <p class="verdict-basis">${basis}。${condition}，${cloudWord(day.cloud)}。</p>
+      ${overturnNote ? `<p class="overturn-note">${overturnNote}</p>` : ''}
       ${thunder}
+      ${gust}
       <p class="sea-sky-tip">海边天色重点看低云与中云影响最大，高云仅供参考。</p>
     </div>
     <div class="ec-probability">
@@ -283,7 +291,7 @@ function renderEcMetrics(assessment) {
   return `<section class="metric-grid" aria-label="EC 主结论判断依据">
     ${metricTile('加权遮蔽云量', `${Math.round(main.maskMean)}%`, '低云×60% + 中云×40% · 阈值 <75%', 'cloud')}
     ${metricTile('累计降水', `${main.precipitationSum.toFixed(1)} mm`, '日间累计 · 阈值 <1 mm')}
-    ${metricTile('最大风速', `${Math.round(main.windMax)} km/h`, '日间最大 · 阈值 <30')}
+    ${metricTile('平均风速', `${Math.round(main.windMean)} km/h`, '日间平均 · 阈值 <30')}
     ${metricTile('高云参考', main.highMean == null ? '—' : `${Math.round(main.highMean)}%`, '薄云与霞光参考，不参与扣分', 'high-cloud')}
   </section>`;
 }
@@ -298,7 +306,7 @@ function renderCrossModel(assessment) {
       return `<li><span>${name}</span><b class="caution">${failed ? '请求失败' : '数据不足'}</b><small>未参与验证</small></li>`;
     }
     const agree = direction != null && model.suitable === direction;
-    return `<li><span>${name}</span><b class="${agree ? 'support' : 'caution'}">${agree ? '支持 EC' : '与 EC 分歧'}</b><small>遮蔽 ${Math.round(model.maskMean)}% · 雨 ${model.precipitationSum.toFixed(1)} mm · 风 ${Math.round(model.windMax)} km/h</small></li>`;
+    return `<li><span>${name}</span><b class="${agree ? 'support' : 'caution'}">${agree ? '支持 EC' : '与 EC 分歧'}</b><small>遮蔽 ${Math.round(model.maskMean)}% · 雨 ${model.precipitationSum.toFixed(1)} mm · 风 ${Math.round(model.windMean)} km/h</small></li>`;
   }).join('');
   return `
   <section class="cross-section" aria-label="外部模型验证">
@@ -330,7 +338,7 @@ function renderForecastCards(days, selectedDate) {
       return `<article class="forecast-card ${active ? 'selected' : ''}">
         <button type="button" class="forecast-summary" data-select-date="${day.date}" aria-label="查看 ${dateLabel(day.date)} 的判断">
           <div class="forecast-date"><span>${index === 0 ? '今天' : dateLabel(day.date)}</span><small>${horizonText(index)}</small></div>
-          ${lottieMarkup(day.iconCodes ?? [[], [], []], 'forecast-symbol', day.assessment.ec.main?.suitable === true, day.code)}
+          ${lottieMarkup(day.iconCodes ?? [[], [], []], 'forecast-symbol', day.assessment.finalSuitable === true, day.code)}
           <div class="forecast-condition"><strong>${probabilityWord(day.assessment.probability)}</strong><span>${condition} · ${Math.round(day.low)}°–${Math.round(day.high)}°</span></div>
           <div class="forecast-probability"><b>${Metrics.formatPercent(day.assessment.probability)}</b><small>${consistency.text}</small></div>
         </button>

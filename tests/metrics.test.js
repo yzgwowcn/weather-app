@@ -12,13 +12,14 @@ const Metrics = context.metricsUnderTest;
 const DAY = '2026-08-08';
 
 // 日间（08:00–17:00 共 10 小时）确定性响应夹具
-function hourlyFixture({ low = 20, mid = 20, high = 100, precip = 0, wind = 20, hours = 10, codes = 0 } = {}) {
+function hourlyFixture({ low = 20, mid = 20, high = 100, precip = 0, wind = 20, gusts, hours = 10, codes = 0 } = {}) {
   const time = Array.from({ length: hours }, (_, i) => `${DAY}T${String(8 + i).padStart(2, '0')}:00`);
   const fill = (v) => Array(hours).fill(v);
   return {
     time,
     cloud_cover_low: fill(low), cloud_cover_mid: fill(mid), cloud_cover_high: fill(high),
     precipitation: fill(precip), wind_speed_10m: fill(wind),
+    wind_gusts_10m: gusts == null ? fill(wind + 5) : (Array.isArray(gusts) ? [...gusts] : fill(gusts)),
     weather_code: Array.isArray(codes) ? [...codes] : fill(codes),
   };
 }
@@ -115,10 +116,31 @@ function ecMain(hourly = hourlyFixture()) { return { 'ECMWF IFS': { hourly } }; 
   assert.equal(result.ec.main.suitable, true, '遮蔽 74% 可出行');
 }
 
-// 8. 最大风速恰 30 km/h → 保留必要条件
+// 8. 平均风速恰 30 km/h → 不满足严格 <30（风力判断用日间平均）
 {
   const result = assess(ecEnsemble([{ low: 10, mid: 10, high: 0, precip: 0, wind: 20 }]), ecMain(hourlyFixture({ wind: 30 })));
-  assert.equal(result.ec.main.suitable, false, '最大风速恰 30 不满足严格 <30');
+  assert.equal(result.ec.main.suitable, false, '平均风速恰 30 不满足严格 <30');
+}
+// 8b. 平均风速达标但短时大阵风 → 仍适合出行，仅生成阵风提醒时段
+{
+  const gusts = [25, 25, 25, 25, 45, 55, 45, 25, 25, 25]; // 12–14 时阵风超 40
+  const result = assess(ecEnsemble([{ low: 10, mid: 10, high: 0, precip: 0, wind: 20 }]), ecMain(hourlyFixture({ wind: 22, gusts })));
+  assert.equal(result.ec.main.suitable, true, '短时大阵风不影响出行判断（平均风 22 <30）');
+  assert.equal(JSON.stringify(result.ec.main.gustWindows), JSON.stringify([[12, 14]]), '阵风 ≥40 km/h 连续时段为 12–14');
+  assert.equal(result.ec.main.gustMax, 55, '阵风峰值 55');
+}
+// 8c. EC 集合晴好率 ≥75% 但主运行不适合 → 集合反超，最终建议出行
+{
+  const members = Array.from({ length: 51 }, () => ({ low: 20, mid: 20, high: 90, precip: 0, wind: 20 }));
+  const result = assess(ecEnsemble(members), ecMain(hourlyFixture({ wind: 35 })));
+  assert.equal(result.ec.main.suitable, false, '主运行平均风 35 不适合');
+  assert.equal(result.finalSuitable, true, '集合 51 成员全晴好 → 反超为适合出行');
+}
+// 8d. 集合晴好率不足 75% → 不反超
+{
+  const members = Array.from({ length: 51 }, (_, i) => ({ low: 20, mid: 20, high: 90, precip: 0, wind: i < 20 ? 35 : 20 }));
+  const result = assess(ecEnsemble(members), ecMain(hourlyFixture({ wind: 35 })));
+  assert.equal(result.finalSuitable, false, '集合晴好率约 61% <75% → 不反超');
 }
 
 // 9. weather_code 缺失 → 降级为不阻断，仅按云量与风判定

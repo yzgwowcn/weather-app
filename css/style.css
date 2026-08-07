@@ -36,6 +36,18 @@ body {
   background:
     radial-gradient(120% 90% at 50% -10%, rgba(255, 196, 96, .38), transparent 60%),
     linear-gradient(160deg, #1b2338 0%, #2a3348 55%, #192131 100%);
+  transition: background 1.2s ease;
+}
+/* 云量分档：云越少越有大太阳 + 蓝天蓝海感（clear <30% / partly 30–60% / cloudy ≥60% 默认） */
+body[data-cloud="clear"] {
+  background:
+    radial-gradient(120% 95% at 50% -10%, rgba(255, 216, 130, .55), transparent 62%),
+    linear-gradient(160deg, #2b5488 0%, #4a7db8 55%, #2b4a72 100%);
+}
+body[data-cloud="partly"] {
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(255, 205, 110, .44), transparent 60%),
+    linear-gradient(160deg, #243b68 0%, #3a5f8f 55%, #24354f 100%);
 }
 /* 背景结构：底色恒为暖金阳光基调（"晴天阳光偏多"）；
    ::before 固定日照渐层并缓慢漂移；
@@ -55,15 +67,32 @@ body::before {
     radial-gradient(120% 90% at 50% -10%, rgba(120, 150, 205, .28), transparent 62%);
   animation: sun-drift 26s ease-in-out infinite alternate;
 }
+/* 云量越低：日照光层更强（大太阳感） */
+body[data-cloud="clear"]::before {
+  background:
+    radial-gradient(95% 75% at 68% 6%, rgba(255, 232, 160, .8), transparent 60%),
+    radial-gradient(130% 100% at 50% -12%, rgba(150, 195, 245, .5), transparent 66%);
+}
+body[data-cloud="partly"]::before {
+  background:
+    radial-gradient(92% 72% at 68% 7%, rgba(255, 215, 130, .62), transparent 58%),
+    radial-gradient(125% 95% at 50% -10%, rgba(135, 175, 225, .38), transparent 63%);
+}
 body::after { opacity: 0; }
 
-/* ---- sunny：光斑呼吸（晴底默认态） ---- */
+/* ---- sunny：光斑呼吸（晴底默认态）；云量低时光斑更强 */
 body[data-mood="sunny"]::after {
   opacity: 1;
   background:
     radial-gradient(340px 180px at 22% 18%, rgba(255, 226, 150, .16), transparent 70%),
     radial-gradient(420px 220px at 78% 30%, rgba(255, 238, 190, .10), transparent 70%);
   animation: sun-breathe 11s ease-in-out infinite alternate;
+}
+body[data-mood="sunny"][data-cloud="clear"]::after {
+  background:
+    radial-gradient(400px 210px at 20% 16%, rgba(255, 240, 185, .34), transparent 70%),
+    radial-gradient(480px 250px at 78% 26%, rgba(255, 246, 215, .24), transparent 70%),
+    radial-gradient(300px 160px at 55% 40%, rgba(190, 225, 255, .18), transparent 70%);
 }
 @keyframes sun-drift { from { transform: translate3d(-1.5%, 0, 0) scale(1); } to { transform: translate3d(1.5%, -1%, 0) scale(1.04); } }
 @keyframes sun-breathe { from { opacity: .55; } to { opacity: 1; } }
@@ -244,6 +273,16 @@ button { font: inherit; }
   display: inline-block; margin: 12px 0 0; padding: 6px 12px; border-radius: 99px;
   background: rgba(183, 156, 255, .14); border: 1px solid rgba(183, 156, 255, .42);
   color: #d6c6ff; font-size: 12.5px; font-weight: 700;
+}
+/* 短时大阵风提醒（平均风力不足为虑，仅提示短时大风时段） */
+.gust-window {
+  display: inline-block; margin: 12px 0 0; padding: 6px 12px; border-radius: 99px;
+  background: rgba(242, 192, 99, .13); border: 1px solid rgba(242, 192, 99, .4);
+  color: #f6d9a3; font-size: 12.5px; font-weight: 700;
+}
+/* 集合反超主运行说明 */
+.overturn-note {
+  margin: 10px 0 0; color: var(--blue); font-size: 13px;
 }
 .sea-sky-tip { margin: 10px 0 0; max-width: 560px; color: rgba(226, 233, 240, .68); font-size: 13px; }
 .ec-probability { display: flex; flex-direction: column; align-items: center; gap: 10px; }
