@@ -1,5 +1,16 @@
 # 更新日志
 
+## v1.6（2026-08-07）
+
+### 变更（可读性优化）
+- **恢复天气背景**：`#fluid-glass` canvas 改为透明背景（不再显示全屏 FBO 渐变），`body[data-mood]` 天气状态机重新可见——晴天阳光光斑呼吸、多云云影、大风气流光带、雷阵雨闪电（`js/rain.js` Canvas 接管）
+- **流体玻璃改为面板折射**：移除跟随鼠标的 `lens.glb` 透镜与全屏 quad；`.workspace / .ec-hero / .metric-grid / .cross-stat / .date-chip` 五个玻璃面板每个渲染为圆角折射 mesh（`MeshTransmissionMaterial`，ior 1.1 / thickness 5 / chromaticAberration 0.1，samples 6），位置/尺寸逐帧与 HTML 元素同步（滚动、重渲染、resize 均跟随）；折射方向随鼠标位置轻微流动（`uPointerTilt`，指数阻尼）——无透镜遮挡、不影响阅读
+- **面板通透化**：五个折射面板去掉 `backdrop-filter` 模糊（模糊会盖掉折射层），底色透明度调低（`--glass` .055→.04）；新增轻量 `text-shadow` 补偿小字对比度；`site-header`/`sky-tooltip` 保留毛玻璃
+- **依赖精简**：移除 `assets/3d/lens.glb`、`vendor/addons/`（GLTFLoader/DRACOLoader/BufferGeometryUtils）与 `vendor/draco/` 解码器，`vendor/` 仅保留 three.js 核心两文件
+
+### 测试
+- `tests/css.check.js` 断言更新：`saturate(1.5)` 检查替换为"折射面板不得使用 backdrop-filter"
+
 ## v1.5（2026-08-07）
 
 ### 新增

@@ -6,8 +6,9 @@
   --ink: #f2f5f9;
   --muted: rgba(222, 230, 238, .74);
   --line: rgba(255, 255, 255, .13);
-  --glass: rgba(255, 255, 255, .055);
-  --glass-strong: rgba(255, 255, 255, .085);
+  /* 面板底更通透：流体玻璃折射层（#fluid-glass）在面板之下透出 */
+  --glass: rgba(255, 255, 255, .04);
+  --glass-strong: rgba(255, 255, 255, .065);
   --blue: #7db4ff;
   --blue-soft: rgba(125, 180, 255, .14);
   --green: #6fd8b4;
@@ -129,6 +130,11 @@ body[data-mood="storm"]::after {
 
 button { font: inherit; }
 .page-shell { width: min(1180px, calc(100% - 40px)); margin: auto; position: relative; z-index: 2; }
+/* 折射面板文字对比度补偿：无 backdrop-filter 后，光斑可能让局部背景变亮，
+   轻量文字阴影保证小字可读性（对白底 active 态影响可忽略） */
+.workspace, .ec-hero, .metric-grid, .cross-stat, .date-chip {
+  text-shadow: 0 1px 2px rgba(6, 12, 24, .4);
+}
 
 /* ---- 顶栏 ---- */
 .site-header {
@@ -170,13 +176,11 @@ button { font: inherit; }
 .intro h1 em { color: var(--blue); font-style: normal; text-shadow: 0 0 34px rgba(125, 180, 255, .35); }
 .intro-copy { max-width: 510px; margin: 27px 0 0; color: rgba(226, 233, 240, .72); font-size: 16px; }
 
-/* ---- 查询面板（玻璃） ---- */
+/* ---- 查询面板（玻璃：折射由 js/fluid-glass.js 面板层提供，不再使用 backdrop-filter）---- */
 .workspace {
   display: grid; grid-template-columns: 1fr auto; gap: 14px 0;
   padding: 16px; border: 1px solid transparent; border-radius: var(--r-lg);
   background: var(--glass-border);
-  backdrop-filter: blur(16px) saturate(1.5);
-  -webkit-backdrop-filter: blur(16px) saturate(1.5);
   box-shadow: var(--shadow), var(--glass-highlight);
 }
 .workspace-section { padding: 0 2px; }
@@ -219,14 +223,12 @@ button { font: inherit; }
   background: rgba(242, 192, 99, .1); color: #f6d9a3; font-size: 13px; border-radius: 0 var(--r-sm) var(--r-sm) 0;
 }
 
-/* ---- EC 主结论 hero ---- */
+/* ---- EC 主结论 hero（折射由 fluid-glass 面板层提供） ---- */
 .ec-hero {
   display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: center;
   min-height: 250px; padding: 34px 40px;
   border: 1px solid transparent; border-radius: var(--r-lg);
   background: var(--glass-border);
-  backdrop-filter: blur(18px) saturate(1.5);
-  -webkit-backdrop-filter: blur(18px) saturate(1.5);
   box-shadow: var(--shadow), var(--glass-highlight);
 }
 .ec-hero .section-kicker { color: var(--blue); }
@@ -272,11 +274,11 @@ button { font: inherit; }
 .confidence-pill.unavailable { background: rgba(255, 255, 255, .07); color: var(--muted); }
 .consistency-desc { margin: 2px 0 0; max-width: 230px; color: var(--muted); font-size: 13px; text-align: center; }
 
-/* ---- 判断依据 tiles ---- */
+/* ---- 判断依据 tiles（折射由 fluid-glass 面板层提供） ---- */
 .metric-grid {
   display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 14px;
   border: 1px solid transparent; border-radius: var(--r-md);
-  background: var(--glass-border); backdrop-filter: blur(14px) saturate(1.5); -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  background: var(--glass-border);
   overflow: hidden; box-shadow: 0 12px 30px rgba(3, 9, 20, .25), var(--glass-highlight);
 }
 .metric-tile { min-height: 112px; padding: 19px; border-right: 1px solid var(--line); background: rgba(255, 255, 255, .02); }
@@ -356,7 +358,7 @@ button { font: inherit; }
 .cross-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
 .cross-stat {
   padding: 15px 18px; border: 1px solid transparent; border-radius: var(--r-md);
-  background: var(--glass-border); backdrop-filter: blur(12px) saturate(1.4); -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  background: var(--glass-border);
   box-shadow: var(--glass-highlight);
 }
 .cross-stat span, .cross-stat small { display: block; color: var(--muted); font-size: 12px; }
@@ -383,7 +385,6 @@ button { font: inherit; }
 .date-chip {
   flex: 0 0 100px; padding: 11px 12px; border: 1px solid transparent; border-radius: 12px;
   background: var(--glass-border); color: var(--muted); text-align: left; cursor: pointer;
-  backdrop-filter: blur(10px) saturate(1.4); -webkit-backdrop-filter: blur(10px) saturate(1.4);
   box-shadow: var(--glass-highlight);
   transition: box-shadow .18s ease, background .18s ease;
 }

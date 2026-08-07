@@ -1,22 +1,33 @@
-// 流体玻璃背景：reactbits.dev FluidGlass（lens 模式）的 vanilla three.js 移植。
-// 原组件：https://github.com/DavidHDev/react-bits/blob/main/src/content/Components/FluidGlass/FluidGlass.jsx
-// 复刻参数：chromaticAberration=0.1、scale=0.15、ior=1.1（demo 页面 URL 参数）。
-// 实现要点（与 drei MeshTransmissionMaterial 一致）：
-//   1) 独立背景 scene 每帧渲染到 FBO；
-//   2) 透镜 mesh（lens.glb 的 Cylinder）用 MeshPhysicalMaterial + onBeforeCompile 注入
-//      transmission shader：IOR 折射采样 buffer + 三通道 chromatic aberration + 体积衰减；
-//   3) 透镜跟随指针（指数阻尼，等价 maath easing.damp3，smoothTime=0.15）。
-// 折射内容：网站暖金蓝背景渐变（与 body 背景一致）+ 柔和彩色光斑。
-// 遵守 prefers-reduced-motion：静态渲染一帧，不跟随、不漂移。
+// 流体玻璃面板：把页面玻璃框体做成 FluidGlass 折射效果（vanilla three.js）。
+// 演进：v1.5 为跟随鼠标的透镜 + 全屏背景 quad（遮挡天气背景、干扰阅读），
+// 本版（v1.6）改为：
+//   1) canvas 透明背景，恢复 body[data-mood] 天气背景（阳光/云影/气流/雨+闪电）；
+//   2) 页面玻璃面板（.workspace/.ec-hero/.metric-grid/.cross-stat/.date-chip）每个
+//      渲染为一个圆角矩形折射 mesh（FluidTransmissionMaterial，ior/色散参数与
+//      reactbits FluidGlass demo 一致），折射采样网站暖金蓝渐变 + 漂移光斑的 FBO；
+//   3) 折射方向随鼠标位置轻微流动（uPointerTilt uniform，指数阻尼）——没有透镜、
+//      不遮挡内容，玻璃质感来自面板本身；
+//   4) prefers-reduced-motion：静态渲染单帧，无鼠标响应、光斑不漂移。
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
-const LENS_URL = 'assets/3d/lens.glb';
-const PARAMS = { ior: 1.1, thickness: 5, anisotropy: 0.01, chromaticAberration: 0.1, scale: 0.15, samples: 10, smoothTime: 0.15 };
+const PARAMS = {
+  ior: 1.1,
+  thickness: 5,
+  anisotropy: 0.01,
+  chromaticAberration: 0.1,
+  samples: 6,          // 折射采样数（demo 10，面板多时降为 6 控性能）
+  fov: 58,             // 宽视角让面板折射有入射角
+  cameraZ: 20,
+  pointerStrength: 0.07, // 鼠标对折射法线扰动的最大幅度（世界单位）
+  smoothTime: 0.15,      // 指数阻尼时间（等价 maath damp3）
+};
+
+// 参与折射的玻璃面板（与 css/style.css 的玻璃样式一致）
+const PANEL_SELECTOR = '.workspace, .ec-hero, .metric-grid, .cross-stat, .date-chip';
 
 // ---- FluidTransmissionMaterial：drei MeshTransmissionMaterialImpl 的 vanilla 移植 ----
-// shader 注入代码与 drei 逐字一致（MIT © drei 作者），仅去掉 React 包装。
+// shader 注入与 drei 逐字一致（MIT © drei 作者），仅去掉 React 包装并新增
+// uPointerTilt（折射法线随鼠标轻微倾斜，产生玻璃流动感）。
 class FluidTransmissionMaterial extends THREE.MeshPhysicalMaterial {
   constructor(samples = PARAMS.samples) {
     super();
@@ -38,6 +49,7 @@ class FluidTransmissionMaterial extends THREE.MeshPhysicalMaterial {
       distortionScale: { value: 0.5 },
       temporalDistortion: { value: 0 },
       buffer: { value: null },
+      uPointerTilt: { value: new THREE.Vector3() },
     };
     this.onBeforeCompile = (shader) => {
       shader.uniforms = { ...shader.uniforms, ...this.uniforms };
@@ -52,6 +64,7 @@ class FluidTransmissionMaterial extends THREE.MeshPhysicalMaterial {
       uniform float distortionScale;
       uniform float temporalDistortion;
       uniform sampler2D buffer;
+      uniform vec3 uPointerTilt;
 
       vec3 random3(vec3 c) {
         float j = 4096.0*sin(dot(c,vec3(17.0, 59.4, 15.0)));
@@ -197,7 +210,7 @@ class FluidTransmissionMaterial extends THREE.MeshPhysicalMaterial {
           }
         #endif\n`);
 
-      // transmission_fragment：折射采样主循环（含三通道 chromatic aberration）
+      // transmission_fragment：折射采样主循环（含三通道 chromatic aberration + 鼠标流动）
       shader.fragmentShader = shader.fragmentShader.replace('#include <transmission_fragment>', `
         material.transmission = _transmission;
         material.transmissionAlpha = 1.0;
@@ -225,7 +238,7 @@ class FluidTransmissionMaterial extends THREE.MeshPhysicalMaterial {
           distortionNormal = distortion * vec3(snoiseFractal(vec3((pos * distortionScale + temporalOffset))), snoiseFractal(vec3(pos.zxy * distortionScale - temporalOffset)), snoiseFractal(vec3(pos.yxz * distortionScale + temporalOffset)));
         }
         for (float i = 0.0; i < ${samples}.0; i ++) {
-          vec3 sampleNorm = normalize(n + roughnessFactor * roughnessFactor * 2.0 * normalize(vec3(rand(runningSeed++) - 0.5, rand(runningSeed++) - 0.5, rand(runningSeed++) - 0.5)) * pow(rand(runningSeed++), 0.33) + distortionNormal);
+          vec3 sampleNorm = normalize(n + roughnessFactor * roughnessFactor * 2.0 * normalize(vec3(rand(runningSeed++) - 0.5, rand(runningSeed++) - 0.5, rand(runningSeed++) - 0.5)) * pow(rand(runningSeed++), 0.33) + distortionNormal + uPointerTilt);
           transmissionR = getIBLVolumeRefraction(
             sampleNorm, v, material.roughness, material.diffuseColor, material.specularColor, material.specularF90,
             pos, modelMatrix, viewMatrix, projectionMatrix, material.ior, material.thickness  + thickness_smear * (i + randomCoords) / float(${samples}),
@@ -279,7 +292,7 @@ function makeBackgroundTexture() {
   return tex;
 }
 
-// ---- 柔和光斑纹理（径向渐变）----
+// ---- 柔和光斑纹理（径向渐变，折射可见性来源）----
 function makeBlobTexture(color) {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
@@ -303,17 +316,16 @@ let scene = null;
 let camera = null;
 let bgScene = null;
 let fbo = null;
-let quad = null;
 let bgPlane = null;
-let lens = null;
 let blobs = [];
 let clock = null;
-let rafId = 0;
 let started = false;
 let reducedMotion = false;
 const pointer = { x: 0, y: 0 };
-const target = new THREE.Vector3();
 const blobBases = [];
+// 面板折射系统：el → { el, mesh, material, w, h }（w/h 为当前几何尺寸，单位 px）
+const panels = new Map();
+let unit = 1; // 世界单位/像素（z=0 平面）
 
 function viewportAt(distance) {
   const height = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * distance;
@@ -322,15 +334,13 @@ function viewportAt(distance) {
 
 function buildBgScene() {
   bgScene = new THREE.Scene();
-  // 渐变底平面（铺满 z=0 视口）
   bgPlane = new THREE.Mesh(
     new THREE.PlaneGeometry(1, 1),
     new THREE.MeshBasicMaterial({ map: makeBackgroundTexture() }),
   );
-  const v0 = viewportAt(20);
+  const v0 = viewportAt(PARAMS.cameraZ);
   bgPlane.scale.set(v0.width, v0.height, 1);
   bgScene.add(bgPlane);
-  // 柔和光斑（折射可见性来源）
   const texs = BLOB_COLORS.map(makeBlobTexture);
   BLOB_COLORS.forEach((_, i) => {
     const blob = new THREE.Mesh(
@@ -353,12 +363,109 @@ function buildBgScene() {
 }
 
 function placeBlobs() {
-  const v0 = viewportAt(20);
+  const v0 = viewportAt(PARAMS.cameraZ);
   blobBases.forEach((b) => {
     b.mesh.position.x = (b.fx - 0.5) * v0.width;
     b.mesh.position.y = (b.fy - 0.5) * v0.height;
   });
 }
+
+// ---- 面板折射系统 ----
+
+// 读取元素圆角（px）
+function readRadius(el) {
+  const css = getComputedStyle(el).borderRadius;
+  if (!css || css === '0px') return 0;
+  const m = css.match(/([\d.]+)px/);
+  return m ? Number(m[1]) : 0;
+}
+
+// 圆角矩形 Shape（中心在原点，单位：世界单位）
+function roundedRectShape(w, h, r) {
+  const r2 = Math.max(0, Math.min(r, w / 2, h / 2));
+  const s = new THREE.Shape();
+  s.moveTo(-w / 2 + r2, -h / 2);
+  s.lineTo(w / 2 - r2, -h / 2);
+  s.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + r2);
+  s.lineTo(w / 2, h / 2 - r2);
+  s.quadraticCurveTo(w / 2, h / 2, w / 2 - r2, h / 2);
+  s.lineTo(-w / 2 + r2, h / 2);
+  s.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - r2);
+  s.lineTo(-w / 2, -h / 2 + r2);
+  s.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + r2, -h / 2);
+  return s;
+}
+
+function makePanelEntry(el, radiusPx) {
+  const material = new FluidTransmissionMaterial(PARAMS.samples);
+  material.buffer = fbo.texture;
+  material.ior = PARAMS.ior;
+  material.thickness = PARAMS.thickness;
+  material.anisotropy = PARAMS.anisotropy;
+  material.chromaticAberration = PARAMS.chromaticAberration;
+  material.anisotropicBlur = PARAMS.anisotropy;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+  mesh.position.z = 0.5;
+  scene.add(mesh);
+  const entry = { el, mesh, material, radius: radiusPx * unit, w: 0, h: 0 };
+  panels.set(el, entry);
+  return entry;
+}
+
+function refreshPanels() {
+  document.querySelectorAll(PANEL_SELECTOR).forEach((el) => {
+    if (!panels.has(el)) makePanelEntry(el, readRadius(el));
+  });
+  panels.forEach((entry, el) => {
+    if (!el.isConnected) {
+      scene.remove(entry.mesh);
+      entry.mesh.geometry.dispose();
+      entry.material.dispose();
+      panels.delete(el);
+    }
+  });
+}
+
+function syncPanels() {
+  unit = viewportAt(PARAMS.cameraZ).height / window.innerHeight;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  panels.forEach((entry) => {
+    const rect = entry.el.getBoundingClientRect();
+    const visible = rect.bottom > 0 && rect.top < vh && rect.right > 0 && rect.left < vw;
+    entry.mesh.visible = visible && rect.width > 0 && rect.height > 0;
+    if (!entry.mesh.visible) return;
+    const cx = (rect.left + rect.width / 2 - vw / 2) * unit;
+    const cy = -(rect.top + rect.height / 2 - vh / 2) * unit;
+    entry.mesh.position.set(cx, cy, 0.5);
+    const w = rect.width * unit;
+    const h = rect.height * unit;
+    if (Math.abs(w - entry.w) > unit || Math.abs(h - entry.h) > unit) {
+      entry.mesh.geometry.dispose();
+      entry.mesh.geometry = new THREE.ShapeGeometry(roundedRectShape(w, h, entry.radius), 8);
+      entry.w = w;
+      entry.h = h;
+    }
+  });
+}
+
+function updatePointerTilt(delta) {
+  const v0 = viewportAt(PARAMS.cameraZ);
+  const mx = (pointer.x * v0.width) / 2;
+  const my = (pointer.y * v0.height) / 2;
+  const k = 1 - Math.exp((-delta * 2) / PARAMS.smoothTime);
+  panels.forEach((entry) => {
+    if (!entry.mesh.visible) return;
+    const dx = mx - entry.mesh.position.x;
+    const dy = my - entry.mesh.position.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const tilt = entry.material.uPointerTilt;
+    tilt.x += ((dx / len) * PARAMS.pointerStrength - tilt.x) * k;
+    tilt.y += ((dy / len) * PARAMS.pointerStrength - tilt.y) * k;
+  });
+}
+
+// ---- 初始化与渲染循环 ----
 
 function init() {
   if (started) return;
@@ -372,59 +479,31 @@ function init() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.setClearColor(0x0c1626, 1);
+  renderer.setClearColor(0x000000, 0); // 透明背景，露出 body 天气背景
   const canvas = renderer.domElement;
   canvas.id = 'fluid-glass';
   canvas.setAttribute('aria-hidden', 'true');
   document.body.appendChild(canvas);
 
   scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(15, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 0, 20);
+  camera = new THREE.PerspectiveCamera(PARAMS.fov, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 0, PARAMS.cameraZ);
 
-  // FBO：背景 scene 渲染目标
+  // FBO：背景 scene（渐变 + 光斑）作为面板折射采样源
   fbo = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { samples: 4 });
   buildBgScene();
 
-  // 全屏 quad 显示 FBO 纹理（背景）
-  quad = new THREE.Mesh(
-    new THREE.PlaneGeometry(1, 1),
-    new THREE.MeshBasicMaterial({ map: fbo.texture, transparent: true }),
-  );
-  const v0 = viewportAt(20);
-  quad.scale.set(v0.width, v0.height, 1);
-  scene.add(quad);
+  refreshPanels();
+  // 查询结果重渲染（renderResult）后面板增删
+  const mo = new MutationObserver(() => { refreshPanels(); });
+  mo.observe(document.body, { childList: true, subtree: true });
 
-  // 透镜（lens.glb 的 Cylinder，Draco 压缩），加载完成后开启动画
-  const material = new FluidTransmissionMaterial(PARAMS.samples);
-  material.buffer = fbo.texture; // 折射采样源：背景 scene 的 FBO 纹理（对应 drei 的 buffer prop）
-  material.ior = PARAMS.ior;
-  material.thickness = PARAMS.thickness;
-  material.anisotropy = PARAMS.anisotropy;
-  material.chromaticAberration = PARAMS.chromaticAberration;
-  material.anisotropicBlur = PARAMS.anisotropy;
-  const loader = new GLTFLoader();
-  const draco = new DRACOLoader();
-  draco.setDecoderPath('vendor/draco/');
-  loader.setDRACOLoader(draco);
-  loader.load(LENS_URL, (gltf) => {
-    const node = gltf.scene.getObjectByName('Cylinder');
-    if (!node || !node.geometry) return;
-    const geo = node.geometry.clone();
-    geo.computeBoundingBox();
-    lens = new THREE.Mesh(geo, material);
-    lens.rotation.x = Math.PI / 2;
-    lens.scale.setScalar(PARAMS.scale);
-    lens.position.z = 15;
-    lens.frustumCulled = false;
-    scene.add(lens);
-    if (reducedMotion) {
-      renderFrame(0, true);
-    } else {
-      clock = new THREE.Clock();
-      renderer.setAnimationLoop(animate);
-    }
-  }, undefined, () => { /* 模型加载失败：保持纯 CSS 毛玻璃背景 */ });
+  if (reducedMotion) {
+    renderFrame(0, true);
+  } else {
+    clock = new THREE.Clock();
+    renderer.setAnimationLoop(animate);
+  }
 
   window.addEventListener('resize', onResize);
   window.addEventListener('pointermove', onPointerMove, { passive: true });
@@ -440,36 +519,29 @@ function onResize() {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   fbo.setSize(window.innerWidth, window.innerHeight);
-  const v0 = viewportAt(20);
-  quad.scale.set(v0.width, v0.height, 1);
+  const v0 = viewportAt(PARAMS.cameraZ);
   bgPlane.scale.set(v0.width, v0.height, 1);
   placeBlobs();
+  // 面板几何按新 unit 重建
+  panels.forEach((entry) => { entry.w = 0; entry.h = 0; });
 }
 
 function renderFrame(delta, staticFrame) {
-  // 透镜跟随指针（指数阻尼，等价 maath damp3 smoothTime=0.15）
-  if (lens && !staticFrame) {
-    const v = viewportAt(5); // 透镜所在 z=15 平面
-    target.set((pointer.x * v.width) / 2, (pointer.y * v.height) / 2, 15);
-    const k = 1 - Math.exp(-delta * 2 / PARAMS.smoothTime);
-    lens.position.x += (target.x - lens.position.x) * k;
-    lens.position.y += (target.y - lens.position.y) * k;
-    lens.position.z = 15;
-  }
-  // 光斑缓慢漂移
+  syncPanels();
   if (!staticFrame && clock) {
     const t = clock.elapsedTime;
     blobBases.forEach((b) => {
-      b.mesh.position.x = (b.fx - 0.5) * viewportAt(20).width + Math.sin(t * b.speed + b.phase) * b.amp;
-      b.mesh.position.y = (b.fy - 0.5) * viewportAt(20).height + Math.cos(t * b.speed * 0.8 + b.phase) * b.amp;
+      b.mesh.position.x = (b.fx - 0.5) * viewportAt(PARAMS.cameraZ).width + Math.sin(t * b.speed + b.phase) * b.amp;
+      b.mesh.position.y = (b.fy - 0.5) * viewportAt(PARAMS.cameraZ).height + Math.cos(t * b.speed * 0.8 + b.phase) * b.amp;
     });
+    updatePointerTilt(delta);
   }
   // 背景 scene → FBO
   renderer.setRenderTarget(fbo);
   renderer.clear();
   renderer.render(bgScene, camera);
   renderer.setRenderTarget(null);
-  // 主场景（quad + 透镜）
+  // 主场景（面板折射 mesh，透明背景）
   renderer.render(scene, camera);
 }
 
@@ -477,7 +549,7 @@ function animate() {
   renderFrame(clock.getDelta(), false);
 }
 
-// reduced-motion：静态渲染一帧（透镜居中，不跟随）
+// reduced-motion：静态渲染一帧（面板不响应鼠标、光斑不漂移）
 const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
 reducedMotion = mq.matches;
 if (mq.addEventListener) {
@@ -486,7 +558,7 @@ if (mq.addEventListener) {
     if (reducedMotion && clock) {
       renderer.setAnimationLoop(null);
       renderFrame(0, true);
-    } else if (!reducedMotion && lens && !clock) {
+    } else if (!reducedMotion && !clock) {
       clock = new THREE.Clock();
       renderer.setAnimationLoop(animate);
     }
@@ -494,4 +566,3 @@ if (mq.addEventListener) {
 }
 
 init();
-

@@ -9,7 +9,7 @@
 - **EC 天空剖面**：原生 SVG 小时精度图表，低/中/高三条平滑曲线、白天时段浅色带、日界线与选中准星；悬停/触控/键盘查看逐小时三层云、加权遮蔽云量、降水与风速；14 天保持小时精度并可横向滚动；支持 EC / 综合预报视图切换。
 - **两层一致性**：`EC 成员一致性`（集合晴好率是否集中于高/低区间 + 主运行方向是否一致）与 `外部模型验证`（GFS/JMA/CMA 支持数、反对数与缺失来源，明确为模型分歧提示）。
 - **晴雨结合氛围界面**：页面底色恒为暖金阳光基调（晴天阳光偏多），按选中日 EC 数据叠加氛围层——cloudy 云影、windy 气流光带、storm 气流+雨、thunder 雨+闪电；雨滴为**本地 Canvas 特效**（`js/rain.js`，零依赖，参考雨特效 demo 的视觉语言：斜向雨滴 + 头部亮点 + 落地涟漪），雷阵雨闪电 2.8–6s 随机双闪；多层毛玻璃面板、细白描边、低饱和主题色；全部动效遵守 `prefers-reduced-motion`。
-- **流体玻璃背景**：`js/fluid-glass.js` 为 reactbits.dev FluidGlass（lens 模式）的 vanilla three.js 移植——`lens.glb` 透镜跟随鼠标，`MeshTransmissionMaterial` 折射 + 三通道 chromatic aberration（ior 1.1 / scale 0.15 / chromaticAberration 0.1 与 demo 一致），折射网站暖金蓝背景渐变与柔和光斑；three.js 0.180 全部本地化（`vendor/`，含 Draco 解码器），`prefers-reduced-motion` 降级为静态单帧。
+- **流体玻璃面板**：`js/fluid-glass.js` 为 reactbits.dev FluidGlass 的 vanilla three.js 移植——五个玻璃面板（查询区/EC 主结论/指标/交叉验证/日期条）每个渲染为圆角折射 mesh（`MeshTransmissionMaterial`，ior 1.1 / chromaticAberration 0.1，与 demo 一致），位置随滚动/重排逐帧同步，折射方向随鼠标轻微流动（无透镜遮挡）；canvas 透明背景，`body[data-mood]` 天气背景（阳光/云影/气流/雨+闪电）完整可见；three.js 0.180 本地化（`vendor/` 仅核心两文件），`prefers-reduced-motion` 降级为静态单帧。
 - **图标与品牌统一**：天气符号使用 meteocons fill 风格（`@meteocons/svg-static`，MIT），hero/逐日卡片/雷雨徽章均为本地 SVG；顶部小红书入口使用官方 logo（`assets/xhs-logo.png`）。
 - **日期先行**：具体日期选择（日期条）位于 EC 主结论上方，先选日期再看判断；预报范围（3/7/14 天）选择位于目的地下方。
 - **近海海况**：保留海洋网格的浪高、周期与涌浪提示。
@@ -86,10 +86,9 @@ weather-app/
 │   ├── rain.js         # Canvas 雨滴特效（雨滴/涟漪/闪电，零依赖）
 │   ├── fluid-glass.js  # 流体玻璃背景（reactbits FluidGlass 的 vanilla three.js 移植）
 │   └── app.js          # 主控制器（选择→查询→渲染 + 图表交互 + mood/雨效应用）
-├── vendor/             # 本地化 three.js 0.180（three.module/three.core + GLTFLoader/DRACOLoader/BufferGeometryUtils + draco 解码器）
+├── vendor/             # 本地化 three.js 0.180（three.module.min.js + three.core.min.js）
 ├── assets/
 │   ├── icons/          # meteocons fill 天气图标（clear-day/cloudy/overcast/fog/drizzle/rain/thunderstorms/lightning-bolt）
-│   ├── 3d/lens.glb     # FluidGlass 透镜模型（Draco 压缩）
 │   ├── xhs-logo.png    # 小红书官方 logo
 │   └── favicon.svg     # 站点图标
 ├── tests/
