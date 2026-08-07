@@ -90,9 +90,13 @@ const thunderBundle = {
   ensembles: { 'ECMWF IFS 集合': { hourly: ens(Array.from({ length: 51 }, () => ({ low: 20, mid: 20, high: 90, precip: 0, wind: 20, codes: thunderCodes }))) }, 'GFS 集合': { hourly: ens(members.slice(0, 3)) } },
 };
 const htmlT = renderWeatherApp(thunderBundle, dest, 3, null, {});
-for (const c of ['verdict-badge good', '⚡ 13:00–15:00 有雷阵雨，注意避雨', '海边天色重点看低云与中云', '阈值 <75%']) {
+for (const c of ['verdict-badge good', '13:00–15:00 有雷阵雨，注意避雨', 'lightning-bolt.svg', '海边天色重点看低云与中云', '阈值 <75%']) {
   if (!htmlT.includes(c)) { console.error('THUNDER/COPY MISSING:', c); process.exit(1); }
 }
 if (!htmlT.includes('data-mood="thunder"')) { console.error('THUNDER MOOD FAIL'); process.exit(1); }
+// 天气图标：fill 风格 SVG 本地化引用（meteocons），hero 与逐日卡片均使用
+for (const c of ['assets/icons/clear-day.svg', 'assets/icons/cloudy.svg', 'assets/icons/rain.svg', 'class="weather-symbol"', 'class="forecast-symbol"']) {
+  if (!htmlT.includes(c)) { console.error('ICON FAIL:', c); process.exit(1); }
+}
 
 console.log('render smoke OK; html length', html.length);

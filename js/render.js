@@ -1,11 +1,13 @@
 // 渲染层：消费 Metrics 输出的结构化日级结果（ec / crossModel / cloudSeries / weatherMood），
 // 输出静态 HTML 与原生 SVG 图表。不持有请求细节，交互由 app.js 事件委托驱动。
+// 天气图标统一使用 meteocons fill 风格（assets/icons/*.svg，本地化，MIT）。
 const WEATHER_META = {
-  0: ['晴', '☀'], 1: ['晴间多云', '◐'], 2: ['多云', '◒'], 3: ['阴', '☁'],
-  45: ['雾', '≋'], 48: ['雾', '≋'], 51: ['毛毛雨', '◌'], 53: ['毛毛雨', '◌'], 55: ['毛毛雨', '◌'],
-  61: ['小雨', '☂'], 63: ['中雨', '☂'], 65: ['大雨', '☂'], 80: ['阵雨', '☂'], 81: ['强阵雨', '☂'], 82: ['暴雨', '☂'],
-  95: ['雷阵雨', 'ϟ'], 96: ['雷阵雨', 'ϟ'], 99: ['强雷阵雨', 'ϟ'],
+  0: ['晴', 'clear-day'], 1: ['晴间多云', 'partly-cloudy-day'], 2: ['多云', 'cloudy'], 3: ['阴', 'overcast'],
+  45: ['雾', 'fog'], 48: ['雾', 'fog'], 51: ['毛毛雨', 'drizzle'], 53: ['毛毛雨', 'drizzle'], 55: ['毛毛雨', 'drizzle'],
+  61: ['小雨', 'rain'], 63: ['中雨', 'rain'], 65: ['大雨', 'rain'], 80: ['阵雨', 'rain'], 81: ['强阵雨', 'rain'], 82: ['暴雨', 'rain'],
+  95: ['雷阵雨', 'thunderstorms'], 96: ['雷阵雨', 'thunderstorms'], 99: ['强雷阵雨', 'thunderstorms'],
 };
+function weatherIcon(code) { return `assets/icons/${weatherMeta(code)[1]}.svg`; }
 
 const SKY_LAYERS = [
   { key: 'low', cls: 'low', label: '低云' },
@@ -13,7 +15,7 @@ const SKY_LAYERS = [
   { key: 'high', cls: 'high', label: '高云' },
 ];
 
-function weatherMeta(code) { return WEATHER_META[code] || ['天气变化', '○']; }
+function weatherMeta(code) { return WEATHER_META[code] || ['天气变化', 'clear-day']; }
 function weekdayCN(date) { return ['日', '一', '二', '三', '四', '五', '六'][new Date(`${date}T00:00:00Z`).getUTCDay()]; }
 function dateLabel(date) { return `${date.slice(5, 7)}.${date.slice(8, 10)} · 周${weekdayCN(date)}`; }
 function horizonText(index) { return index <= 2 ? '近期判断' : index <= 6 ? '留意变化' : '趋势参考'; }
@@ -185,7 +187,7 @@ function renderSkySection(cloudSeries, dates, skyView, skyIndex) {
 
 function renderEcHero(day, assessment, destination) {
   const main = assessment.ec.main;
-  const [condition, symbol] = weatherMeta(day.code);
+  const [condition] = weatherMeta(day.code);
   const verdict = main
     ? (main.suitable ? { text: '适合出行', cls: 'good' } : { text: '不建议出行', cls: 'bad' })
     : { text: '数据待补充', cls: 'none' };
@@ -193,13 +195,13 @@ function renderEcHero(day, assessment, destination) {
     ? `加权遮蔽云量 ${Math.round(main.maskMean)}% · 累计降水 ${main.precipitationSum.toFixed(1)} mm · 最大风速 ${Math.round(main.windMax)} km/h`
     : 'EC 主运行暂未返回，页面依据综合预报示意。';
   const thunder = main && main.thunderWindows.length
-    ? `<p class="thunder-window">⚡ ${formatWindows(main.thunderWindows)} 有雷阵雨，注意避雨</p>` : '';
+    ? `<p class="thunder-window"><img class="thunder-icon" src="assets/icons/lightning-bolt.svg" alt="" aria-hidden="true">${formatWindows(main.thunderWindows)} 有雷阵雨，注意避雨</p>` : '';
   const consistency = assessment.ec.memberConsistency;
   return `
   <section class="ec-hero" data-mood="${assessment.weatherMood.mood}">
     <div class="ec-verdict">
       <p class="section-kicker">ECMWF 主运行 · 08:00–18:00 · ${destination.name}</p>
-      <div class="verdict-row"><span class="weather-symbol" aria-hidden="true">${symbol}</span><h2>${verdict.text}</h2><span class="verdict-badge ${verdict.cls}">${verdict.text}</span></div>
+      <div class="verdict-row"><img class="weather-symbol" src="${weatherIcon(day.code)}" alt="" aria-hidden="true"><h2>${verdict.text}</h2><span class="verdict-badge ${verdict.cls}">${verdict.text}</span></div>
       <p class="verdict-basis">${basis}。${condition}，${cloudWord(day.cloud)}。</p>
       ${thunder}
       <p class="sea-sky-tip">海边天色重点看低云与中云影响最大，高云仅供参考。</p>
@@ -264,13 +266,13 @@ function renderDayRail(days, selectedDate) {
 function renderForecastCards(days, selectedDate) {
   return `<section class="forecast-section"><div class="section-heading"><p class="section-kicker">OUTLOOK</p><h2>逐日判断</h2></div>
     <div class="forecast-list">${days.map((day, index) => {
-      const [condition, symbol] = weatherMeta(day.code);
+      const [condition] = weatherMeta(day.code);
       const active = day.date === selectedDate;
       const consistency = day.assessment.ec.memberConsistency;
       return `<article class="forecast-card ${active ? 'selected' : ''}">
         <button type="button" class="forecast-summary" data-select-date="${day.date}" aria-label="查看 ${dateLabel(day.date)} 的判断">
           <div class="forecast-date"><span>${index === 0 ? '今天' : dateLabel(day.date)}</span><small>${horizonText(index)}</small></div>
-          <span class="forecast-symbol" aria-hidden="true">${symbol}</span>
+          <img class="forecast-symbol" src="${weatherIcon(day.code)}" alt="" aria-hidden="true">
           <div class="forecast-condition"><strong>${probabilityWord(day.assessment.probability)}</strong><span>${condition} · ${Math.round(day.low)}°–${Math.round(day.high)}°</span></div>
           <div class="forecast-probability"><b>${Metrics.formatPercent(day.assessment.probability)}</b><small>${consistency.text}</small></div>
         </button>

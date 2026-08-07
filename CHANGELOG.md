@@ -1,5 +1,16 @@
 # 更新日志
 
+## v1.5（2026-08-07）
+
+### 新增
+- 天气图标统一为 **meteocons fill 风格**（`@meteocons/svg-static`，MIT）：hero 天气符号、逐日卡片、雷雨徽章全部替换为本地化 SVG（`assets/icons/`），与 WMO 天气码一一映射
+- **流体玻璃背景**（`js/fluid-glass.js`）：reactbits.dev FluidGlass（lens 模式）的 vanilla three.js 移植——`lens.glb` 透镜跟随鼠标，`MeshTransmissionMaterial` 折射 + 三通道 chromatic aberration（ior 1.1 / scale 0.15 / chromaticAberration 0.1，与 demo 参数一致），折射内容为网站暖金蓝背景渐变 + 柔和光斑；three.js 0.180 全部本地化（`vendor/`，含 Draco 解码器）；`prefers-reduced-motion` 降级为静态单帧
+- 小红书入口换用官方 logo（`assets/xhs-logo.png`），胶囊底色改为深色玻璃，避免红上加红
+- 网站 favicon（`assets/favicon.svg`，品牌蓝圆 + 太阳）
+
+### 优化
+- 页面层叠重构：背景（-1）→ 流体玻璃（0）→ 雨滴层（1）→ 内容（2）
+
 ## v1.4（2026-08-07）
 
 ### 新增

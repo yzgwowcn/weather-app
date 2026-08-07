@@ -86,7 +86,7 @@ const server = http.createServer((req, res) => {
   }
   check('日期切换收集到 mood 变化', moods.size >= 1 && [...moods].every((m) => /sunny|cloudy|rain|windy|storm|thunder|neutral/.test(m)), [...moods].join(','));
   const thunderCount = await page.locator('.thunder-window').count();
-  check('雷雨徽章渲染正常（0 或含时段文案）', thunderCount === 0 || /⚡ .*有雷阵雨，注意避雨/.test(await page.locator('.thunder-window').textContent()), `thunder-window=${thunderCount}`);
+  check('雷雨徽章渲染正常（0 或含时段文案与图标）', thunderCount === 0 || (/有雷阵雨，注意避雨/.test(await page.locator('.thunder-window').textContent()) && (await page.locator('.thunder-window .thunder-icon').count()) === 1), `thunder-window=${thunderCount}`);
   await page.close();
 
   // 移动端

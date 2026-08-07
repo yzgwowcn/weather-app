@@ -105,9 +105,19 @@ body[data-mood="storm"]::after {
 #rain-layer {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: 1; /* 在流体玻璃层之上，雨滴落在玻璃前面 */
   pointer-events: none;
   opacity: .85;
+}
+
+/* ---- 流体玻璃背景层（js/fluid-glass.js，reactbits FluidGlass 移植） ---- */
+#fluid-glass {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 /* ---- 减弱动态偏好：关闭动效，仅保留必要指示 ---- */
@@ -118,7 +128,7 @@ body[data-mood="storm"]::after {
 }
 
 button { font: inherit; }
-.page-shell { width: min(1180px, calc(100% - 40px)); margin: auto; }
+.page-shell { width: min(1180px, calc(100% - 40px)); margin: auto; position: relative; z-index: 2; }
 
 /* ---- 顶栏 ---- */
 .site-header {
@@ -139,17 +149,18 @@ button { font: inherit; }
 .header-note, .field-label, .section-kicker, .metric-tile span, .forecast-detail span,
 .forecast-date small, .forecast-probability small { color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
 .header-right { display: flex; align-items: center; gap: 16px; }
-/* 小红书主页链接（玻璃胶囊 + 品牌红渐变，融入毛玻璃风格） */
+/* 小红书主页链接（官方 logo 图 + 深色玻璃胶囊，红色 logo 自带品牌色） */
 .xhs-link {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 14px; border-radius: 99px; text-decoration: none;
-  background: linear-gradient(135deg, #ff4d5e, #e62e4d);
-  color: #fff; font-size: 12.5px; font-weight: 700;
-  border: 1px solid rgba(255, 255, 255, .28);
-  box-shadow: 0 6px 18px rgba(230, 46, 77, .35), inset 0 1px 0 rgba(255, 255, 255, .4);
-  transition: transform .18s ease, filter .18s ease;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 13px 6px 7px; border-radius: 99px; text-decoration: none;
+  background: rgba(255, 255, 255, .06);
+  color: rgba(226, 233, 240, .92); font-size: 12.5px; font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, .16);
+  box-shadow: var(--glass-highlight);
+  transition: transform .18s ease, filter .18s ease, border-color .18s ease;
 }
-.xhs-link:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.xhs-logo { height: 21px; width: auto; border-radius: 5px; display: block; }
+.xhs-link:hover { filter: brightness(1.1); transform: translateY(-1px); border-color: rgba(255, 255, 255, .3); }
 .xhs-link:focus-visible { outline: 2px solid rgba(255, 255, 255, .7); outline-offset: 2px; }
 
 /* ---- 首屏标语 ---- */
@@ -222,7 +233,8 @@ button { font: inherit; }
 .ec-verdict { min-width: 0; }
 .verdict-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .verdict-row h2 { margin: 0; font-size: clamp(29px, 4vw, 46px); letter-spacing: -.06em; }
-.weather-symbol { font-size: 32px; color: var(--blue); }
+.weather-symbol { width: 44px; height: 44px; display: inline-block; vertical-align: middle; }
+.thunder-icon { width: 14px; height: 14px; margin-right: 5px; vertical-align: -2px; }
 .verdict-badge {
   padding: 5px 11px; border-radius: 99px; font-size: 12.5px; font-weight: 750;
   border: 1px solid rgba(255, 255, 255, .2);
@@ -394,7 +406,7 @@ button { font: inherit; }
 .forecast-summary:hover { background: rgba(125, 180, 255, .06); }
 .forecast-date span, .forecast-condition strong, .forecast-condition span, .forecast-probability small { display: block; }
 .forecast-date span, .forecast-condition strong { font-size: 14px; font-weight: 750; }
-.forecast-symbol { color: var(--blue); font-size: 24px; text-align: center; }
+.forecast-symbol { width: 30px; height: 30px; justify-self: center; align-self: center; }
 .forecast-condition span { color: var(--muted); font-size: 13px; }
 .forecast-probability { text-align: right; }
 .forecast-probability b { color: var(--blue); font-size: 20px; letter-spacing: -.05em; }

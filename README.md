@@ -9,11 +9,13 @@
 - **EC 天空剖面**：原生 SVG 小时精度图表，低/中/高三条平滑曲线、白天时段浅色带、日界线与选中准星；悬停/触控/键盘查看逐小时三层云、加权遮蔽云量、降水与风速；14 天保持小时精度并可横向滚动；支持 EC / 综合预报视图切换。
 - **两层一致性**：`EC 成员一致性`（集合晴好率是否集中于高/低区间 + 主运行方向是否一致）与 `外部模型验证`（GFS/JMA/CMA 支持数、反对数与缺失来源，明确为模型分歧提示）。
 - **晴雨结合氛围界面**：页面底色恒为暖金阳光基调（晴天阳光偏多），按选中日 EC 数据叠加氛围层——cloudy 云影、windy 气流光带、storm 气流+雨、thunder 雨+闪电；雨滴为**本地 Canvas 特效**（`js/rain.js`，零依赖，参考雨特效 demo 的视觉语言：斜向雨滴 + 头部亮点 + 落地涟漪），雷阵雨闪电 2.8–6s 随机双闪；多层毛玻璃面板、细白描边、低饱和主题色；全部动效遵守 `prefers-reduced-motion`。
+- **流体玻璃背景**：`js/fluid-glass.js` 为 reactbits.dev FluidGlass（lens 模式）的 vanilla three.js 移植——`lens.glb` 透镜跟随鼠标，`MeshTransmissionMaterial` 折射 + 三通道 chromatic aberration（ior 1.1 / scale 0.15 / chromaticAberration 0.1 与 demo 一致），折射网站暖金蓝背景渐变与柔和光斑；three.js 0.180 全部本地化（`vendor/`，含 Draco 解码器），`prefers-reduced-motion` 降级为静态单帧。
+- **图标与品牌统一**：天气符号使用 meteocons fill 风格（`@meteocons/svg-static`，MIT），hero/逐日卡片/雷雨徽章均为本地 SVG；顶部小红书入口使用官方 logo（`assets/xhs-logo.png`）。
 - **日期先行**：具体日期选择（日期条）位于 EC 主结论上方，先选日期再看判断；预报范围（3/7/14 天）选择位于目的地下方。
 - **近海海况**：保留海洋网格的浪高、周期与涌浪提示。
 
 - 数据源：[Open-Meteo](https://open-meteo.com/)（免费、无需 API Key、支持浏览器 CORS 直连）
-- 技术栈：原生 HTML + CSS + Vanilla JS，零依赖、零后端（图表为原生 SVG，雨效为原生 Canvas，无图表库、无第三方请求，利于国内访问 Vercel 的加载速度）
+- 技术栈：原生 HTML + CSS + Vanilla JS（图表为原生 SVG，雨效为原生 Canvas，无图表库）；仅引入本地化的 three.js 0.180（`vendor/`，用于流体玻璃背景），无任何第三方网络请求，利于国内访问 Vercel 的加载速度
 - 部署方式：GitHub 仓库 → Vercel 导入 → 挂载自定义域名（国内可访问）
 - 数据口径：时区 `Asia/Shanghai`、海洋网格 `cell_selection=sea`、时效分层提示
 
@@ -73,7 +75,7 @@ NODE_PATH="$(npm root -g)" node tests/e2e.check.js   # 端到端（真实 API + 
 
 ```
 weather-app/
-├── index.html          # 页面骨架（移动端优先，body[data-mood] 初始 neutral）
+├── index.html          # 页面骨架（移动端优先，body[data-mood] 初始 neutral；importmap 指向本地 vendor）
 ├── css/
 │   └── style.css       # 毛玻璃视觉系统 + 天气状态机 + reduced-motion + 响应式
 ├── js/
@@ -82,13 +84,19 @@ weather-app/
 │   ├── metrics.js      # EC 主结论、加权遮蔽、成员一致性、外部验证、云图序列、天气状态机
 │   ├── render.js       # 首屏区块 + SVG 天空剖面 + 视图切换（只消费结构化日级结果）
 │   ├── rain.js         # Canvas 雨滴特效（雨滴/涟漪/闪电，零依赖）
+│   ├── fluid-glass.js  # 流体玻璃背景（reactbits FluidGlass 的 vanilla three.js 移植）
 │   └── app.js          # 主控制器（选择→查询→渲染 + 图表交互 + mood/雨效应用）
+├── vendor/             # 本地化 three.js 0.180（three.module/three.core + GLTFLoader/DRACOLoader/BufferGeometryUtils + draco 解码器）
+├── assets/
+│   ├── icons/          # meteocons fill 天气图标（clear-day/cloudy/overcast/fog/drizzle/rain/thunderstorms/lightning-bolt）
+│   ├── 3d/lens.glb     # FluidGlass 透镜模型（Draco 压缩）
+│   ├── xhs-logo.png    # 小红书官方 logo
+│   └── favicon.svg     # 站点图标
 ├── tests/
 │   ├── metrics.test.js # 无依赖指标夹具测试（node tests/metrics.test.js）
 │   ├── render.smoke.js # 渲染层无依赖冒烟测试
 │   ├── css.check.js    # CSS 状态机结构检查
 │   └── e2e.check.js    # Playwright 端到端（真实 API）
-├── assets/             # 预留（图标等）
 └── README.md
 ```
 
