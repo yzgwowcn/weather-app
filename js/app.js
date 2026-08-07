@@ -2,27 +2,70 @@
 // 并把渲染层输出的 weatherMood 应用到页面背景状态机。
 (() => {
   'use strict';
-  const state = { dest: DESTINATIONS[0], days: DEFAULT_DAYS, bundle: null, selectedDate: null, skyView: 'ec', skyIndex: null };
+  const state = { dest: DESTINATIONS[0], days: DEFAULT_DAYS, bundle: null, selectedDate: null, skyView: 'ec', skyIndex: null, customDest: null };
   const destListEl = document.getElementById('dest-list');
   const daysGroupEl = document.getElementById('days-group');
   const queryBtnEl = document.getElementById('query-btn');
   const resultEl = document.getElementById('result');
   const loadingEl = document.getElementById('loading');
+  const searchInputEl = document.getElementById('location-search');
+  const searchResultsEl = document.getElementById('search-results');
+  let searchTimer = null;
+  let searchItems = [];
 
   function dateStr(offsetDays) {
     const date = new Date();
     date.setDate(date.getDate() + offsetDays);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
   function renderDestButtons() {
+    const customBtn = state.customDest
+      ? `<button type="button" class="dest-btn custom ${state.dest.id === 'custom' ? 'active' : ''}" data-id="custom" aria-pressed="${state.dest.id === 'custom'}">
+          <span>${escapeHtml(state.customDest.name)}</span><span class="dest-tag">自定义</span>
+        </button>` : '';
     destListEl.innerHTML = DESTINATIONS.map((dest) => `
       <button type="button" class="dest-btn ${dest.id === state.dest.id ? 'active' : ''}" data-id="${dest.id}" aria-pressed="${dest.id === state.dest.id}">
         <span>${dest.name}</span>${dest.marine ? '<span class="dest-tag">近海</span>' : ''}
-      </button>`).join('');
+      </button>`).join('') + customBtn;
     destListEl.querySelectorAll('.dest-btn').forEach((button) => button.addEventListener('click', () => {
-      state.dest = DESTINATIONS.find((dest) => dest.id === button.dataset.id);
+      state.dest = button.dataset.id === 'custom' ? { ...state.customDest } : DESTINATIONS.find((dest) => dest.id === button.dataset.id);
       renderDestButtons();
     }));
+  }
+  function closeSearchResults() {
+    searchResultsEl.classList.add('hidden');
+    searchResultsEl.innerHTML = '';
+  }
+  async function handleSearchInput() {
+    const q = searchInputEl.value.trim();
+    if (!q) { closeSearchResults(); return; }
+    const results = await API.searchLocation(q);
+    if (searchInputEl.value.trim() !== q) return; // 过期响应不再覆盖新输入与结果
+    searchItems = results;
+    if (!searchItems.length) {
+      searchResultsEl.innerHTML = '<li class="search-empty">未找到相关地点，换个关键词试试</li>';
+      searchResultsEl.classList.remove('hidden');
+      return;
+    }
+    searchResultsEl.innerHTML = searchItems.map((item, index) => `
+      <li role="option" class="search-item" data-index="${index}">
+        <span class="search-item-name">${escapeHtml(item.name)}</span>
+        ${item.region ? `<span class="search-item-region">${escapeHtml(item.region)}</span>` : ''}
+      </li>`).join('');
+    searchResultsEl.classList.remove('hidden');
+  }
+  function selectSearchItem(index) {
+    const item = searchItems[index];
+    if (!item) return;
+    state.customDest = { id: 'custom', name: item.name, lat: item.lat, lon: item.lon, marine: false };
+    state.dest = state.customDest;
+    searchInputEl.value = '';
+    closeSearchResults();
+    renderDestButtons();
+    query();
   }
   function renderResult() {
     const oldScroll = resultEl.querySelector('.sky-scroll');
@@ -104,6 +147,23 @@
       daysGroupEl.querySelectorAll('.days-btn').forEach((item) => item.classList.toggle('active', item === button));
     }));
     queryBtnEl.addEventListener('click', query);
+
+    // 地点搜索：输入防抖 300ms，点击结果选中并立即查询
+    searchInputEl.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      if (!searchInputEl.value.trim()) { closeSearchResults(); return; }
+      searchTimer = setTimeout(handleSearchInput, 300);
+    });
+    searchInputEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') { searchInputEl.value = ''; closeSearchResults(); }
+    });
+    searchResultsEl.addEventListener('click', (event) => {
+      const itemEl = event.target.closest('.search-item');
+      if (itemEl) selectSearchItem(Number(itemEl.dataset.index));
+    });
+    document.addEventListener('pointerdown', (event) => {
+      if (!event.target.closest('.location-search')) closeSearchResults();
+    });
 
     // 点击委托：日期选择与天空剖面视图切换
     resultEl.addEventListener('click', (event) => {

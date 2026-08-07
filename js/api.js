@@ -52,6 +52,24 @@ const API = (() => {
   function fetchMarine(lat, lon, startDate, endDate) {
     return safeRequest(`${MARINE_URL}?${query({ ...baseParams(lat, lon, startDate, endDate), cell_selection: 'sea', hourly: MARINE_HOURLY, daily: MARINE_DAILY })}`, '近海海况');
   }
+  // 地名搜索（Photon / OpenStreetMap）：返回 [{ name, region, lat, lon }]
+  // 注意 Photon 坐标顺序为 [lng, lat]；查询失败或为空时返回空数组，不抛错。
+  async function searchLocation(q) {
+    const trimmed = String(q || '').trim();
+    if (!trimmed) return [];
+    try {
+      const url = `https://photon.komoot.io/api/?${query({ q: trimmed, limit: 5 })}`;
+      const data = await getJSON(url);
+      return (data.features || []).map((feature) => {
+        const p = feature.properties || {};
+        const [lon, lat] = feature.geometry?.coordinates || [null, null];
+        const region = [p.state, p.country].filter(Boolean).join(' · ');
+        return { name: p.name || '', region, lat, lon };
+      }).filter((item) => item.name && Number.isFinite(item.lat) && Number.isFinite(item.lon));
+    } catch {
+      return [];
+    }
+  }
   async function fetchBundle(destination, startDate, endDate) {
     const { lat, lon, marine } = destination;
     const [forecast, ecmwf, gfs, jma, cma, ensembleEcmwf, ensembleGfs, marineData] = await Promise.all([
@@ -71,5 +89,5 @@ const API = (() => {
       marine: marineData,
     };
   }
-  return { fetchBundle };
+  return { fetchBundle, searchLocation };
 })();

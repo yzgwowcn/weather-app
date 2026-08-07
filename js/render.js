@@ -359,7 +359,12 @@ function renderMarineCards(marine, destination) {
 }
 
 // ---- 主入口：EC 主结论 → EC 晴好率与成员一致性 → 天空剖面 → 外部模型验证 → 逐日判断与海况 ----
+// 目的地名称可能来自外部地理编码服务，统一转义后再进入模板（防 XSS）
+function escapeText(text) {
+  return String(text).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
 function renderWeatherApp(bundle, destination, requestedDays, selectedDate, ui = {}) {
+  destination = { ...destination, name: escapeText(destination.name) };
   const forecast = bundle?.forecast;
   if (!forecast || forecast.error || !forecast.daily?.time?.length) return `<div class="error-card"><strong>暂时无法生成旅行判断</strong><p>${forecast?.error || '未返回综合预报数据，请稍后重试。'}</p></div>`;
   const dates = forecast.daily.time;

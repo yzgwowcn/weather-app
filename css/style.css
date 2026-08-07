@@ -223,6 +223,35 @@ button { font: inherit; }
 .dest-btn:hover, .days-btn:hover, .dest-btn:focus-visible, .days-btn:focus-visible { border-color: rgba(125, 180, 255, .55); outline: none; background: rgba(125, 180, 255, .08); }
 .dest-btn.active, .days-btn.active { background: rgba(238, 242, 246, .94); color: #101c2c; font-weight: 700; }
 .dest-tag { margin-left: 5px; color: inherit; font-size: 10px; opacity: .68; }
+/* 自定义地点按钮：绿色强调，区别于预设暖金色 */
+.dest-btn.custom { border-color: rgba(111, 216, 180, .45); color: var(--green); }
+.dest-btn.custom.active { background: rgba(111, 216, 180, .94); color: #0d1a16; }
+
+/* ---- 地点搜索 ---- */
+.location-search { position: relative; margin-top: 8px; }
+.location-search-input {
+  width: min(420px, 100%); min-height: 34px; padding: 6px 12px 6px 34px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, .06) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b8c6d6' stroke-width='2' stroke-linecap='round'><circle cx='11' cy='11' r='7'/><path d='M20 20l-3.8-3.8'/></svg>") no-repeat 11px center / 15px;
+  color: rgba(222, 230, 238, .92); font-size: 13px;
+  transition: background-color .18s ease, border-color .18s ease;
+}
+.location-search-input::placeholder { color: rgba(222, 230, 238, .42); }
+.location-search-input:hover, .location-search-input:focus-visible { border-color: rgba(125, 180, 255, .55); outline: none; background-color: rgba(125, 180, 255, .08); }
+.search-results {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+  width: min(420px, 100%); margin: 0; padding: 5px; list-style: none;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: rgba(23, 31, 46, .94);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: var(--shadow);
+}
+.search-item { display: flex; align-items: baseline; gap: 8px; padding: 7px 10px; border-radius: 7px; cursor: pointer; font-size: 13px; color: rgba(222, 230, 238, .85); }
+.search-item:hover, .search-item:focus-visible { background: rgba(125, 180, 255, .14); color: #fff; }
+.search-item-name { font-weight: 600; }
+.search-item-region { margin-left: auto; padding-left: 12px; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-empty { padding: 8px 10px; color: var(--muted); font-size: 12.5px; }
 .query-btn {
   align-self: center; min-height: 42px; margin-left: 16px; padding: 0 18px; border: 0; border-radius: var(--r-sm);
   background: linear-gradient(135deg, #5f9cf0, #3c76d6); color: #fff; cursor: pointer; font-weight: 750;
