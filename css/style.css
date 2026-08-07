@@ -226,10 +226,10 @@ button { font: inherit; }
 .verdict-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .verdict-row h2 { margin: 0; font-size: clamp(29px, 4vw, 46px); letter-spacing: -.06em; }
 .weather-symbol { width: 64px; height: 64px; display: inline-block; vertical-align: middle; }
-.icon-sep {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 18px; color: rgba(222, 230, 238, .55); font-size: 14px; line-height: 1;
-}
+/* 三段式图标槽：标签在上、图标在下 */
+.icon-group { display: inline-flex; align-items: flex-start; gap: 12px; }
+.icon-slot { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; }
+.icon-period { color: var(--muted); font-size: 12px; letter-spacing: .08em; font-weight: 700; }
 .thunder-icon { width: 14px; height: 14px; margin-right: 5px; vertical-align: -2px; }
 .verdict-badge {
   padding: 5px 11px; border-radius: 99px; font-size: 12.5px; font-weight: 750;
@@ -400,18 +400,20 @@ button { font: inherit; }
 .forecast-list { border-top: 1px solid var(--line); }
 .forecast-card { border-bottom: 1px solid var(--line); }
 .forecast-summary {
-  display: grid; grid-template-columns: 150px auto 1fr auto; gap: 12px; align-items: center;
+  display: grid; grid-template-columns: 150px 1fr auto auto; gap: 12px; align-items: center;
+  grid-template-areas: "date cond prob icons";
   width: 100%; padding: 17px 5px; border: 0; background: transparent; color: var(--ink);
   text-align: left; cursor: pointer; transition: background .18s ease;
 }
 .forecast-summary:hover { background: rgba(125, 180, 255, .06); }
+.forecast-date { grid-area: date; }
 .forecast-date span, .forecast-condition strong, .forecast-condition span, .forecast-probability small { display: block; }
 .forecast-date span, .forecast-condition strong { font-size: 14px; font-weight: 750; }
-.forecast-symbol { width: 42px; height: 42px; justify-self: center; align-self: center; }
-.forecast-symbol + .icon-sep, .icon-sep + .forecast-symbol { }
-.forecast-summary .icon-sep { font-size: 12px; width: 14px; }
+.forecast-symbol { width: 42px; height: 42px; }
+.forecast-summary .icon-group { grid-area: icons; justify-self: end; align-self: center; gap: 10px; }
+.forecast-condition { grid-area: cond; }
 .forecast-condition span { color: var(--muted); font-size: 13px; }
-.forecast-probability { text-align: right; }
+.forecast-probability { grid-area: prob; text-align: right; }
 .forecast-probability b { color: var(--blue); font-size: 20px; letter-spacing: -.05em; }
 .forecast-card.selected .forecast-summary { background: var(--blue-soft); }
 .forecast-detail {
@@ -471,10 +473,13 @@ button { font: inherit; }
   .cross-stat { padding: 12px; }
   .sky-heading { align-items: flex-start; }
   .sky-view-btn { padding: 5px 11px; }
-  .forecast-summary { grid-template-columns: 82px auto 1fr; gap: 8px; padding: 14px 2px; }
-  .forecast-probability { grid-column: 3; grid-row: 2; text-align: left; }
+  .forecast-summary { grid-template-columns: 82px 1fr auto; gap: 6px 8px; padding: 14px 2px; grid-template-areas: "date cond icons" "date prob icons"; }
+  .forecast-probability { text-align: left; }
   .forecast-probability b, .forecast-probability small { display: inline; margin-right: 5px; }
   .forecast-probability b { font-size: 15px; }
+  .forecast-summary .icon-group { gap: 6px; }
+  .forecast-symbol { width: 30px; height: 30px; }
+  .forecast-summary .icon-period { font-size: 10px; }
   .forecast-detail { grid-template-columns: repeat(3, 1fr); padding: 0 10px 15px; }
   .forecast-detail b { font-size: 14px; }
   .forecast-detail p { font-size: 12px; }

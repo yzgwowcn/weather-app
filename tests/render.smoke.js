@@ -125,12 +125,14 @@ const seqBundle = {
   },
 };
 const htmlSeq = renderWeatherApp(seqBundle, dest, 3, null, {});
-for (const c of ['data-lottie="clear-day"', 'data-lottie="partly-cloudy-day-drizzle"', 'data-lottie="thunderstorms"', 'icon-sep']) {
+for (const c of ['data-lottie="clear-day"', 'data-lottie="partly-cloudy-day-drizzle"', 'data-lottie="thunderstorms"', 'icon-period', '>早<', '>中<', '>晚<']) {
   if (!htmlSeq.includes(c)) { console.error('SEQ FAIL:', c); process.exit(1); }
 }
-// 卡片限制 2 个图标
-const cardHtml = htmlSeq.slice(htmlSeq.indexOf('forecast-summary'), htmlSeq.indexOf('forecast-list') + 500);
-const cardIcons = (cardHtml.match(/data-lottie=/g) || []).length;
-if (cardIcons > 2) { console.error('CARD ICON LIMIT FAIL:', cardIcons); process.exit(1); }
+// 卡片为早-中-晚三段式（3 个 icon-slot）
+const firstCard = htmlSeq.indexOf('forecast-summary');
+const secondCard = htmlSeq.indexOf('forecast-summary', firstCard + 10);
+const cardHtml = htmlSeq.slice(firstCard, secondCard === -1 ? htmlSeq.length : secondCard);
+const cardSlots = (cardHtml.match(/icon-slot/g) || []).length;
+if (cardSlots !== 3) { console.error('CARD 3-PERIOD FAIL:', cardSlots); process.exit(1); }
 
 console.log('render smoke OK; html length', html.length);

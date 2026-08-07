@@ -10,7 +10,52 @@ const WEATHER_META = {
 };
 function weatherIcon(code) { return `assets/lottie/${weatherMeta(code)[1]}.json`; }
 
-// ---- 天气图标序列：日间（08–17）小时码按大类分段合并，返回最多 3 个 meteocons 图标名 ----
+// ---- 天气图标三段式：早（08–10）/ 中（11–13）/ 晚（14–17），每段取主导天气码 ----
+const DAY_PERIODS = [
+  { label: '早', hours: [8, 9, 10] },
+  { label: '中', hours: [11, 12, 13] },
+  { label: '晚', hours: [14, 15, 16, 17] },
+];
+// 取 forecast.hourly 中某日的三段小时天气码（与 metrics 日间口径一致）
+function hourlyCodesFor(forecast, date) {
+  const buckets = [[], [], []];
+  if (!forecast?.hourly?.time) return buckets;
+  forecast.hourly.time.forEach((time, index) => {
+    if (time.slice(0, 10) !== date) return;
+    const hour = Number(time.slice(11, 13));
+    const code = Number(forecast.hourly.weather_code?.[index]);
+    if (!Number.isFinite(code)) return;
+    DAY_PERIODS.forEach((period, pi) => {
+      if (period.hours.includes(hour)) buckets[pi].push(code);
+    });
+  });
+  return buckets;
+}
+function dominantCode(codes) {
+  if (!codes.length) return null;
+  const count = {};
+  codes.forEach((c) => { count[c] = (count[c] || 0) + 1; });
+  return Number(Object.entries(count).sort((a, b) => b[1] - a[1])[0][0]);
+}
+function iconForCode(code, suitable) {
+  const seg = ICON_SEGMENTS.find((s) => s.test(code));
+  if (!seg) return 'clear-day';
+  // 适合出行：优先晴天 / 晴间多云 / 晴间多云伴零星阵雨
+  if (suitable) {
+    if (seg.name === 'overcast') return 'partly-cloudy-day';
+    if (seg.name === 'drizzle') return 'partly-cloudy-day-drizzle';
+  }
+  return seg.icon;
+}
+function lottieMarkup(buckets, cls, suitable, fallbackCode) {
+  const slots = DAY_PERIODS.map((period, pi) => {
+    const codes = buckets[pi] || [];
+    const code = codes.length ? dominantCode(codes) : fallbackCode;
+    const name = code == null ? 'clear-day' : iconForCode(code, suitable);
+    return `<span class="icon-slot"><span class="icon-period">${period.label}</span><span class="weather-lottie ${cls}" data-lottie="${name}" aria-hidden="true"></span></span>`;
+  }).join('');
+  return `<span class="icon-group ${cls}">${slots}</span>`;
+}
 const ICON_SEGMENTS = [
   { test: (c) => c === 0, name: 'clear', icon: 'clear-day' },
   { test: (c) => c === 1 || c === 2, name: 'partly', icon: 'partly-cloudy-day' },
@@ -20,48 +65,6 @@ const ICON_SEGMENTS = [
   { test: (c) => c >= 61 && c <= 82, name: 'rain', icon: 'rain' },
   { test: (c) => c >= 95, name: 'thunder', icon: 'thunderstorms' },
 ];
-function iconSequence(codes, suitable) {
-  const merged = [];
-  codes.forEach((code) => {
-    const seg = ICON_SEGMENTS.find((s) => s.test(code));
-    if (!seg) return;
-    const last = merged[merged.length - 1];
-    if (last && last.name === seg.name) last.count += 1;
-    else merged.push({ ...seg, count: 1 });
-  });
-  // 首段不足 2 小时且存在后续时段时并入下一段（避免零星噪音）
-  if (merged.length > 1 && merged[0].count < 2) {
-    merged[1].count += merged[0].count;
-    merged.shift();
-  }
-  return merged.slice(0, 3).map((seg) => {
-    // 适合出行：优先晴天 / 晴间多云 / 晴间多云伴零星阵雨
-    if (suitable) {
-      if (seg.name === 'overcast') return 'partly-cloudy-day';
-      if (seg.name === 'drizzle') return 'partly-cloudy-day-drizzle';
-    }
-    return seg.icon;
-  });
-}
-// 取 forecast.hourly 中某日 08–17 时的小时天气码（与 metrics 出行口径一致）
-function hourlyCodesFor(forecast, date) {
-  if (!forecast?.hourly?.time) return [];
-  const codes = [];
-  forecast.hourly.time.forEach((time, index) => {
-    if (time.slice(0, 10) !== date) return;
-    const hour = Number(time.slice(11, 13));
-    if (hour >= 8 && hour < 18) {
-      const code = Number(forecast.hourly.weather_code?.[index]);
-      if (Number.isFinite(code)) codes.push(code);
-    }
-  });
-  return codes;
-}
-function lottieMarkup(codes, cls, suitable, max = 3) {
-  return iconSequence(codes, suitable).slice(0, max)
-    .map((name, i) => `${i > 0 ? '<span class="icon-sep" aria-hidden="true">→</span>' : ''}<span class="weather-lottie ${cls}" data-lottie="${name}" aria-hidden="true"></span>`)
-    .join('');
-}
 
 const SKY_LAYERS = [
   { key: 'low', cls: 'low', label: '低云' },
@@ -256,7 +259,7 @@ function renderEcHero(day, assessment, destination) {
   <section class="ec-hero" data-mood="${assessment.weatherMood.mood}" data-thunder-intensity="${Metrics.thunderIntensity(day, main)}">
     <div class="ec-verdict">
       <p class="section-kicker">ECMWF 主运行 · 08:00–18:00 · ${destination.name}</p>
-      <div class="verdict-row">${lottieMarkup(day.iconCodes?.length ? day.iconCodes : [day.code], 'weather-symbol', suitable)}<h2>${verdict.text}</h2><span class="verdict-badge ${verdict.cls}">${verdict.text}</span></div>
+      <div class="verdict-row">${lottieMarkup(day.iconCodes ?? [[], [], []], 'weather-symbol', suitable, day.code)}<h2>${verdict.text}</h2><span class="verdict-badge ${verdict.cls}">${verdict.text}</span></div>
       <p class="verdict-basis">${basis}。${condition}，${cloudWord(day.cloud)}。</p>
       ${thunder}
       <p class="sea-sky-tip">海边天色重点看低云与中云影响最大，高云仅供参考。</p>
@@ -327,7 +330,7 @@ function renderForecastCards(days, selectedDate) {
       return `<article class="forecast-card ${active ? 'selected' : ''}">
         <button type="button" class="forecast-summary" data-select-date="${day.date}" aria-label="查看 ${dateLabel(day.date)} 的判断">
           <div class="forecast-date"><span>${index === 0 ? '今天' : dateLabel(day.date)}</span><small>${horizonText(index)}</small></div>
-          ${lottieMarkup(day.iconCodes?.length ? day.iconCodes : [day.code], 'forecast-symbol', day.assessment.ec.main?.suitable === true, 2)}
+          ${lottieMarkup(day.iconCodes ?? [[], [], []], 'forecast-symbol', day.assessment.ec.main?.suitable === true, day.code)}
           <div class="forecast-condition"><strong>${probabilityWord(day.assessment.probability)}</strong><span>${condition} · ${Math.round(day.low)}°–${Math.round(day.high)}°</span></div>
           <div class="forecast-probability"><b>${Metrics.formatPercent(day.assessment.probability)}</b><small>${consistency.text}</small></div>
         </button>
