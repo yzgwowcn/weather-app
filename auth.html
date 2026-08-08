@@ -133,10 +133,13 @@
       // Turnstile 显式渲染（仅注册 tab 需要）
       var turnstileRendered = false;
       var turnstileToken = '';
-      function renderTurnstile() {
-        if (turnstileRendered) return;
-        if (typeof turnstile === 'undefined' || !TURNSTILE_CONFIG || !TURNSTILE_CONFIG.siteKey) return;
-        if (String(TURNSTILE_CONFIG.siteKey).indexOf('__TURNSTILE_') === 0) return; // 占位符未注入
+      var turnstileWidgetEl = $('turnstile-widget');
+      function turnstileUnavailable(reason) {
+        turnstileWidgetEl.textContent = reason;
+        turnstileWidgetEl.style.color = '#ff8f8f';
+        turnstileWidgetEl.style.fontSize = '13px';
+      }
+      function doRender() {
         turnstile.render('turnstile-widget', {
           sitekey: TURNSTILE_CONFIG.siteKey,
           callback: function (token) { turnstileToken = token; },
@@ -144,6 +147,33 @@
           'expired-callback': function () { turnstileToken = ''; },
         });
         turnstileRendered = true;
+      }
+      function renderTurnstile() {
+        if (turnstileRendered) return;
+        if (!TURNSTILE_CONFIG || !TURNSTILE_CONFIG.siteKey) {
+          turnstileUnavailable('人机验证未配置（TURNSTILE_SITE_KEY 未注入），注册暂不可用');
+          return;
+        }
+        if (String(TURNSTILE_CONFIG.siteKey).indexOf('__TURNSTILE_') === 0) {
+          turnstileUnavailable('人机验证未配置（TURNSTILE_SITE_KEY 未注入），注册暂不可用');
+          return;
+        }
+        if (typeof turnstile === 'undefined') {
+          // Turnstile API 由 async defer 脚本加载，可能尚未就绪：轮询等待后自动渲染
+          var waited = 0;
+          var timer = setInterval(function () {
+            waited += 500;
+            if (typeof turnstile !== 'undefined') {
+              clearInterval(timer);
+              doRender();
+            } else if (waited >= 10000) {
+              clearInterval(timer);
+              turnstileUnavailable('人机验证组件加载失败（网络被拦截？），请刷新页面重试');
+            }
+          }, 500);
+          return;
+        }
+        doRender();
       }
 
       // Tab 切换
