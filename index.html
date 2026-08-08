@@ -35,7 +35,7 @@
           <span class="field-label">目的地</span>
           <div id="dest-list" class="dest-list" role="group" aria-label="选择目的地"></div>
           <div class="dest-tools">
-            <button type="button" id="map-btn" class="map-btn" disabled title="在地图上点选海南任意位置（需配置高德 Key）">🗺️ 地图选点</button>
+            <button type="button" id="map-btn" class="map-btn" disabled title="在地图上点选海南任意位置（需配置高德 Key）"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.5v11"/><path d="M9 7.5v11"/></svg>地图选点</button>
             <div class="location-search">
             <div class="location-search-row">
               <input type="search" id="location-search" class="location-search-input" placeholder="搜索任意地点（如 杭州、大理、大阪）" autocomplete="off" aria-label="搜索任意地点">
@@ -75,15 +75,15 @@
   <div id="map-panel" class="map-panel" aria-hidden="true">
     <div class="map-panel-inner">
       <div class="map-panel-head">
-        <strong>🗺️ 地图选点</strong>
-        <button type="button" id="map-close" class="map-close" aria-label="关闭地图选点">✕</button>
+        <strong><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.5v11"/><path d="M9 7.5v11"/></svg>地图选点</strong>
+        <button type="button" id="map-close" class="map-close" aria-label="关闭地图选点"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
       <input type="search" id="map-search" class="map-search" placeholder="搜索海南地点（高德 POI）" autocomplete="off" aria-label="地图内搜索地点">
       <div id="map-container" class="map-container" aria-label="海南地图，点击放置选点标记"></div>
       <p id="map-pick-name" class="map-pick-name">点击地图放置选点标记，可拖动 Marker 微调</p>
       <p id="map-coords" class="map-coords">—</p>
       <div class="map-actions">
-        <button type="button" id="map-locate" class="map-locate">📍 使用当前位置</button>
+        <button type="button" id="map-locate" class="map-locate"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/></svg>使用当前位置</button>
         <button type="button" id="map-confirm" class="map-confirm" disabled>确认查询</button>
         <button type="button" id="map-cancel" class="map-cancel">取消</button>
       </div>
