@@ -1,0 +1,6 @@
+{
+  "buildCommand": "node inject-env.js",
+  "outputDirectory": ".",
+  "installCommand": "",
+  "framework": null
+}
