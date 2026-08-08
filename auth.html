@@ -151,7 +151,9 @@
         setTimeout(function () {
           if (turnstileRendered) return;
           if (!turnstileWidgetEl) return;
-          turnstile.render('turnstile-widget', {
+          // 传元素对象而非字符串选择器：Turnstile 的字符串参数按 CSS 选择器解析，
+          // 'turnstile-widget' 无 # 前缀匹配不到容器（实测静默失败），元素对象与手动验证成功路径一致
+          turnstile.render(turnstileWidgetEl, {
             sitekey: TURNSTILE_CONFIG.siteKey,
             callback: function (token) { turnstileToken = token; },
             'error-callback': function () { turnstileToken = ''; },
