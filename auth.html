@@ -253,7 +253,8 @@
           }
           var r = await Auth.signUp($('signup-email').value, p1);
           if (!r.ok) { setMsg(r.message, true); return; }
-          setMsg(r.message);
+          setMsg('注册成功，正在跳转…');
+          setTimeout(function () { window.location.href = 'account.html'; }, 600);
         } finally {
           btn.disabled = false;
         }

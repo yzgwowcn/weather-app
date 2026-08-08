@@ -63,18 +63,18 @@
   function isReady() { return !!client; }
   function getUser() { return currentUser; }
 
-  // 注册：返回 { ok, message }；开启邮箱确认时提示查收验证邮件
+  // 注册（关闭邮箱确认后：注册即登录）：返回 { ok, message, user }
   async function signUp(email, password) {
     if (!client) return { ok: false, message: '认证未配置' };
     var { data, error } = await client.auth.signUp({
       email: email.trim().toLowerCase(),
       password: password,
-      options: {
-        emailRedirectTo: window.location.origin + '/auth/callback.html',
-      },
     });
     if (error) return { ok: false, message: error.message };
-    return { ok: true, message: '注册成功，请查收验证邮件并点击确认链接', user: data.user || null };
+    // Supabase 关闭 Email Confirmations 后，signUp 直接返回 session（已登录）
+    if (data && data.session) return { ok: true, user: data.user || null };
+    // 保险：个别配置下 signUp 不返回 session，则用密码自动登录
+    return signIn(email, password);
   }
 
   // 登录
