@@ -222,4 +222,47 @@ function ecMain(hourly = hourlyFixture()) { return { 'ECMWF IFS': { hourly } }; 
   assert.equal(series.forecast.days[DAY].points.length, 24);
 }
 
+// 15. travelAdvice 出行建议分级：确定性 vs 集合判读 + 预报时效
+{
+  const A = (main, probability, horizon) => Metrics.travelAdvice({ main, probability, horizon });
+  const ok = { suitable: true };
+  const no = { suitable: false };
+  // 主运行适合 + 集合一致（p≥75）→ 推荐出行
+  assert.equal(A(ok, 100, 0).level, 'recommended', '主运行与集合一致 → 推荐出行');
+  assert.equal(A(ok, 75, 4).level, 'recommended', 'p 恰 75 仍推荐');
+  // 主运行适合 + p 50–75：近 48h 适合出行，中远期审慎
+  assert.equal(A(ok, 61, 0).level, 'suitable', '近 48h 主运行适合且集合过半 → 适合出行');
+  assert.equal(A(ok, 61, 1).level, 'suitable', '第 2 天仍属近 48h');
+  assert.equal(A(ok, 61, 2).level, 'caution', '48h 后主运行适合但集合仅过半 → 审慎出行');
+  assert.equal(A(ok, 50, 3).level, 'caution', 'p 恰 50 中远期审慎');
+  // 主运行适合但集合多数不看好（p<50）：近 48h 审慎（主运行仍较可信），中远期关注后续
+  assert.equal(A(ok, 30, 0).level, 'caution', '0–24h 主运行适合但集合多数不看好 → 审慎');
+  assert.equal(A(ok, 30, 3).level, 'watch', '主运行是集合少数派且中远期 → 关注后续预报');
+  assert.equal(A(ok, 30, 6).level, 'watch', '5 天以后同样关注后续');
+  // 主运行不适合：p≥75 集合反超 → 适合出行；50–75 反超边缘 → 审慎；<50 近期不建议、远期关注
+  assert.equal(A(no, 100, 0).level, 'suitable', '集合反超主运行 → 适合出行');
+  assert.equal(A(no, 61, 0).level, 'caution', '反超边缘（50–75）→ 审慎出行');
+  assert.equal(A(no, 10, 0).level, 'avoid', '主运行与集合都不看好且近期 → 不建议出行');
+  assert.equal(A(no, 10, 5).level, 'watch', '远期不看好 → 关注后续预报');
+  // 集合缺失：主运行适合近 48h 可出行、远期审慎；主运行不适合近期不建议、远期关注
+  assert.equal(A(ok, null, 0).level, 'suitable', '集合缺失但近 48h 主运行适合 → 适合出行');
+  assert.equal(A(ok, null, 3).level, 'caution', '集合缺失远期 → 审慎出行');
+  assert.equal(A(no, null, 0).level, 'avoid', '集合缺失且主运行不适合近期 → 不建议');
+  assert.equal(A(no, null, 6).level, 'watch', '集合缺失远期 → 关注后续');
+  // 主运行缺失 → 数据待补充
+  assert.equal(A(null, 50, 0).level, 'none', '主运行缺失 → 数据待补充');
+  // 文案完整性：note 非空且含概率信息
+  assert.ok(A(ok, 100, 0).note.includes('100%'), 'recommended note 含概率');
+  assert.ok(A(no, 10, 0).note.length > 0, 'avoid note 非空');
+}
+
+// 16. buildAssessment 注入 advice 字段（horizon=0：主运行适合 + 集合 100% → 推荐出行）
+{
+  const members = Array.from({ length: 51 }, () => ({ low: 20, mid: 20, high: 90, precip: 0, wind: 20 }));
+  const result = assess(ecEnsemble(members), ecMain(hourlyFixture({ low: 20, mid: 20 })));
+  assert.equal(result.advice.level, 'recommended', 'buildAssessment 注入 advice');
+  assert.equal(result.advice.text, '推荐出行');
+  assert.equal(result.finalSuitable, true, 'finalSuitable 公式不受 advice 影响');
+}
+
 console.log('metrics fixture tests passed');

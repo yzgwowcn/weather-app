@@ -242,14 +242,23 @@ function renderSkySection(cloudSeries, dates, skyView, skyIndex) {
 
 // ---- 首屏各区块 -----------------------------------------------------------
 
+// 出行建议徽章样式映射（advice.level → 徽章 class）
+const ADVICE_META = {
+  recommended: { cls: 'good' },
+  suitable: { cls: 'good' },
+  caution: { cls: 'caution' },
+  watch: { cls: 'watch' },
+  avoid: { cls: 'bad' },
+  none: { cls: 'none' },
+};
+
 function renderEcHero(day, assessment, destination) {
   const main = assessment.ec.main;
   const finalSuitable = assessment.finalSuitable === true;
   const ensembleOverturn = finalSuitable && main && !main.suitable;
   const [condition] = weatherMeta(day.code);
-  const verdict = main
-    ? (finalSuitable ? { text: '适合出行', cls: 'good' } : { text: '不建议出行', cls: 'bad' })
-    : { text: '数据待补充', cls: 'none' };
+  const advice = assessment.advice || { level: 'none', text: '数据待补充', note: '' };
+  const verdict = { text: advice.text, cls: (ADVICE_META[advice.level] || ADVICE_META.none).cls };
   const basis = main
     ? `遮蔽云量 ${Math.round(main.maskMean)}% · 累计降水 ${main.precipitationSum.toFixed(1)} mm · 平均风速 ${Math.round(main.windMean)} km/h`
     : 'EC 主运行暂未返回，页面依据综合预报示意。';
@@ -267,13 +276,18 @@ function renderEcHero(day, assessment, destination) {
       <p class="section-kicker">ECMWF 主运行 · 08:00–18:00 · ${destination.name}</p>
       <div class="verdict-row">${lottieMarkup(day.iconCodes ?? [[], [], []], 'weather-symbol', finalSuitable, day.code)}<h2>${verdict.text}</h2><span class="verdict-badge ${verdict.cls}">${verdict.text}</span></div>
       <p class="verdict-basis">${basis}。${condition}，${cloudWord(day.cloud)}。</p>
+      ${advice.note ? `<p class="advice-note">${advice.note}</p>` : ''}
       ${overturnNote ? `<p class="overturn-note">${overturnNote}</p>` : ''}
       ${thunder}
       ${gust}
       <p class="sea-sky-tip">海边天色重点看低云与中云影响最大，高云仅供参考。</p>
     </div>
     <div class="ec-probability">
-      <div class="probability-orb ${assessment.probability == null ? 'unavailable' : ''}" style="--probability:${Math.round(assessment.probability || 0)}">
+      <div class="probability-orb ${assessment.probability == null ? 'unavailable' : ''}">
+        <svg class="prob-ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="prob-track" cx="60" cy="60" r="50"></circle>
+          <circle class="prob-arc" cx="60" cy="60" r="50" pathLength="100" stroke-dasharray="${Math.round(assessment.probability || 0)} 100" transform="rotate(-90 60 60)"></circle>
+        </svg>
         <span>EC 集合晴好率</span><strong>${Metrics.formatPercent(assessment.probability)}</strong>
         <small>${assessment.ec.ensemble ? `${assessment.ec.ensemble.suitable}/${assessment.ec.ensemble.total} 成员满足` : '成员数据暂缺'}</small>
       </div>

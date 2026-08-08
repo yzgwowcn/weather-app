@@ -304,7 +304,10 @@ button { font: inherit; }
 .verdict-badge.good { background: rgba(111, 216, 180, .16); color: #8ff0cd; border-color: rgba(111, 216, 180, .45); }
 .verdict-badge.bad { background: rgba(255, 143, 135, .14); color: #ffb3ac; border-color: rgba(255, 143, 135, .42); }
 .verdict-badge.none { background: rgba(255, 255, 255, .08); color: var(--muted); }
+.verdict-badge.caution { background: rgba(242, 192, 99, .15); color: #f5d68a; border-color: rgba(242, 192, 99, .45); }
+.verdict-badge.watch { background: rgba(120, 170, 225, .14); color: #b0d4f8; border-color: rgba(120, 170, 225, .42); }
 .verdict-basis { max-width: 520px; margin: 14px 0 0; color: rgba(230, 236, 242, .86); font-size: 14px; }
+.advice-note { max-width: 520px; margin: 8px 0 0; color: var(--muted); font-size: 13px; }
 .thunder-window {
   display: inline-block; margin: 12px 0 0; padding: 6px 12px; border-radius: 99px;
   background: rgba(183, 156, 255, .14); border: 1px solid rgba(183, 156, 255, .42);
@@ -323,15 +326,17 @@ button { font: inherit; }
 .sea-sky-tip { margin: 10px 0 0; max-width: 560px; color: rgba(226, 233, 240, .78); font-size: 13px; }
 .ec-probability { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .probability-orb {
-  --p: calc(var(--probability) * 1%);
+  position: relative;
   display: grid; place-content: center; width: 162px; aspect-ratio: 1; border-radius: 50%; text-align: center;
-  background:
-    radial-gradient(circle, rgba(13, 22, 36, .92) 56%, transparent 57%),
-    conic-gradient(#6ea6f5 var(--p), rgba(255, 255, 255, .12) 0);
+  background: radial-gradient(circle, rgba(13, 22, 36, .92) 0 55%, rgba(13, 22, 36, .55) 57%, transparent 59%);
   border: 1px solid rgba(255, 255, 255, .16);
   box-shadow: 0 10px 30px rgba(0, 0, 0, .3), inset 0 0 26px rgba(125, 180, 255, .12);
 }
-.probability-orb.unavailable { background: radial-gradient(circle, rgba(13, 22, 36, .92) 56%, transparent 57%), conic-gradient(rgba(255, 255, 255, .12) 0 100%); }
+/* 概率环形图：SVG 圆环（pathLength=100，dasharray 即百分比），平头端点保证弧线边界精确 */
+.prob-ring { position: absolute; inset: 0; width: 100%; height: 100%; }
+.prob-track { fill: none; stroke: rgba(255, 255, 255, .12); stroke-width: 9; }
+.prob-arc { fill: none; stroke: #6ea6f5; stroke-width: 9; }
+.probability-orb.unavailable .prob-arc { stroke: rgba(255, 255, 255, .12); }
 .probability-orb span, .probability-orb small { color: var(--muted); font-size: 12px; }
 .probability-orb strong { font-size: 37px; letter-spacing: -.07em; line-height: 1.05; }
 .confidence-pill {

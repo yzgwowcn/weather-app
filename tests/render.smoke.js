@@ -72,6 +72,10 @@ const checks = ['ec-hero', 'verdict-badge good', 'EC 集合晴好率', '100%', '
 for (const c of checks) {
   if (!html.includes(c)) { console.error('MISSING:', c); process.exit(1); }
 }
+// 概率环形图：SVG 环（pathLength=100，dasharray 即百分比；全成员晴好 → 100 100）
+for (const c of ['prob-ring', 'prob-arc', 'prob-track', 'stroke-dasharray="100 100"', 'rotate(-90 60 60)']) {
+  if (!html.includes(c)) { console.error('PROB-RING MISSING:', c); process.exit(1); }
+}
 const iRail = html.indexOf('date-rail');
 const iHero = html.indexOf('ec-hero');
 const iSky = html.indexOf('sky-section');

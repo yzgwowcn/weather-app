@@ -205,7 +205,7 @@ const Metrics = (() => {
     const modelSources = Object.entries(deterministicResponses).map(([name, response]) => ({ name, ...deterministicDaily(response) }));
     const ecMainSource = modelSources.find((source) => source.name === EC_MAIN_NAME);
     const ecEnsembleSource = ensembleSources.find((source) => source.name === EC_ENSEMBLE_NAME);
-    return dates.reduce((all, date) => {
+    return dates.reduce((all, date, index) => {
       const ecMain = ecMainSource && !ecMainSource.error ? ecMainSource.days[date] || null : null;
       const ecEnsemble = ecEnsembleSource && !ecEnsembleSource.error ? ecEnsembleSource.days[date] || null : null;
       const ensemble = ensembleSources.filter((source) => source.days[date]).map((source) => ({ name: source.name, ...source.days[date] }));
@@ -213,10 +213,13 @@ const Metrics = (() => {
       const probability = ecEnsemble ? ecEnsemble.probability : null;
       // 集合反超：主运行不适合但 EC 集合晴好率 ≥75% 时依旧建议出行（主运行为少数派）
       const finalSuitable = ecMain ? (ecMain.suitable || (probability != null && probability >= 75)) : null;
+      // 出行建议分级（确定性 vs 集合判读 + 预报时效），horizon = 距今天数
+      const advice = travelAdvice({ main: ecMain, probability, horizon: index });
       all[date] = {
         date,
         probability,
         finalSuitable,
+        advice,
         ec: { main: ecMain, ensemble: ecEnsemble, memberConsistency: memberConsistency(ecEnsemble, ecMain) },
         crossModel: externalVerdict(ecMain, modelSources, date),
         weatherMood: moodFor(ecMain),
@@ -268,5 +271,35 @@ const Metrics = (() => {
     const codeFactor = day.code >= 99 ? 1 : day.code >= 96 ? 0.9 : 0.75;
     return Math.min(1, lengthFactor * 0.55 + cloudFactor * 0.25 + rainFactor * 0.1 + codeFactor * 0.1);
   }
-  return { THRESHOLDS, buildAssessment, buildCloudSeries, formatPercent, thunderIntensity };
+  // 出行建议分级：结合 ECMWF 确定性主运行与 ENS 集合概率分布（参照确定性 vs 集合的判读规则）：
+  //  - 主运行 = 一个具体情景，集合 = 该情景的可信度；主运行与多数成员一致 → 可信度高；
+  //  - 主运行是集合离群值 → 以集合概率为主，不采信确定性细节；
+  //  - 集合自身分阵营（晴好率接近 50%）→ 低可预报性，应按概率理解而非平均云量；
+  //  - 时效：0–48 h 主运行仍较可信；48 h 后主运行与集合冲突时偏向集合；5 天以后基本按概率/情景看。
+  // horizon：距今天数（0 = 今天）。返回 { level, text, note }，level ∈ recommended/suitable/caution/watch/avoid/none。
+  function travelAdvice({ main, probability, horizon }) {
+    if (!main) return { level: 'none', text: '数据待补充', note: 'EC 主运行暂未返回，稍后重试，或先参考综合预报。' };
+    const p = probability;
+    const near = horizon <= 1;              // 0–48 h
+    const far = horizon >= 5;               // 120 h+
+    const pct = p == null ? '—' : `${Math.round(p)}%`;
+    if (main.suitable) {
+      if (p != null && p >= 75) return { level: 'recommended', text: '推荐出行', note: `主运行与集合多数成员一致（晴好率 ${pct}），把握较大。` };
+      if (p != null && p >= 50) {
+        if (near) return { level: 'suitable', text: '适合出行', note: '近两天主运行适合且集合过半支持；临近可结合卫星实况、雷达再确认。' };
+        return { level: 'caution', text: '审慎出行', note: `主运行适合但集合支持仅 ${pct}，中远期细节应按概率/情景看，具体小时与云带边缘别太较真。` };
+      }
+      if (p != null) {
+        if (near) return { level: 'caution', text: '审慎出行', note: `主运行适合但集合多数成员不看好（晴好率仅 ${pct}）；0–24 h 主运行仍较可信，建议结合实况确认。` };
+        return { level: 'watch', text: '关注后续预报', note: `主运行是集合少数派（晴好率仅 ${pct}），不宜按确定性结论出行；以集合概率为主，关注临近起报。` };
+      }
+      if (near) return { level: 'suitable', text: '适合出行', note: '集合数据暂缺；近两天主运行判断仍可参考，出行前再看一眼实况更稳妥。' };
+      return { level: 'caution', text: '审慎出行', note: '集合数据暂缺，主运行单看远期可信度有限，建议关注后续预报再定。' };
+    }
+    if (p != null && p >= 75) return { level: 'suitable', text: '适合出行', note: `集合晴好率 ${pct} 反超主运行（主运行为少数派），以集合为准；分歧仍在，出行前可再确认。` };
+    if (p != null && p >= 50) return { level: 'caution', text: '审慎出行', note: `主运行不适合，但集合有 ${pct} 成员看好，两方分歧较大；建议临近再确认，或按保守判断。` };
+    if (near) return { level: 'avoid', text: '不建议出行', note: p == null ? '主运行不适合且集合数据暂缺，不建议按当前预报出行。' : `主运行不适合，集合多数成员也不看好（晴好率仅 ${pct}）。` };
+    return { level: 'watch', text: '关注后续预报', note: p == null ? '主运行不适合且集合数据暂缺，远期变化大，建议关注后续起报。' : `主运行与集合多数成员都不看好（晴好率仅 ${pct}），远期仍可关注临近更新。` };
+  }
+  return { THRESHOLDS, buildAssessment, buildCloudSeries, formatPercent, thunderIntensity, travelAdvice };
 })();

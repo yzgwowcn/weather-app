@@ -33,7 +33,7 @@ const server = http.createServer((req, res) => {
   check('小红书新标签打开', (await page.getAttribute('.xhs-link', 'target')) === '_blank');
   check('EC 主结论徽章', await page.locator('.verdict-badge').count() === 1);
   const verdict = await page.locator('.verdict-badge').textContent();
-  check('EC 主结论为适合/不适合', /适合出行|不建议出行|数据待补充/.test(verdict), verdict);
+  check('EC 主结论为适合/不适合', /推荐出行|适合出行|审慎出行|关注后续预报|不建议出行|数据待补充/.test(verdict), verdict);
   check('EC 集合晴好率 orb', (await page.locator('.probability-orb strong').textContent()).includes('%'));
   const memberText = await page.locator('.probability-orb small').textContent();
   check('EC 51 成员统计', /\/\s*51\s*成员/.test(memberText), memberText);
