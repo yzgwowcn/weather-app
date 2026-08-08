@@ -145,9 +145,7 @@
         turnstileWidgetEl.style.fontSize = '13px';
       }
       function doRender() {
-        // 延迟到下一轮事件循环，让注册表单完成从 hidden 到可见的布局；
-        // 不做 offsetParent 可见性判断（实测部分浏览器误判为 null 导致永不渲染），
-        // 渲染结果由下方 iframe 检查兜底诊断。
+        // 延迟到下一轮事件循环，让注册表单完成从 hidden 到可见的布局
         setTimeout(function () {
           if (turnstileRendered) return;
           if (!turnstileWidgetEl) return;
@@ -156,16 +154,16 @@
           turnstile.render(turnstileWidgetEl, {
             sitekey: TURNSTILE_CONFIG.siteKey,
             callback: function (token) { turnstileToken = token; },
-            'error-callback': function () { turnstileToken = ''; },
+            'error-callback': function () {
+              // Turnstile 自身失败回调（如域名白名单不匹配、网络错误），据实提示
+              turnstileToken = '';
+              turnstileUnavailable('人机验证组件出错，请刷新页面重试；若持续出现请检查 Turnstile 站点域名白名单');
+            },
             'expired-callback': function () { turnstileToken = ''; },
           });
           turnstileRendered = true;
-          // 渲染后验证：iframe 未出现通常是 Cloudflare Turnstile 域名白名单不匹配
-          setTimeout(function () {
-            if (!turnstileWidgetEl.querySelector('iframe')) {
-              turnstileUnavailable('人机验证未能显示：请确认 Cloudflare Turnstile 站点域名白名单包含当前域名（' + window.location.hostname + '）');
-            }
-          }, 1500);
+          // 不做 iframe 超时质检：Turnstile iframe 加载可能慢于 1.5s（首次/网络），
+          // 误判后用 textContent 覆盖会毁掉已渲染的 widget（实测复现）；失败由上方 error-callback 反馈
         }, 0);
       }
       function renderTurnstile() {
