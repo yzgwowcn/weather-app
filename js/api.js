@@ -21,14 +21,14 @@ const API = (() => {
   const MARINE_DAILY = 'wave_height_max,wave_period_max,swell_wave_height_max,swell_wave_period_max';
 
   function query(params) { return new URLSearchParams(params).toString(); }
-  async function getJSON(url) {
-    const response = await fetch(url);
+  async function getJSON(url, signal) {
+    const response = await fetch(url, { signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   }
-  async function safeRequest(url, source) {
+  async function safeRequest(url, source, signal) {
     try {
-      const data = await getJSON(url);
+      const data = await getJSON(url, signal);
       return { ...data, source, fetchedAt: new Date().toISOString() };
     } catch (error) {
       return { error: `${source} 请求失败：${error.message}`, source, fetchedAt: new Date().toISOString() };
@@ -38,19 +38,19 @@ const API = (() => {
     return { latitude: lat, longitude: lon, start_date: startDate, end_date: endDate, timezone: TIMEZONE };
   }
 
-  function fetchForecast(lat, lon, startDate, endDate) {
-    return safeRequest(`${FORECAST_URL}?${query({ ...baseParams(lat, lon, startDate, endDate), hourly: HOURLY, daily: DAILY })}`, '综合预报');
+  function fetchForecast(lat, lon, startDate, endDate, signal) {
+    return safeRequest(`${FORECAST_URL}?${query({ ...baseParams(lat, lon, startDate, endDate), hourly: HOURLY, daily: DAILY })}`, '综合预报', signal);
   }
-  function fetchDeterministic(id, lat, lon, startDate, endDate) {
+  function fetchDeterministic(id, lat, lon, startDate, endDate, signal) {
     const model = MODEL_ENDPOINTS[id];
-    return safeRequest(`${model.url}?${query({ ...baseParams(lat, lon, startDate, endDate), hourly: MODEL_HOURLY })}`, model.label);
+    return safeRequest(`${model.url}?${query({ ...baseParams(lat, lon, startDate, endDate), hourly: MODEL_HOURLY })}`, model.label, signal);
   }
-  function fetchEnsemble(id, lat, lon, startDate, endDate) {
+  function fetchEnsemble(id, lat, lon, startDate, endDate, signal) {
     const model = ENSEMBLE_MODELS[id];
-    return safeRequest(`${ENSEMBLE_URL}?${query({ ...baseParams(lat, lon, startDate, endDate), hourly: MODEL_HOURLY, models: model.model })}`, model.label);
+    return safeRequest(`${ENSEMBLE_URL}?${query({ ...baseParams(lat, lon, startDate, endDate), hourly: MODEL_HOURLY, models: model.model })}`, model.label, signal);
   }
-  function fetchMarine(lat, lon, startDate, endDate) {
-    return safeRequest(`${MARINE_URL}?${query({ ...baseParams(lat, lon, startDate, endDate), cell_selection: 'sea', hourly: MARINE_HOURLY, daily: MARINE_DAILY })}`, '近海海况');
+  function fetchMarine(lat, lon, startDate, endDate, signal) {
+    return safeRequest(`${MARINE_URL}?${query({ ...baseParams(lat, lon, startDate, endDate), cell_selection: 'sea', hourly: MARINE_HOURLY, daily: MARINE_DAILY })}`, '近海海况', signal);
   }
   // 地名搜索（Photon / OpenStreetMap）：返回 [{ name, region, lat, lon }]
   // 注意 Photon 坐标顺序为 [lng, lat]；查询失败或为空时返回空数组，不抛错。
@@ -70,17 +70,17 @@ const API = (() => {
       return [];
     }
   }
-  async function fetchBundle(destination, startDate, endDate) {
+  async function fetchBundle(destination, startDate, endDate, signal) {
     const { lat, lon, marine } = destination;
     const [forecast, ecmwf, gfs, jma, cma, ensembleEcmwf, ensembleGfs, marineData] = await Promise.all([
-      fetchForecast(lat, lon, startDate, endDate),
-      fetchDeterministic('ecmwf', lat, lon, startDate, endDate),
-      fetchDeterministic('gfs', lat, lon, startDate, endDate),
-      fetchDeterministic('jma', lat, lon, startDate, endDate),
-      fetchDeterministic('cma', lat, lon, startDate, endDate),
-      fetchEnsemble('ecmwf', lat, lon, startDate, endDate),
-      fetchEnsemble('gfs', lat, lon, startDate, endDate),
-      marine ? fetchMarine(lat, lon, startDate, endDate) : Promise.resolve(null),
+      fetchForecast(lat, lon, startDate, endDate, signal),
+      fetchDeterministic('ecmwf', lat, lon, startDate, endDate, signal),
+      fetchDeterministic('gfs', lat, lon, startDate, endDate, signal),
+      fetchDeterministic('jma', lat, lon, startDate, endDate, signal),
+      fetchDeterministic('cma', lat, lon, startDate, endDate, signal),
+      fetchEnsemble('ecmwf', lat, lon, startDate, endDate, signal),
+      fetchEnsemble('gfs', lat, lon, startDate, endDate, signal),
+      marine ? fetchMarine(lat, lon, startDate, endDate, signal) : Promise.resolve(null),
     ]);
     return {
       forecast,

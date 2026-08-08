@@ -35,7 +35,16 @@
           <span class="field-label">目的地</span>
           <div id="dest-list" class="dest-list" role="group" aria-label="选择目的地"></div>
           <div class="location-search">
-            <input type="search" id="location-search" class="location-search-input" placeholder="搜索任意地点（如 杭州、大理、大阪）" autocomplete="off" aria-label="搜索任意地点">
+            <div class="location-search-row">
+              <input type="search" id="location-search" class="location-search-input" placeholder="搜索任意地点（如 杭州、大理、大阪）" autocomplete="off" aria-label="搜索任意地点">
+              <button type="button" id="coord-toggle" class="coord-toggle" aria-expanded="false" title="手动输入经纬度选点">📌 坐标</button>
+            </div>
+            <div id="coord-input" class="coord-input hidden" aria-label="手动输入经纬度">
+              <input type="number" id="coord-lat" class="coord-field" placeholder="纬度 如 18.50" min="-90" max="90" step="0.0001" inputmode="decimal" aria-label="纬度">
+              <input type="number" id="coord-lon" class="coord-field" placeholder="经度 如 110.03" min="-180" max="180" step="0.0001" inputmode="decimal" aria-label="经度">
+              <label class="coord-gcj"><input type="checkbox" id="coord-is-gcj"> 坐标来自高德地图（自动换算）</label>
+              <button type="button" id="coord-confirm" class="coord-confirm">查询此坐标</button>
+            </div>
             <ul id="search-results" class="search-results hidden" role="listbox" aria-label="搜索结果"></ul>
           </div>
         </div>
@@ -62,6 +71,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/location.js"></script>
   <script src="js/metrics.js"></script>
   <script src="js/render.js"></script>
   <script src="js/rain.js"></script>

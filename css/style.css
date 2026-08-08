@@ -252,6 +252,43 @@ button { font: inherit; }
 .search-item-name { font-weight: 600; }
 .search-item-region { margin-left: auto; padding-left: 12px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .search-empty { padding: 8px 10px; color: var(--muted); font-size: 12.5px; }
+.location-search-row { display: flex; gap: 8px; width: min(420px, 100%); }
+.location-search-row .location-search-input { flex: 1; width: auto; }
+.coord-toggle {
+  flex-shrink: 0; min-height: 34px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, .06); color: rgba(222, 230, 238, .85);
+  font-size: 12.5px; cursor: pointer; transition: background-color .18s ease, border-color .18s ease;
+}
+.coord-toggle:hover, .coord-toggle:focus-visible { border-color: rgba(125, 180, 255, .55); background-color: rgba(125, 180, 255, .08); }
+.coord-input {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px;
+  width: min(420px, 100%); padding: 10px; border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, .05);
+}
+.coord-field {
+  flex: 1 1 130px; min-width: 0; min-height: 32px; padding: 4px 10px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, .06); color: rgba(222, 230, 238, .92); font-size: 13px;
+}
+.coord-field:focus-visible { border-color: rgba(125, 180, 255, .55); outline: none; }
+.coord-gcj { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.coord-confirm {
+  min-height: 32px; padding: 0 14px; border: 0; border-radius: var(--r-sm);
+  background: rgba(125, 180, 255, .9); color: #0c1626; font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.coord-confirm:hover { background: #9cc6ff; }
+.search-item-coord { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.search-item-tag { flex-shrink: 0; padding: 1px 7px; border-radius: 99px; background: rgba(242, 192, 99, .16); color: #f5d68a; font-size: 11.5px; white-space: nowrap; }
+.toast {
+  position: fixed; left: 50%; bottom: 28px; z-index: 60; max-width: min(420px, 86vw);
+  padding: 10px 16px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .18);
+  background: rgba(9, 17, 30, .92); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  color: var(--ink); font-size: 13px; line-height: 1.5;
+  opacity: 0; transform: translate(-50%, 8px); pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease; box-shadow: var(--shadow);
+}
+.toast.visible { opacity: 1; transform: translate(-50%, 0); }
 .query-btn {
   align-self: center; min-height: 42px; margin-left: 16px; padding: 0 18px; border: 0; border-radius: var(--r-sm);
   background: linear-gradient(135deg, #5f9cf0, #3c76d6); color: #fff; cursor: pointer; font-weight: 750;

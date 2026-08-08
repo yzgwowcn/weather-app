@@ -10,8 +10,29 @@
   const loadingEl = document.getElementById('loading');
   const searchInputEl = document.getElementById('location-search');
   const searchResultsEl = document.getElementById('search-results');
-  let searchTimer = null;
+  const coordToggleEl = document.getElementById('coord-toggle');
+  const coordInputEl = document.getElementById('coord-input');
+  const coordLatEl = document.getElementById('coord-lat');
+  const coordLonEl = document.getElementById('coord-lon');
+  const coordGcjEl = document.getElementById('coord-is-gcj');
+  const coordConfirmEl = document.getElementById('coord-confirm');
   let searchItems = [];
+  let requestSeq = 0;
+  let abortController = null;
+
+  function toast(message) {
+    let el = document.querySelector('.toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'toast';
+      el.setAttribute('role', 'status');
+      document.body.appendChild(el);
+    }
+    el.textContent = message;
+    el.classList.add('visible');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => el.classList.remove('visible'), 2600);
+  }
 
   function dateStr(offsetDays) {
     const date = new Date();
@@ -42,11 +63,11 @@
   async function handleSearchInput() {
     const q = searchInputEl.value.trim();
     if (!q) { closeSearchResults(); return; }
-    const results = await API.searchLocation(q);
+    const results = await Location.searchPlaces(q); // 防抖集中在 Location 层
     if (searchInputEl.value.trim() !== q) return; // 过期响应不再覆盖新输入与结果
     searchItems = results;
     if (!searchItems.length) {
-      searchResultsEl.innerHTML = '<li class="search-empty">未找到相关地点，换个关键词试试</li>';
+      searchResultsEl.innerHTML = '<li class="search-empty">未找到相关地点，换个关键词试试，或使用 📌 坐标 手动输入</li>';
       searchResultsEl.classList.remove('hidden');
       return;
     }
@@ -54,13 +75,16 @@
       <li role="option" class="search-item" data-index="${index}">
         <span class="search-item-name">${escapeHtml(item.name)}</span>
         ${item.region ? `<span class="search-item-region">${escapeHtml(item.region)}</span>` : ''}
+        <span class="search-item-coord">${Location.coordLabel(item.lat, item.lon)}</span>
+        ${item.inHainan ? '' : '<span class="search-item-tag">⚠ 非海南</span>'}
       </li>`).join('');
     searchResultsEl.classList.remove('hidden');
   }
   function selectSearchItem(index) {
     const item = searchItems[index];
     if (!item) return;
-    state.customDest = { id: 'custom', name: item.name, lat: item.lat, lon: item.lon, marine: false };
+    if (!item.inHainan) toast('该地点不在海南范围内，预报数据仅供参考');
+    state.customDest = { id: 'custom', name: item.name, lat: item.lat, lon: item.lon, marine: false, outOfRegion: !item.inHainan };
     state.dest = state.customDest;
     searchInputEl.value = '';
     closeSearchResults();
@@ -169,12 +193,20 @@
   async function query() {
     const start = dateStr(0);
     const end = dateStr(state.days - 1);
+    const seq = ++requestSeq;
+    // 并发控制：取消上一次未完成的查询，仅最新一次结果可写入
+    abortController?.abort();
+    abortController = new AbortController();
     queryBtnEl.disabled = true;
+    loadingEl.textContent = `正在汇集 ${state.dest.name} 附近的模型数据`;
     loadingEl.classList.remove('hidden');
     resultEl.setAttribute('aria-busy', 'true');
-    state.bundle = await API.fetchBundle(state.dest, start, end);
+    const bundle = await API.fetchBundle(state.dest, start, end, abortController.signal);
+    if (seq !== requestSeq) return; // 过期响应丢弃
+    state.bundle = bundle;
     state.selectedDate = null;
     state.skyIndex = null;
+    state.cloudPick = null;
     loadingEl.classList.add('hidden');
     queryBtnEl.disabled = false;
     resultEl.removeAttribute('aria-busy');
@@ -188,14 +220,36 @@
     }));
     queryBtnEl.addEventListener('click', query);
 
-    // 地点搜索：输入防抖 300ms，点击结果选中并立即查询
+    // 地点搜索：防抖由 Location.searchPlaces 内部管理（300ms），点击结果选中并立即查询
     searchInputEl.addEventListener('input', () => {
-      clearTimeout(searchTimer);
       if (!searchInputEl.value.trim()) { closeSearchResults(); return; }
-      searchTimer = setTimeout(handleSearchInput, 300);
+      handleSearchInput();
     });
     searchInputEl.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') { searchInputEl.value = ''; closeSearchResults(); }
+    });
+    // 手动经纬度选点：展开/收起、校验与确认（支持高德 GCJ-02 坐标自动换算）
+    coordToggleEl.addEventListener('click', () => {
+      const show = coordInputEl.classList.toggle('hidden');
+      coordToggleEl.setAttribute('aria-expanded', String(!show));
+    });
+    coordConfirmEl.addEventListener('click', () => {
+      const lat = Number(coordLatEl.value);
+      const lon = Number(coordLonEl.value);
+      if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) {
+        toast('请输入有效经纬度（纬度 -90~90，经度 -180~180）');
+        return;
+      }
+      const [wgsLon, wgsLat] = coordGcjEl.checked ? Location.gcj02ToWgs84(lon, lat) : [lon, lat];
+      const name = Location.formatCoordName(wgsLat, wgsLon);
+      const outOfRegion = !Location.isInHainan(wgsLat, wgsLon);
+      if (outOfRegion) toast('该坐标不在海南范围内，预报数据仅供参考');
+      state.customDest = { id: 'custom', name, lat: wgsLat, lon: wgsLon, marine: false, outOfRegion };
+      state.dest = state.customDest;
+      searchInputEl.value = '';
+      closeSearchResults();
+      renderDestButtons();
+      query();
     });
     searchResultsEl.addEventListener('click', (event) => {
       const itemEl = event.target.closest('.search-item');

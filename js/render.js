@@ -456,5 +456,6 @@ function renderWeatherApp(bundle, destination, requestedDays, selectedDate, ui =
   const skyView = ui.skyView === 'forecast' ? 'forecast' : 'ec';
   const skyIndex = ui.skyIndex;
   const farNotice = requestedDays > 7 ? '<p class="notice">第 8 天及以后仅适合作趋势参考，临近出行请再次更新。</p>' : '';
-  return `${farNotice}${renderDayRail(days, currentDate)}${renderEcHero(selected, selected.assessment, destination)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderForecastCards(days, currentDate, cloudCurves)}${renderMarineCards(bundle.marine, destination)}`;
+  const regionNotice = destination.outOfRegion ? '<p class="notice">该地点不在海南范围内，预报数据仅供参考，出行请以当地气象台通知为准。</p>' : '';
+  return `${regionNotice}${farNotice}${renderDayRail(days, currentDate)}${renderEcHero(selected, selected.assessment, destination)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderForecastCards(days, currentDate, cloudCurves)}${renderMarineCards(bundle.marine, destination)}`;
 }

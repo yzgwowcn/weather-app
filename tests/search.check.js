@@ -29,9 +29,14 @@ const server = http.createServer((req, res) => {
   // 等待防抖 + Photon 请求返回下拉结果（最多 20s）
   await page.waitForFunction(() => document.querySelectorAll('.search-item').length >= 1, null, { timeout: 20000 }).catch(() => {});
   check('下拉出现结果', await page.locator('.search-item').count() >= 1, `items=${await page.locator('.search-item').count()}`);
+  check('非海南结果带标签', await page.locator('.search-item-tag').count() >= 1, `tags=${await page.locator('.search-item-tag').count()}`);
+  check('结果含坐标摘要', /°[NS], /.test(await page.locator('.search-item-coord').first().textContent()), await page.locator('.search-item-coord').first().textContent());
   const firstName = await page.locator('.search-item-name').first().textContent();
   check('结果含中文名称', /杭州/.test(firstName), firstName);
   await page.locator('.search-item').first().click();
+  // 选中非海南点应出现 toast 提示
+  await page.waitForTimeout(120);
+  check('非海南选择有 toast 提示', await page.locator('.toast.visible').count() === 1);
   // 等待查询完成：结果区标题出现自定义地点名（网络慢时最多等 60s）
   await page.waitForFunction(() => /杭州市/.test(document.querySelector('.section-kicker')?.textContent || ''), null, { timeout: 60000 }).catch(() => {});
   const loadingVisible = await page.locator('#loading').evaluate((el) => !el.classList.contains('hidden'));
@@ -49,6 +54,35 @@ const server = http.createServer((req, res) => {
   check('再次搜索出现下拉', await page.locator('.search-item').count() >= 1);
   await page.keyboard.press('Escape');
   check('Escape 关闭下拉', await page.locator('#search-results').evaluate((el) => el.classList.contains('hidden')));
+
+  // 手动经纬度选点：展开输入行 → 填坐标 → 查询此坐标 → 自定义按钮出现
+  await page.locator('#coord-toggle').click();
+  check('坐标输入行展开', await page.locator('#coord-input').evaluate((el) => !el.classList.contains('hidden')));
+  // 无效坐标：toast 提示且不发起查询
+  await page.fill('#coord-lat', '99');
+  await page.fill('#coord-lon', '110');
+  await page.locator('#coord-confirm').click();
+  await page.waitForTimeout(120);
+  check('无效坐标有 toast 提示', await page.locator('.toast.visible').count() === 1, `visible=${await page.locator('.toast.visible').count()}`);
+  // 有效坐标（海南内）→ 查询成功
+  await page.fill('#coord-lat', '18.5');
+  await page.fill('#coord-lon', '110.03');
+  await page.locator('#coord-confirm').click();
+  await page.waitForFunction(() => /自选点/.test(document.querySelector('.section-kicker')?.textContent || ''), null, { timeout: 60000 }).catch(() => {});
+  check('坐标查询生成自定义按钮', /自选点 \(18\.50°N, 110\.03°E\)/.test(await page.locator('.dest-btn.custom').textContent()), await page.locator('.dest-btn.custom').textContent());
+  const coordLoading = await page.locator('#loading').evaluate((el) => !el.classList.contains('hidden'));
+  check('坐标查询完成后 loading 隐藏', !coordLoading);
+  // 高德 GCJ-02 坐标勾选换算：输入高德拾取坐标，确认后名称应显示换算后的 WGS84 坐标
+  await page.locator('#coord-toggle').click(); // 重新展开（确认后未收起时跳过）
+  const coordVisible = await page.locator('#coord-input').evaluate((el) => !el.classList.contains('hidden'));
+  if (!coordVisible) { await page.locator('#coord-toggle').click(); }
+  await page.fill('#coord-lat', '18.236');
+  await page.fill('#coord-lon', '109.529');
+  await page.locator('#coord-is-gcj').check();
+  await page.locator('#coord-confirm').click();
+  await page.waitForTimeout(300);
+  const gcjName = await page.locator('.dest-btn.custom').textContent();
+  check('GCJ-02 自动换算为 WGS84', /自选点 \(18\.2\d°N, 109\.5\d°E\)/.test(gcjName), gcjName);
   await browser.close();
   server.close();
   if (failures.length) { console.log(`\n${failures.length} FAILURES: ${failures.join(' | ')}`); process.exit(1); }
