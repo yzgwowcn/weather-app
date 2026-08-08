@@ -28,10 +28,57 @@ const API = (() => {
   const MARINE_HOURLY = ['wave_height', 'wind_wave_height', 'swell_wave_height', 'wave_direction', 'wave_period', 'swell_wave_period'].join(',');
   const MARINE_DAILY = 'wave_height_max,wave_period_max,swell_wave_height_max,swell_wave_period_max';
 
+  // ---- 用户侧缓存：同一地点 + 预报范围短时间重复查询，先查模型是否更新（meta 不计配额），未更新直接读缓存 ----
+  const CACHE_PREFIX = 'omCache:v1:';
+  const CACHE_MAX_KEYS = 8;            // 最多保留 8 个地点的缓存，超出删最旧
+  const CACHE_STALE_LIMIT_MS = 6 * 3600 * 1000; // meta 查询失败兜底：缓存超 6 小时强制重新请求
+
+  function cacheKey(destination, startDate, endDate) {
+    return CACHE_PREFIX + destination.lat.toFixed(4) + ':' + destination.lon.toFixed(4) + ':' +
+      startDate + ':' + endDate + ':' + (destination.marine ? '1' : '0');
+  }
+  function cacheGet(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const entry = JSON.parse(raw);
+      if (!entry || !entry.bundle) return null;
+      return entry;
+    } catch (e) { return null; } // 隐私模式/存储异常：静默降级为直接请求
+  }
+  function cacheSet(key, bundle, metaAvail) {
+    try {
+      localStorage.setItem(key, JSON.stringify({ ts: Date.now(), metaAvail: metaAvail || 0, bundle }));
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf(CACHE_PREFIX) === 0) keys.push(k);
+      }
+      if (keys.length > CACHE_MAX_KEYS) {
+        keys.sort((a, b) => (cacheGet(a) ? cacheGet(a).ts : 0) - (cacheGet(b) ? cacheGet(b).ts : 0));
+        for (let i = 0; i < keys.length - CACHE_MAX_KEYS; i += 1) localStorage.removeItem(keys[i]);
+      }
+    } catch (e) { /* 存储不可用：静默 */ }
+  }
+  // 限流检测：任一天气请求返回 "Daily API request limit exceeded" 视为配额耗尽
+  function hasRateLimitError(bundle) {
+    const list = [bundle.forecast, bundle.marine];
+    Object.keys(bundle.deterministic || {}).forEach((k) => list.push(bundle.deterministic[k]));
+    Object.keys(bundle.ensembles || {}).forEach((k) => list.push(bundle.ensembles[k]));
+    return list.some((m) => m && m.error && /Daily API request limit/i.test(m.error));
+  }
+
   function query(params) { return new URLSearchParams(params).toString(); }
   async function getJSON(url, signal) {
     const response = await fetch(url, { signal });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) {
+      let reason = '';
+      try {
+        const body = await response.json();
+        if (body && body.reason) reason = body.reason;
+      } catch (e) { /* 非 JSON 响应 */ }
+      throw new Error(reason ? `HTTP ${response.status}：${reason}` : `HTTP ${response.status}`);
+    }
     return response.json();
   }
   async function safeRequest(url, source, signal) {
@@ -82,7 +129,8 @@ const API = (() => {
       return [];
     }
   }
-  async function fetchBundle(destination, startDate, endDate, signal) {
+  // 完整拉取（无缓存路径）：8 个天气请求 + 4 个 meta
+  async function fetchBundleFresh(destination, startDate, endDate, signal) {
     const { lat, lon, marine } = destination;
     const [forecast, ecmwf, gfs, jma, cma, ensembleEcmwf, ensembleGfs, marineData, metaEcmwf, metaGfs, metaJma, metaCma] = await Promise.all([
       fetchForecast(lat, lon, startDate, endDate, signal),
@@ -105,6 +153,44 @@ const API = (() => {
       marine: marineData,
       modelMeta: { 'ECMWF IFS': metaEcmwf, 'NOAA GFS': metaGfs, 'JMA GSM': metaJma, 'CMA GRAPES': metaCma },
     };
+  }
+  // 带缓存的入口：同一地点短时间重复查询，先查 EC meta（不计配额）判断模型是否出新数据，未更新直接读缓存
+  async function fetchBundle(destination, startDate, endDate, signal) {
+    const key = cacheKey(destination, startDate, endDate);
+    const cached = cacheGet(key);
+    if (cached) {
+      const meta = await fetchModelMeta('ecmwf', signal); // Metadata API 不计请求限额
+      const avail = meta && !meta.error ? Number(meta.last_run_availability_time) : NaN;
+      if (Number.isFinite(avail) && avail > 0) {
+        if (avail === cached.metaAvail) {
+          return { ...cached.bundle, fromCache: true }; // 模型未更新 → 读缓存
+        }
+      } else if (Date.now() - cached.ts < CACHE_STALE_LIMIT_MS) {
+        return { ...cached.bundle, fromCache: true }; // meta 查询失败：缓存 6 小时内直接使用
+      }
+      // meta 显示模型已更新，或缓存超过 6 小时 → 重新请求
+    }
+    const bundle = await fetchBundleFresh(destination, startDate, endDate, signal);
+    // 配额耗尽兜底：天气请求被限流且有缓存时，受限部分用缓存对应数据替换，避免页面空白
+    if (cached && hasRateLimitError(bundle)) {
+      const merged = { ...bundle, deterministic: { ...bundle.deterministic }, ensembles: { ...bundle.ensembles } };
+      ['forecast', 'marine'].forEach((k) => {
+        if (bundle[k] && bundle[k].error && cached.bundle[k] && !cached.bundle[k].error) merged[k] = cached.bundle[k];
+      });
+      ['deterministic', 'ensembles'].forEach((group) => {
+        Object.keys(bundle[group] || {}).forEach((name) => {
+          const m = bundle[group][name];
+          const c = cached.bundle[group] && cached.bundle[group][name];
+          if (m && m.error && c && !c.error) merged[group][name] = c;
+        });
+      });
+      return { ...merged, fromCache: true, partialFallback: true };
+    }
+    // 写入缓存：以 EC 集合所属模型的 last_run_availability_time 作为"数据版本"快照
+    const metaEcmwf = bundle.modelMeta && bundle.modelMeta['ECMWF IFS'];
+    const avail = metaEcmwf && !metaEcmwf.error ? Number(metaEcmwf.last_run_availability_time) : NaN;
+    cacheSet(key, bundle, Number.isFinite(avail) && avail > 0 ? avail : 0);
+    return bundle;
   }
   return { fetchBundle, searchLocation };
 })();
