@@ -236,8 +236,21 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token: turnstileToken }),
-          }).then(function (r) { return r.json(); }).catch(function () { return { success: false }; });
-          if (!vr.success) { setMsg('人机验证未通过，请重试', true); if (turnstileRendered) turnstile.reset('turnstile-widget'); return; }
+          }).then(async function (r) {
+            var data = await r.json().catch(function () { return {}; });
+            return { ok: r.ok, status: r.status, success: data.success, error: data.error, codes: data.codes };
+          }).catch(function () { return { ok: false, status: 0, success: false }; });
+          if (!vr.ok) {
+            // 服务端异常（secret 未配置 500 / 上游失败 502 / 网络 0）
+            setMsg('人机验证服务异常（HTTP ' + vr.status + '）：请确认 Vercel 已配置 CLOUDFLARE_TURNSTILE_SECRET 并重新部署', true);
+            return;
+          }
+          if (!vr.success) {
+            var detail = vr.error ? ' (' + vr.error + (vr.codes && vr.codes.length ? ' ' + vr.codes.join(',') : '') + ')' : '';
+            setMsg('人机验证未通过' + detail + '，请重试', true);
+            if (turnstileRendered) turnstile.reset(turnstileWidgetEl); // 元素对象（字符串参数会被当 CSS 选择器）
+            return;
+          }
           var r = await Auth.signUp($('signup-email').value, p1);
           if (!r.ok) { setMsg(r.message, true); return; }
           setMsg(r.message);
