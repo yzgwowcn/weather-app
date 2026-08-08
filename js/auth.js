@@ -110,8 +110,8 @@
   }
 
   // 回调处理：兼容三种情况
-  // 1) PKCE 旧链接：?code=... → exchangeCodeForSession
-  // 2) implicit 链接：URL hash 携带 token，createClient 的 detectSessionInUrl 已自动建立会话
+  // 1) implicit：URL hash 携带 token，createClient 的 detectSessionInUrl 自动建立会话（等待 10s）
+  // 2) PKCE 旧链接：?code=... → exchangeCodeForSession
   // 3) 找回密码：type=recovery → 返回类型让页面显示改密表单
   async function handleCallback(url) {
     if (!client) return { ok: false, message: '认证未配置' };
@@ -119,19 +119,20 @@
     var type = params.get('type') || '';
     if (type === 'recovery') {
       // 等待 supabase-js 处理 hash token（detectSessionInUrl），recovery 需要已登录态才能改密
-      var sess = await waitForSession(3000);
-      if (!sess) return { ok: false, message: '重置链接无效或已过期，请重新发起找回密码' };
+      var rs = await waitForSession(10000);
+      if (!rs) return { ok: false, message: '重置链接无效或已过期，请重新发起找回密码' };
       return { ok: true, type: 'recovery' };
     }
+    // implicit 确认链接：hash 带 access_token，优先等会话建立（detectSessionInUrl 异步处理）
+    var sess = await waitForSession(10000);
+    if (sess) return { ok: true, type: 'confirm' };
+    // PKCE 旧链接兜底：query 带 code → exchangeCodeForSession
     var code = params.get('code');
     if (code) {
       var exchange = await client.auth.exchangeCodeForSession(code);
       if (exchange.error) return { ok: false, message: exchange.error.message };
       return { ok: true, type: 'confirm' };
     }
-    // implicit 确认链接：hash 带 access_token，等待会话建立
-    var session = await waitForSession(3000);
-    if (session) return { ok: true, type: 'confirm' };
     return { ok: false, message: '链接无效或已过期，请重新操作' };
   }
 
