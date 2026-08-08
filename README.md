@@ -187,7 +187,7 @@ Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `packa
 | 表 | 列 | 说明 |
 |---|---|---|
 | `profiles` | `user_id`（uuid PK，引用 `auth.users.id`）、`username`（text 唯一）、`created_at` | 用户名；注册时可选填写，账户页可修改 |
-| `favorites` | `id`（uuid PK）、`user_id`（外键）、`name`、`lat`、`lon`、`is_gcj`、`created_at` | 收藏位置；首页「☆ 收藏此位置」与「我的收藏」列表 |
+| `favorites` | `id`（uuid PK）、`user_id`（外键）、`name`、`lat`、`lon`、`is_gcj`、`created_at` | 收藏位置；首页「收藏此位置」与收藏列表 |
 
 - 两张表均开启 RLS：用户只能读/写 `user_id = auth.uid()` 的自己的行（profiles 3 条策略 + favorites 4 条策略）。
 - `username_taken(p_username)` RPC：security definer 全表检查用户名占用，配合数据库唯一约束双保险。

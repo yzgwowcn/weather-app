@@ -77,7 +77,7 @@
     if (searchInputEl.value.trim() !== q) return; // 过期响应不再覆盖新输入与结果
     searchItems = results;
     if (!searchItems.length) {
-      searchResultsEl.innerHTML = '<li class="search-empty">未找到相关地点，换个关键词试试，或使用 📌 坐标 手动输入</li>';
+      searchResultsEl.innerHTML = '<li class="search-empty">未找到相关地点，换个关键词试试，或使用「坐标」手动输入</li>';
       searchResultsEl.classList.remove('hidden');
       return;
     }

@@ -15,20 +15,22 @@
     <header class="site-header">
       <a class="brand" href="#top" aria-label="晴海首页"><span class="brand-mark">◐</span>晴海</a>
       <div class="header-right">
-        <a id="auth-entry" class="auth-entry" href="auth.html" style="font-size:13px;padding:5px 14px;border:1px solid rgba(255,255,255,.28);border-radius:999px;text-decoration:none;color:inherit;white-space:nowrap;flex-shrink:0;">登录</a>
-        <p class="header-note">海南旅行天气判断 / Open-Meteo</p>
-        <a class="xhs-link" href="https://xhslink.cn/m/4BS8N8iCK3F" target="_blank" rel="noopener" aria-label="我的小红书主页">
+        <a id="auth-entry" class="auth-entry" href="auth.html">登录</a>
+        <a class="xhs-link" href="https://xhslink.cn/m/4BS8N8iCK3F" target="_blank" rel="noopener" aria-label="我的小红书主页 · 海南旅行天气判断">
           <img class="xhs-logo" src="assets/xhs-logo.png" alt="" width="205" height="96" aria-hidden="true">
-          <span>我的小红书</span>
+          <span class="xhs-brand">海南旅行天气判断</span>
+          <i class="xhs-sep" aria-hidden="true"></i>
+          <span class="xhs-sub">我的小红书</span>
         </a>
       </div>
     </header>
 
     <main id="top">
       <section class="intro">
-        <p class="eyebrow">WEATHER INTELLIGENCE · HAINAN</p>
+        <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>WEATHER INTELLIGENCE · HAINAN<span class="eyebrow-line" aria-hidden="true"></span></p>
         <h1>看见晴天，<br><em>再出发。</em></h1>
-        <p class="intro-copy">以日间云量为主，结合降水、风力与多模型分歧，为海边行程判断晴好窗口。</p>
+        <p class="intro-copy">以日间云量为主，结合降水、风力与各家模型的分歧，挑出海边适合出发的晴天窗口。</p>
+        <p class="intro-source">EC 集合 51 成员 · GFS / JMA / CMA 交叉验证</p>
       </section>
 
       <section class="workspace" aria-label="查询控制">
@@ -40,7 +42,7 @@
             <div class="location-search">
             <div class="location-search-row">
               <input type="search" id="location-search" class="location-search-input" placeholder="搜索任意地点（如 杭州、大理、大阪）" autocomplete="off" aria-label="搜索任意地点">
-              <button type="button" id="coord-toggle" class="coord-toggle" aria-expanded="false" title="手动输入经纬度选点">📌 坐标</button>
+              <button type="button" id="coord-toggle" class="coord-toggle" aria-expanded="false" title="手动输入经纬度选点"><i data-lucide="crosshair"></i> 坐标</button>
             </div>
             <div id="coord-input" class="coord-input hidden" aria-label="手动输入经纬度">
               <input type="number" id="coord-lat" class="coord-field" placeholder="纬度 如 18.50" min="-90" max="90" step="0.0001" inputmode="decimal" aria-label="纬度">
@@ -64,19 +66,18 @@
       </section>
 
       <section class="workspace-section fav-section" aria-label="收藏">
-        <span class="field-label">我的收藏</span>
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-          <button type="button" id="fav-add" class="fav-add" style="padding:7px 14px;border:1px solid rgba(255,255,255,.25);border-radius:999px;background:transparent;color:inherit;cursor:pointer;font-size:13px;">☆ 收藏此位置</button>
-          <span id="fav-msg" style="font-size:12px;opacity:.8;" role="status"></span>
+        <div class="fav-tools">
+          <button type="button" id="fav-add" class="fav-add"><i data-lucide="star"></i> 收藏此位置</button>
+          <span id="fav-msg" class="fav-msg" role="status"></span>
         </div>
-        <div id="fav-edit" style="display:none;margin-bottom:8px;">
-          <input type="text" id="fav-name" maxlength="15" placeholder="收藏名称（15 字以内，可自定义备注）" style="width:100%;box-sizing:border-box;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.25);color:inherit;font-size:14px;margin-bottom:8px;">
-          <div style="display:flex;gap:8px;">
-            <button type="button" id="fav-confirm" style="flex:1;padding:8px 0;border:none;border-radius:8px;font-size:14px;background:linear-gradient(135deg,#f0b45a,#e08a3c);color:#1a1a1a;font-weight:600;cursor:pointer;">确认收藏</button>
-            <button type="button" id="fav-cancel" style="flex:1;padding:8px 0;border:none;border-radius:8px;font-size:14px;background:rgba(255,255,255,.12);color:inherit;cursor:pointer;">取消</button>
+        <div id="fav-edit" class="fav-edit">
+          <input type="text" id="fav-name" class="fav-name" maxlength="15" placeholder="收藏名称（15 字以内，可自定义备注）">
+          <div class="fav-actions">
+            <button type="button" id="fav-confirm" class="fav-confirm">确认收藏</button>
+            <button type="button" id="fav-cancel" class="fav-cancel">取消</button>
           </div>
         </div>
-        <div id="fav-list" style="display:flex;flex-direction:column;gap:6px;font-size:13px;"></div>
+        <div id="fav-list" class="fav-list"></div>
       </section>
 
       <div id="loading" class="loading hidden" role="status"><span class="spinner"></span>正在汇集最新模型数据</div>
@@ -114,6 +115,7 @@
   </div>
 
   <script src="js/config.js"></script>
+  <script src="vendor/lucide.min.js"></script>
   <script src="vendor/supabase.min.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/user.js"></script>
@@ -161,16 +163,17 @@
         User.listFavorites().then(function (r) {
           if (!r.ok) { favList.innerHTML = '<span style="opacity:.65;">' + escapeHtml(r.message) + '</span>'; return; }
           if (!r.favorites.length) {
-            favList.innerHTML = '<span style="opacity:.65;">暂无收藏，点击上方「☆ 收藏此位置」保存当前目的地</span>';
+            favList.innerHTML = '<span style="opacity:.65;">暂无收藏，点击上方「收藏此位置」保存当前目的地</span>';
             return;
           }
           favList.innerHTML = r.favorites.map(function (f) {
-            return '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between;padding:6px 10px;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(255,255,255,.05);">' +
-              '<button type="button" data-id="' + f.id + '" data-name="' + escapeHtml(f.name) + '" data-lat="' + f.lat + '" data-lon="' + f.lon + '" ' +
-              'style="flex:1;text-align:left;background:none;border:none;color:inherit;cursor:pointer;font-size:13px;padding:0;">📍 ' + escapeHtml(f.name) + '</button>' +
-              '<button type="button" data-id="' + f.id + '" title="取消收藏" ' +
-              'style="background:none;border:none;color:inherit;cursor:pointer;opacity:.6;font-size:13px;padding:0 2px;">✕</button></div>';
+            return '<div class="fav-item">' +
+              '<button type="button" class="fav-item-open" data-id="' + f.id + '" data-name="' + escapeHtml(f.name) + '" data-lat="' + f.lat + '" data-lon="' + f.lon + '">' +
+              '<i data-lucide="map-pin"></i><span>' + escapeHtml(f.name) + '</span></button>' +
+              '<button type="button" class="fav-item-remove" data-id="' + f.id + '" title="取消收藏" aria-label="取消收藏 ' + escapeHtml(f.name) + '"><i data-lucide="x"></i></button>' +
+              '</div>';
           }).join('');
+          if (window.lucide) lucide.createIcons({ attrs: { 'aria-hidden': 'true' } });
           favList.querySelectorAll('button[data-id]').forEach(function (b) {
             b.addEventListener('click', function () {
               var id = b.dataset.id;
@@ -225,6 +228,7 @@
       });
 
       document.addEventListener('auth-change', renderFavs);
+      if (window.lucide) lucide.createIcons({ attrs: { 'aria-hidden': 'true' } });
       renderFavs();
     })();
   </script>
