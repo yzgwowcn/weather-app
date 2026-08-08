@@ -110,7 +110,7 @@
   <script src="js/config.js"></script>
   <script src="vendor/supabase.min.js"></script>
   <script src="js/auth.js"></script>
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileLoad" async defer></script>
   <script>
     (function () {
       'use strict';
@@ -118,6 +118,11 @@
       var msg = $('auth-msg');
       var hint = $('auth-hint');
       var currentMode = 'login';
+
+      // Turnstile API 加载完成回调（onload 参数触发；兜底处理 API 晚于用户切 tab 的情况）
+      window.onTurnstileLoad = function () {
+        if (currentMode === 'signup') renderTurnstile();
+      };
 
       function setMsg(text, isError) {
         msg.textContent = text || '';
@@ -140,13 +145,24 @@
         turnstileWidgetEl.style.fontSize = '13px';
       }
       function doRender() {
-        turnstile.render('turnstile-widget', {
-          sitekey: TURNSTILE_CONFIG.siteKey,
-          callback: function (token) { turnstileToken = token; },
-          'error-callback': function () { turnstileToken = ''; },
-          'expired-callback': function () { turnstileToken = ''; },
+        // 等待一帧确保容器完成布局（注册表单刚从 hidden 切换为可见），避免 Turnstile 在隐藏/未布局容器中静默失败
+        requestAnimationFrame(function () {
+          if (turnstileRendered) return;
+          if (!turnstileWidgetEl || turnstileWidgetEl.offsetParent === null) return; // 容器仍不可见，等 onload/下次切 tab 兜底
+          turnstile.render('turnstile-widget', {
+            sitekey: TURNSTILE_CONFIG.siteKey,
+            callback: function (token) { turnstileToken = token; },
+            'error-callback': function () { turnstileToken = ''; },
+            'expired-callback': function () { turnstileToken = ''; },
+          });
+          turnstileRendered = true;
+          // 渲染后验证：iframe 未出现通常是 Cloudflare Turnstile 域名白名单不匹配
+          setTimeout(function () {
+            if (!turnstileWidgetEl.querySelector('iframe')) {
+              turnstileUnavailable('人机验证未能显示：请确认 Cloudflare Turnstile 站点域名白名单包含当前域名（' + window.location.hostname + '）');
+            }
+          }, 1500);
         });
-        turnstileRendered = true;
       }
       function renderTurnstile() {
         if (turnstileRendered) return;
