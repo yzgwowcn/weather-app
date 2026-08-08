@@ -1,6 +1,6 @@
-# 纯静态部署：排除构建脚本与测试文件（outputDirectory 为项目根目录）
+# 纯静态部署：排除测试文件与文档（outputDirectory 为项目根目录）
+# 注意：inject-env.js 不能排除——Vercel 构建阶段需要执行它（buildCommand）
 tests/
-inject-env.js
 package.json
 package-lock.json
 README.md
