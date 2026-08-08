@@ -13,9 +13,16 @@
 
   var client = null;
   if (isConfigured && typeof supabase !== 'undefined' && supabase.createClient) {
-    // PKCE 流程：确认/找回密码邮件链接带 code，由回调页 exchangeCodeForSession 换取会话
+    // PKCE 流程：确认/找回密码邮件链接带 code，由回调页 exchangeCodeForSession 换取会话。
+    // storage 必须用 localStorage：默认 sessionStorage 按标签页隔离，
+    // 邮件确认链接在新标签打开时读不到 code_verifier（报 PKCE code verifier not found）。
     client = supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
-      auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true },
+      auth: {
+        flowType: 'pkce',
+        persistSession: true,
+        autoRefreshToken: true,
+        storage: localStorage,
+      },
     });
   }
 
