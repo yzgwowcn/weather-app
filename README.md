@@ -46,30 +46,12 @@ node tests/css.check.js       # CSS 状态机结构检查（mood 选择器、闪
 NODE_PATH="$(npm root -g)" node tests/e2e.check.js   # 端到端（真实 API + Playwright，桌面/移动/reduced-motion）
 ```
 
-## 部署到 Vercel（挂载自己的域名）
+## 部署到 Vercel
 
-1. **推送 GitHub**：在 GitHub 新建仓库（如 `weather-app`），然后：
-
-   ```bash
-   cd weather-app
-   git init
-   git add -A
-   git commit -m "feat: EC 主判断 + 分层云图 + 天气氛围界面"
-   git branch -M main
-   git remote add origin https://github.com/<你的用户名>/weather-app.git
-   git push -u origin main
-   ```
-
-2. **Vercel 导入**：登录 [vercel.com](https://vercel.com) → **Add New → Project → Import Git Repository** → 选择刚推送的仓库。
-   - 纯静态项目，无需任何构建设置（Framework Preset 选 Other / 直接默认即可）。
-   - 点击 **Deploy**，稍等即获得 `https://weather-app.vercel.app`。
-
-3. **挂载自定义域名**：Vercel 项目 → **Settings → Domains** → 输入你的域名（如 `weather.example.com`），按提示在域名服务商处配置 DNS：
-   - 主域名：添加 `A` 记录指向 `76.76.21.21`；
-   - 子域名：添加 `CNAME` 记录指向 `cname.vercel-dns.com`。
-   - 等待 DNS 生效（通常几分钟到几小时），Vercel 自动签发 HTTPS 证书。
-
-4. **后续更新**：每次本地改动 `git push` 后，Vercel 自动重新部署，无需手动操作。
+1. 代码推送到 GitHub 仓库（`git push origin master`）。
+2. [vercel.com](https://vercel.com) → **Add New → Project** → 导入该仓库；纯静态项目无需构建设置，直接 **Deploy** 即可。
+3. **Settings → Domains** 挂载自定义域名，按提示在域名服务商处配置 DNS，Vercel 自动签发 HTTPS 证书。
+4. 之后每次本地 `git push`，Vercel 自动重新部署。
 
 ## 目录结构
 
@@ -154,13 +136,9 @@ Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `packa
 
 注册流程：`注册 → Turnstile 人机验证 → Supabase 创建用户 → Resend 发送验证邮件 → 点击确认链接（/auth/callback.html）→ 登录`。
 
-### ① 服务端依赖配置（一次性）
+### ① 服务端依赖（一次性）
 
-| 服务 | 配置 |
-|---|---|
-| Resend | 注册账号 → Domains 验证发件域名（SPF/DKIM）→ 创建 API Key（Sending access） |
-| Supabase | 创建项目 → Authentication → SMTP Settings 填 Resend（host `smtp.resend.com`、port `465`、username `resend`、password 为 Resend API Key）→ 开启 Email 确认 → Site URL 填生产域名 → Redirect URLs 添加 `https://<域名>/auth/callback.html` |
-| Cloudflare Turnstile | Add Site（域名填生产域名，Mode 选 Managed）→ 记录 Site Key 与 Secret Key |
+需要三个外部服务，按官方引导注册即可：**Supabase**（认证 + 数据库，SMTP 指向 Resend）、**Resend**（找回密码邮件）、**Cloudflare Turnstile**（注册人机验证）。
 
 ### ② 配置 Vercel 环境变量
 
@@ -184,14 +162,9 @@ Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `packa
 
 ### ④ 用户数据表（profiles / favorites，已在 Supabase 建好）
 
-| 表 | 列 | 说明 |
-|---|---|---|
-| `profiles` | `user_id`（uuid PK，引用 `auth.users.id`）、`username`（text 唯一）、`created_at` | 用户名；注册时可选填写，账户页可修改 |
-| `favorites` | `id`（uuid PK）、`user_id`（外键）、`name`、`lat`、`lon`、`is_gcj`、`created_at` | 收藏位置；首页「收藏此位置」与收藏列表 |
-
-- 两张表均开启 RLS：用户只能读/写 `user_id = auth.uid()` 的自己的行（profiles 3 条策略 + favorites 4 条策略）。
-- `username_taken(p_username)` RPC：security definer 全表检查用户名占用，配合数据库唯一约束双保险。
-- 前端 `js/user.js`（`window.User`）封装所有读写：`getProfile / setUsername / isUsernameTaken / listFavorites / addFavorite / removeFavorite`；收藏项点击即设为当前目的地并查询（`app.js` 暴露 `__getCurrentDest / __WeatherSelectDest` 接入点）。
+- `profiles`：用户名（注册时可选填，账户页可修改）；`favorites`：收藏位置（名称 + 坐标 + 是否高德坐标）。
+- 两张表均开启 RLS，按 `user_id = auth.uid()` 隔离，用户只能读写自己的行；`username_taken` RPC 做用户名占用检查。
+- 读写封装在 `js/user.js`（`window.User`）：`getProfile / setUsername / listFavorites / addFavorite / removeFavorite`；收藏项点击即设为当前目的地并查询。
 
 ## 已知限制
 

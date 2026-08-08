@@ -199,22 +199,32 @@ button { font: inherit; }
 }
 .xhs-brand { font-size: 13px; font-weight: 800; letter-spacing: .01em; }
 .xhs-sep { width: 1px; height: 13px; background: rgba(255, 255, 255, .22); }
-.xhs-sub { font-weight: 600; opacity: .8; font-size: 12px; }
+.xhs-sub { font-weight: 700; color: #fff; font-size: 13px; }
 .xhs-logo { height: 21px; width: auto; border-radius: 5px; display: block; }
 .auth-entry:hover, .xhs-link:hover { filter: brightness(1.1); transform: translateY(-1px); border-color: rgba(255, 255, 255, .3); }
 .auth-entry:focus-visible, .xhs-link:focus-visible { outline: 2px solid rgba(255, 255, 255, .7); outline-offset: 2px; }
 
-/* ---- 首屏标语 ---- */
-.intro { padding: 74px 0 40px; max-width: 760px; }
+/* ---- 首屏标语（大屏两栏铺开：左标题右说明，整体居中；窄屏回落单栏居中） ---- */
+.intro {
+  padding: 74px 0 40px;
+  display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 64px; align-items: center;
+}
+.intro-lead, .intro-aside { min-width: 0; }
 .eyebrow, .section-kicker { margin: 0 0 12px; color: var(--blue); font-size: 12px; font-weight: 800; letter-spacing: .13em; }
 .eyebrow { display: inline-flex; align-items: center; gap: 13px; letter-spacing: .16em; }
 .eyebrow-line { width: 36px; height: 1px; background: linear-gradient(90deg, transparent, rgba(125, 180, 255, .65)); }
 .eyebrow-line:last-child { background: linear-gradient(90deg, rgba(125, 180, 255, .65), transparent); }
-.intro h1 { margin: 0; font-size: clamp(50px, 8vw, 102px); letter-spacing: -.085em; line-height: .94; font-weight: 800; }
+.intro h1 { margin: 0; font-size: clamp(48px, 6.5vw, 96px); letter-spacing: -.085em; line-height: .94; font-weight: 800; }
 .intro h1 em { color: var(--blue); font-style: normal; text-shadow: 0 0 34px rgba(125, 180, 255, .35); }
-.intro-copy { max-width: 510px; margin: 27px 0 0; color: rgba(226, 233, 240, .8); font-size: 16px; }
-.intro-source { margin: 24px 0 0; color: var(--muted); font-size: 12.5px; letter-spacing: .05em; }
-.intro-source::before { content: ''; display: block; width: 100%; max-width: 420px; height: 1px; margin-bottom: 14px; background: linear-gradient(90deg, rgba(255, 255, 255, .2), transparent); }
+.intro-copy { margin: 0; color: rgba(226, 233, 240, .8); font-size: 16px; line-height: 1.75; }
+.intro-source { margin: 26px 0 0; color: var(--muted); font-size: 12.5px; letter-spacing: .05em; }
+.intro-source::before { content: ''; display: block; width: 56px; height: 1px; margin-bottom: 14px; background: linear-gradient(90deg, rgba(255, 255, 255, .25), transparent); }
+.source-line { margin: 0 0 6px; }
+.source-status { margin: 0; display: flex; align-items: center; gap: 7px; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .28); transition: background .3s ease; }
+.source-status.live .status-dot { background: var(--green); box-shadow: 0 0 8px rgba(111, 216, 180, .6); }
+.source-status.dead .status-dot { background: var(--red); }
 
 /* ---- 查询面板（亚克力：半透明 + backdrop-filter 模糊） ---- */
 .workspace {
@@ -712,6 +722,11 @@ button { font: inherit; }
 
 /* ---- 响应式 ---- */
 @media (max-width: 800px) {
+  .intro { grid-template-columns: 1fr; gap: 26px; padding: 48px 0 28px; text-align: center; }
+  .intro .eyebrow { justify-content: center; }
+  .intro-copy { max-width: 440px; margin: 0 auto; }
+  .intro-source { display: flex; flex-direction: column; align-items: center; }
+  .intro-source::before { margin-left: auto; margin-right: auto; }
   .workspace { grid-template-columns: 1fr auto; }
   .ec-hero { padding: 28px; gap: 26px; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }
@@ -724,8 +739,10 @@ button { font: inherit; }
 @media (max-width: 560px) {
   .page-shell { width: min(100% - 24px, 1180px); }
   .site-header { min-height: 62px; }
-  .intro { padding: 48px 0 28px; }
+  .intro { padding: 44px 0 26px; gap: 22px; }
   .intro h1 { font-size: 54px; }
+  .intro-copy { font-size: 15px; line-height: 1.65; }
+  .intro-source { font-size: 12px; }
   .workspace { grid-template-columns: 1fr; padding: 13px; }
   .horizon-field { padding: 0 2px; }
   .query-btn { width: 100%; margin: 14px 0 0; }
@@ -747,6 +764,12 @@ button { font: inherit; }
   .forecast-detail b { font-size: 14px; }
   .forecast-detail p { font-size: 12px; }
   .section-heading h2 { font-size: 26px; }
+}
+
+/* 超窄屏：隐藏 eyebrow 两侧横线，避免挤压换行 */
+@media (max-width: 420px) {
+  .eyebrow-line { display: none; }
+  .eyebrow { gap: 0; }
 }
 
 /* ---- 地图选点（高德 JS API） ---- */

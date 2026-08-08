@@ -112,12 +112,30 @@
     renderDestButtons();
     query();
   };
+  // 首屏数据来源状态：未查询 / 更新至（取 hourly 最后时间戳）/ 暂不可用
+  function updateDataStatus() {
+    const el = document.getElementById('data-status');
+    if (!el) return;
+    const f = state.bundle && state.bundle.forecast;
+    const ok = f && !f.error && f.hourly && f.hourly.time && f.hourly.time.length;
+    el.classList.toggle('live', !!ok);
+    el.classList.toggle('dead', !!(f && f.error));
+    const textEl = el.querySelector('.status-text');
+    if (!textEl) return;
+    if (!ok) {
+      textEl.textContent = f && f.error ? '数据：暂不可用' : '数据：尚未查询';
+      return;
+    }
+    const last = String(f.hourly.time[f.hourly.time.length - 1]).slice(0, 16).replace('T', ' ');
+    textEl.textContent = '数据更新至 ' + last + '（北京时间）';
+  }
   function renderResult() {
     const oldScroll = resultEl.querySelector('.sky-scroll');
     const scrollLeft = oldScroll ? oldScroll.scrollLeft : 0;
     const oldRail = resultEl.querySelector('.date-rail');
     const railLeft = oldRail ? oldRail.scrollLeft : 0;
     resultEl.innerHTML = renderWeatherApp(state.bundle, state.dest, state.days, state.selectedDate, { skyView: state.skyView, skyIndex: state.skyIndex });
+    updateDataStatus();
     const mood = resultEl.querySelector('[data-mood]')?.dataset.mood || 'neutral';
     document.body.dataset.mood = mood;
     // 云量分档（clear/partly/cloudy）驱动背景晴蓝视觉
