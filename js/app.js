@@ -112,7 +112,7 @@
     renderDestButtons();
     query();
   };
-  // 各模型数据时效表：模型名（状态灯：正常绿 / error 红）· 更新到（hourly 末项）· 多久前（fetchedAt 距今）
+  // 各模型数据时效表：模型名（状态灯：正常绿 / error 红）· 更新到（hourly 末项）· 多久前（Metadata API 的 last_run_availability_time 距今）
   function renderModelTable() {
     const wrap = document.getElementById('model-table');
     if (!wrap) return;
@@ -121,6 +121,7 @@
       wrap.innerHTML = '<div class="model-row placeholder"><span>查询后显示各模型数据时效</span></div>';
       return;
     }
+    const meta = state.bundle && state.bundle.modelMeta;
     const now = Date.now();
     const rows = ['ECMWF IFS', 'NOAA GFS', 'JMA GSM', 'CMA GRAPES'].map(function (name) {
       const m = det[name];
@@ -128,10 +129,12 @@
         return '<div class="model-row dead"><span class="model-name"><i class="status-dot" aria-hidden="true"></i>' + name + '</span><span class="model-upto">未返回</span><span class="model-ago">—</span></div>';
       }
       const last = String(m.hourly.time[m.hourly.time.length - 1]).slice(5, 16).replace('T', ' ');
+      // "多久前更新" = 模型数据在 API 可用的时间（last_run_availability_time，Unix 秒）距今
       let ago = '—';
-      const fetched = m.fetchedAt ? Date.parse(m.fetchedAt) : NaN;
-      if (Number.isFinite(fetched)) {
-        const mins = Math.max(0, Math.round((now - fetched) / 60000));
+      const mMeta = meta && meta[name];
+      const avail = mMeta && !mMeta.error ? Number(mMeta.last_run_availability_time) : NaN;
+      if (Number.isFinite(avail) && avail > 0) {
+        const mins = Math.max(0, Math.round((now / 1000 - avail) / 60));
         ago = mins < 60 ? mins + ' 分钟前' : Math.floor(mins / 60) + ' 小时前';
       }
       return '<div class="model-row live"><span class="model-name"><i class="status-dot" aria-hidden="true"></i>' + name + '</span><span class="model-upto">' + last + '</span><span class="model-ago">' + ago + '</span></div>';

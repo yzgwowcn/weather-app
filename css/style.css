@@ -208,9 +208,10 @@ button { font: inherit; }
 .intro {
   padding: 74px 0 40px;
   display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  gap: 64px; align-items: center;
+  gap: 64px; align-items: flex-start; /* 两栏顶部平齐：eyebrow 与说明首行对齐 */
 }
 .intro-lead, .intro-aside { min-width: 0; }
+.intro-aside { padding-top: 2px; } /* 与 12px eyebrow 视觉平齐微调 */
 .eyebrow, .section-kicker { margin: 0 0 12px; color: var(--blue); font-size: 12px; font-weight: 800; letter-spacing: .13em; }
 .eyebrow { display: inline-flex; align-items: center; gap: 13px; letter-spacing: .16em; }
 .eyebrow-line { width: 36px; height: 1px; background: linear-gradient(90deg, transparent, rgba(125, 180, 255, .65)); }
@@ -768,6 +769,8 @@ button { font: inherit; }
   .xhs-brand, .xhs-sep { display: none; }
   .intro { padding: 44px 0 26px; gap: 22px; }
   .intro h1 { font-size: 54px; }
+  /* 移动端标题去标点：居中两行无标点，重心更正 */
+  .intro h1 .punct { display: none; }
   .intro-copy { font-size: 15px; line-height: 1.65; }
   .intro-source { font-size: 12px; }
   .model-row { gap: 6px; font-size: 11.5px; }

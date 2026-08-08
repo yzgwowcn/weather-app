@@ -13,6 +13,14 @@ const API = (() => {
     ecmwf: { label: 'ECMWF IFS 集合', model: 'ecmwf_ifs025' },
     gfs: { label: 'GFS 集合', model: 'gfs_seamless' },
   };
+  // Metadata API（不计请求限额）：https://api.open-meteo.com/data/{model}/static/meta.json
+  // 返回 last_run_availability_time（数据在 API 可用的时间）等字段，用于展示"模型数据多久前更新"
+  const MODEL_META = {
+    ecmwf: { name: 'ecmwf_ifs025' },
+    gfs: { name: 'ncep_gfs025' },
+    jma: { name: 'jma_gsm' },
+    cma: { name: 'cma_grapes_global' },
+  };
 
   const HOURLY = ['temperature_2m', 'precipitation', 'rain', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'cloud_cover', 'cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'visibility'].join(',');
   const DAILY = ['weather_code', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'precipitation_probability_max', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'sunrise', 'sunset', 'cloud_cover_mean', 'cloud_cover_max', 'cloud_cover_min'].join(',');
@@ -52,6 +60,10 @@ const API = (() => {
   function fetchMarine(lat, lon, startDate, endDate, signal) {
     return safeRequest(`${MARINE_URL}?${query({ ...baseParams(lat, lon, startDate, endDate), cell_selection: 'sea', hourly: MARINE_HOURLY, daily: MARINE_DAILY })}`, '近海海况', signal);
   }
+  function fetchModelMeta(id, signal) {
+    const meta = MODEL_META[id];
+    return safeRequest(`https://api.open-meteo.com/data/${meta.name}/static/meta.json`, meta.name, signal);
+  }
   // 地名搜索（Photon / OpenStreetMap）：返回 [{ name, region, lat, lon }]
   // 注意 Photon 坐标顺序为 [lng, lat]；查询失败或为空时返回空数组，不抛错。
   async function searchLocation(q) {
@@ -72,7 +84,7 @@ const API = (() => {
   }
   async function fetchBundle(destination, startDate, endDate, signal) {
     const { lat, lon, marine } = destination;
-    const [forecast, ecmwf, gfs, jma, cma, ensembleEcmwf, ensembleGfs, marineData] = await Promise.all([
+    const [forecast, ecmwf, gfs, jma, cma, ensembleEcmwf, ensembleGfs, marineData, metaEcmwf, metaGfs, metaJma, metaCma] = await Promise.all([
       fetchForecast(lat, lon, startDate, endDate, signal),
       fetchDeterministic('ecmwf', lat, lon, startDate, endDate, signal),
       fetchDeterministic('gfs', lat, lon, startDate, endDate, signal),
@@ -81,12 +93,17 @@ const API = (() => {
       fetchEnsemble('ecmwf', lat, lon, startDate, endDate, signal),
       fetchEnsemble('gfs', lat, lon, startDate, endDate, signal),
       marine ? fetchMarine(lat, lon, startDate, endDate, signal) : Promise.resolve(null),
+      fetchModelMeta('ecmwf', signal),
+      fetchModelMeta('gfs', signal),
+      fetchModelMeta('jma', signal),
+      fetchModelMeta('cma', signal),
     ]);
     return {
       forecast,
       deterministic: { 'ECMWF IFS': ecmwf, 'NOAA GFS': gfs, 'JMA GSM': jma, 'CMA GRAPES': cma },
       ensembles: { 'ECMWF IFS 集合': ensembleEcmwf, 'GFS 集合': ensembleGfs },
       marine: marineData,
+      modelMeta: { 'ECMWF IFS': metaEcmwf, 'NOAA GFS': metaGfs, 'JMA GSM': metaJma, 'CMA GRAPES': metaCma },
     };
   }
   return { fetchBundle, searchLocation };
