@@ -134,11 +134,11 @@ Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `packa
 
 注册/登录/退出/找回密码/邮箱确认，用户唯一身份为 **Supabase `user_id`（UID，UUID）**——后续收藏城市、用户偏好、AI 对话、DeepSeek 用量、Pro 权限、支付订单等表统一用该 UID 关联，**不用邮箱作为数据库主键**。注册用户 A/B 各自得到独立 UID，登录状态互不影响。
 
-注册流程：`注册 → Turnstile 人机验证 → Supabase 创建用户 → Resend 发送验证邮件 → 点击确认链接（/auth/callback.html）→ 登录`。
+注册流程：`注册 → Turnstile 人机验证 → Supabase 创建用户（未确认）→ 阿里云 SMTP 发送数字验证码邮件 → 输入验证码（verifyOtp）→ 验证通过自动登录`。
 
 ### ① 服务端依赖（一次性）
 
-需要三个外部服务，按官方引导注册即可：**Supabase**（认证 + 数据库，SMTP 指向 Resend）、**Resend**（找回密码邮件）、**Cloudflare Turnstile**（注册人机验证）。
+需要三个外部服务，按官方引导注册即可：**Supabase**（认证 + 数据库，SMTP 指向阿里云邮件推送）、**阿里云邮件推送 DirectMail**（认证验证码邮件发送通道）、**Cloudflare Turnstile**（注册人机验证）。
 
 ### ② 配置 Vercel 环境变量
 
@@ -155,7 +155,7 @@ Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `packa
 
 - 页面：`auth.html`（登录/注册/找回密码三态）、`account.html`（邮箱 + 用户名 + UID + 退出）、`auth/callback.html`（找回密码回调）。
 - 认证使用 supabase-js（`vendor/supabase.min.js` 本地化，implicit 流程，会话 localStorage 持久化，刷新不掉线）。
-- 注册流程：邮箱 + 密码（可选用户名）→ Turnstile 人机验证 → 注册即登录（**已关闭邮箱确认**），无需收邮件验证；找回密码仍走邮件。
+- 注册流程：邮箱 + 密码（可选用户名）→ Turnstile 人机验证 → `supabase.auth.signUp()` 发送验证码邮件（**已开启邮箱确认**，未确认用户无法登录）→ 页面切到第二步输入邮件中的验证码 → `verifyOtp` 验证通过即登录；找回密码仍走邮件链接。
 - 注册表单带 Turnstile：前端拿到 token → `POST /api/verify-turnstile`（Vercel Function 用服务端 Secret Key 调 Cloudflare siteverify）→ 通过后才执行 `supabase.auth.signUp()`；Secret Key 不出现在任何静态文件或日志。
 - 未配置环境变量时（本地开发），认证入口按钮保留但表单禁用并提示"认证服务未配置"，不影响天气查询等既有功能。
 - 数据安全：所有用户表开启 **RLS** 并按 `user_id = auth.uid()` 配置策略，anon key 才可安全暴露于前端。
@@ -165,6 +165,21 @@ Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `packa
 - `profiles`：用户名（注册时可选填，账户页可修改）；`favorites`：收藏位置（名称 + 坐标 + 是否高德坐标）。
 - 两张表均开启 RLS，按 `user_id = auth.uid()` 隔离，用户只能读写自己的行；`username_taken` RPC 做用户名占用检查。
 - 读写封装在 `js/user.js`（`window.User`）：`getProfile / setUsername / listFavorites / addFavorite / removeFavorite`；收藏项点击即设为当前目的地并查询。
+
+### ⑤ 验证码注册 · Supabase 控制台配置清单（一次性）
+
+- **Authentication → Providers → Email**：开启 **Confirm email**；OTP Expiry 建议 300 秒（5 分钟，官方建议 ≤3600）。
+- **Authentication → Emails → SMTP Settings**：启用 **Custom SMTP**（内置邮件服务全项目仅 2 封/小时，必须自配 SMTP 才能解除限流）：
+  - Host `smtpdm.aliyun.com` / Port `465` / SMTP User 与 Sender email 均为阿里云发信地址（如 `noreply@你的域名.com`）/ Password 为阿里云邮件推送的 SMTP 密码。
+- **Authentication → Email Templates → Confirm signup**：模板改为显示验证码（`{{ .Token }}`，位数由 Supabase 项目决定，6/8 位均支持），例如：
+  ```html
+  <h2>欢迎注册晴海</h2>
+  <p>您的邮箱验证码是:</p>
+  <h1 style="letter-spacing:4px;">{{ .Token }}</h1>
+  <p>验证码 5 分钟内有效,请勿泄露给他人。</p>
+  ```
+- **Authentication → Rate Limits**（可选）：`rate_limit_otp`（OTP 发送）默认 30/小时，多人注册场景可调高至 60；同一邮箱 60 秒内只能重发一次（前端 60s 倒计时已对齐）。
+- 验证码位数不写死在代码里：前端校验 4~10 位纯数字，实际位数以服务端为准。
 
 ## 已知限制
 

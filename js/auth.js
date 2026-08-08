@@ -63,7 +63,8 @@
   function isReady() { return !!client; }
   function getUser() { return currentUser; }
 
-  // 注册（关闭邮箱确认后：注册即登录）：返回 { ok, message, user }
+  // 注册（开启邮箱确认 + 验证码邮件模板后）：发送注册验证码邮件，返回 { ok, needsConfirm, message }
+  // needsConfirm=true 表示验证码已发出，用户需输入邮件中的验证码（verifyEmailOtp）完成注册
   async function signUp(email, password) {
     if (!client) return { ok: false, message: '认证未配置' };
     var { data, error } = await client.auth.signUp({
@@ -71,10 +72,33 @@
       password: password,
     });
     if (error) return { ok: false, message: error.message };
-    // Supabase 关闭 Email Confirmations 后，signUp 直接返回 session（已登录）
-    if (data && data.session) return { ok: true, user: data.user || null };
-    // 保险：个别配置下 signUp 不返回 session，则用密码自动登录
-    return signIn(email, password);
+    // 开启 Email Confirmations 后，signUp 不返回 session（用户未确认），仅发送验证码邮件
+    if (data && data.session) return { ok: true, user: data.user || null }; // 兼容个别直接登录的配置
+    return { ok: true, needsConfirm: true };
+  }
+
+  // 提交邮箱验证码完成注册（成功后自动建立会话，即已登录）
+  // 验证码位数由 Supabase 项目决定（6 位或 8 位），此处不限制位数，仅交服务端校验
+  async function verifyEmailOtp(email, token) {
+    if (!client) return { ok: false, message: '认证未配置' };
+    var { data, error } = await client.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: String(token).trim(),
+      type: 'signup',
+    });
+    if (error) return { ok: false, message: error.message };
+    return { ok: true, user: (data && data.user) || null };
+  }
+
+  // 重新发送注册验证码（Supabase 对同一邮箱有 60 秒发送窗口限制）
+  async function resendSignupCode(email) {
+    if (!client) return { ok: false, message: '认证未配置' };
+    var { error } = await client.auth.resend({
+      type: 'signup',
+      email: email.trim().toLowerCase(),
+    });
+    if (error) return { ok: false, message: error.message };
+    return { ok: true };
   }
 
   // 登录
@@ -185,6 +209,8 @@
     signUp: signUp,
     signIn: signIn,
     signOut: signOut,
+    verifyEmailOtp: verifyEmailOtp,
+    resendSignupCode: resendSignupCode,
     resetPasswordForEmail: resetPasswordForEmail,
     handleCallback: handleCallback,
     updatePassword: updatePassword,

@@ -43,6 +43,14 @@
     .auth-msg.ok { color: #8fd6a0; }
     .auth-hint { margin-top: 14px; font-size: 12px; opacity: 0.7; line-height: 1.6; }
     .cf-turnstile { margin-top: 4px; }
+    .auth-code-hint { margin: 0 0 14px; font-size: 13px; line-height: 1.6; opacity: 0.9; word-break: break-all; }
+    .auth-resend-row { display: flex; gap: 8px; margin-top: 10px; }
+    .auth-secondary {
+      flex: 1; padding: 9px 0; cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 8px;
+      background: rgba(255,255,255,0.06); color: inherit; font-size: 14px;
+    }
+    .auth-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
     .auth-back { display: inline-block; margin-top: 16px; font-size: 13px; opacity: 0.85; }
     .auth-back a { color: inherit; }
   </style>
@@ -73,27 +81,41 @@
           <button type="submit" class="auth-submit" id="login-submit">登录</button>
         </form>
 
-        <!-- 注册（含 Turnstile 人机验证） -->
+        <!-- 注册（含 Turnstile 人机验证；两步：资料 → 邮箱验证码） -->
         <form id="signup-form" class="auth-form hidden" novalidate>
-          <div class="auth-field">
-            <label for="signup-email">邮箱</label>
-            <input type="email" id="signup-email" autocomplete="email" required>
+          <div id="signup-step1">
+            <div class="auth-field">
+              <label for="signup-email">邮箱</label>
+              <input type="email" id="signup-email" autocomplete="email" required>
+            </div>
+            <div class="auth-field">
+              <label for="signup-username">用户名（可选，建议使用小红书昵称）</label>
+              <input type="text" id="signup-username" maxlength="20" autocomplete="username" placeholder="2-20 位中文/字母/数字/下划线">
+              <p style="margin:6px 0 0;font-size:12px;opacity:.7;">💡 建议使用您的小红书用户名称，方便识别</p>
+            </div>
+            <div class="auth-field">
+              <label for="signup-password">密码（至少 6 位）</label>
+              <input type="password" id="signup-password" minlength="6" autocomplete="new-password" required>
+            </div>
+            <div class="auth-field">
+              <label for="signup-password2">确认密码</label>
+              <input type="password" id="signup-password2" minlength="6" autocomplete="new-password" required>
+            </div>
+            <div id="turnstile-widget" class="cf-turnstile"></div>
+            <button type="submit" class="auth-submit" id="signup-submit">注册</button>
           </div>
-          <div class="auth-field">
-            <label for="signup-username">用户名（可选，建议使用小红书昵称）</label>
-            <input type="text" id="signup-username" maxlength="20" autocomplete="username" placeholder="2-20 位中文/字母/数字/下划线">
-            <p style="margin:6px 0 0;font-size:12px;opacity:.7;">💡 建议使用您的小红书用户名称，方便识别</p>
+          <div id="signup-step2" class="hidden">
+            <p class="auth-code-hint">验证码已发送至 <strong id="signup-code-email"></strong>,请查收邮件（含垃圾箱）。</p>
+            <div class="auth-field">
+              <label for="signup-code">邮箱验证码</label>
+              <input type="text" id="signup-code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="请输入邮件中的数字验证码" required>
+            </div>
+            <button type="button" class="auth-submit" id="signup-code-submit">验证并完成注册</button>
+            <div class="auth-resend-row">
+              <button type="button" class="auth-secondary" id="signup-resend">重新发送验证码</button>
+              <button type="button" class="auth-secondary" id="signup-back">返回修改</button>
+            </div>
           </div>
-          <div class="auth-field">
-            <label for="signup-password">密码（至少 6 位）</label>
-            <input type="password" id="signup-password" minlength="6" autocomplete="new-password" required>
-          </div>
-          <div class="auth-field">
-            <label for="signup-password2">确认密码</label>
-            <input type="password" id="signup-password2" minlength="6" autocomplete="new-password" required>
-          </div>
-          <div id="turnstile-widget" class="cf-turnstile"></div>
-          <button type="submit" class="auth-submit" id="signup-submit">注册</button>
         </form>
 
         <!-- 找回密码 -->
@@ -227,10 +249,82 @@
         setTimeout(function () { window.location.href = 'account.html'; }, 600);
       });
 
-      // 注册：Turnstile → 服务端验证 → Supabase signUp
+      // ---- 注册第二步：邮箱验证码 ----
+      var signupEmail = '';
+      var resendTimer = null;
+
+      // 展示验证码步骤（第一步提交成功、验证码已发送后调用）
+      function showSignupStep2(email) {
+        signupEmail = email.trim().toLowerCase();
+        $('signup-form').classList.add('hidden');
+        $('signup-step2').classList.remove('hidden');
+        $('signup-code-email').textContent = signupEmail;
+        $('signup-code').value = '';
+        $('signup-code').focus();
+        startResendCountdown();
+      }
+
+      // 重新发送 60s 倒计时（与 Supabase 同邮箱发送窗口一致）
+      function startResendCountdown() {
+        var btn = $('signup-resend');
+        var remain = 60;
+        btn.disabled = true;
+        btn.textContent = '重新发送（' + remain + 's）';
+        clearInterval(resendTimer);
+        resendTimer = setInterval(function () {
+          remain -= 1;
+          if (remain <= 0) {
+            clearInterval(resendTimer);
+            btn.disabled = false;
+            btn.textContent = '重新发送验证码';
+          } else {
+            btn.textContent = '重新发送（' + remain + 's）';
+          }
+        }, 1000);
+      }
+
+      // Turnstile token → 服务端 siteverify（第一步提交与重发验证码共用）
+      async function verifyTurnstileToken() {
+        if (!turnstileToken) return { ok: false, message: '请先完成人机验证' };
+        var vr = await fetch('/api/verify-turnstile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: turnstileToken }),
+        }).then(async function (r) {
+          var data = await r.json().catch(function () { return {}; });
+          return { ok: r.ok, status: r.status, success: data.success, error: data.error, codes: data.codes };
+        }).catch(function () { return { ok: false, status: 0, success: false }; });
+        if (!vr.ok) {
+          return { ok: false, message: '人机验证服务异常（HTTP ' + vr.status + '）：请确认 Vercel 已配置 CLOUDFLARE_TURNSTILE_SECRET 并重新部署' };
+        }
+        if (!vr.success) {
+          var detail = vr.error ? ' (' + vr.error + (vr.codes && vr.codes.length ? ' ' + vr.codes.join(',') : '') + ')' : '';
+          if (turnstileRendered) turnstile.reset(turnstileWidgetEl); // 元素对象（字符串参数会被当 CSS 选择器）
+          return { ok: false, message: '人机验证未通过' + detail + '，请重试' };
+        }
+        return { ok: true };
+      }
+
+      // 注册收尾：可选设置用户名 → 跳转账户页
+      async function finishSignup() {
+        var uname = $('signup-username').value.trim();
+        if (uname) {
+          var ur = await User.setUsername(uname);
+          if (!ur.ok) { setMsg('注册成功，但用户名设置失败：' + ur.message, true); return; }
+        }
+        setMsg('注册成功，正在跳转…');
+        setTimeout(function () { window.location.href = 'account.html'; }, 600);
+      }
+
+      // 注册：第一步资料 + Turnstile → signUp 发送验证码 → 切第二步输入验证码
       $('signup-form').addEventListener('submit', async function (e) {
         e.preventDefault();
         setMsg('');
+        // 第二步可见时（验证码输入框按 Enter）转交验证码提交
+        if (!$('signup-step2').classList.contains('hidden')) {
+          $('signup-code-submit').click();
+          return;
+        }
         var p1 = $('signup-password').value;
         var p2 = $('signup-password2').value;
         if (p1 !== p2) { setMsg('两次输入的密码不一致', true); return; }
@@ -238,38 +332,71 @@
         var btn = $('signup-submit');
         btn.disabled = true;
         try {
-          var vr = await fetch('/api/verify-turnstile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: turnstileToken }),
-          }).then(async function (r) {
-            var data = await r.json().catch(function () { return {}; });
-            return { ok: r.ok, status: r.status, success: data.success, error: data.error, codes: data.codes };
-          }).catch(function () { return { ok: false, status: 0, success: false }; });
-          if (!vr.ok) {
-            // 服务端异常（secret 未配置 500 / 上游失败 502 / 网络 0）
-            setMsg('人机验证服务异常（HTTP ' + vr.status + '）：请确认 Vercel 已配置 CLOUDFLARE_TURNSTILE_SECRET 并重新部署', true);
-            return;
-          }
-          if (!vr.success) {
-            var detail = vr.error ? ' (' + vr.error + (vr.codes && vr.codes.length ? ' ' + vr.codes.join(',') : '') + ')' : '';
-            setMsg('人机验证未通过' + detail + '，请重试', true);
-            if (turnstileRendered) turnstile.reset(turnstileWidgetEl); // 元素对象（字符串参数会被当 CSS 选择器）
-            return;
-          }
+          var tv = await verifyTurnstileToken();
+          if (!tv.ok) { setMsg(tv.message, true); return; }
           var r = await Auth.signUp($('signup-email').value, p1);
-          if (!r.ok) { setMsg(r.message, true); return; }
-          // 可选：注册时设置用户名
-          var uname = $('signup-username').value.trim();
-          if (uname) {
-            var ur = await User.setUsername(uname);
-            if (!ur.ok) { setMsg('注册成功，但用户名设置失败：' + ur.message, true); return; }
+          if (!r.ok) {
+            // Supabase 原始错误（邮箱已注册 / 发送频率限制等）
+            setMsg(r.message, true);
+            return;
           }
-          setMsg('注册成功，正在跳转…');
-          setTimeout(function () { window.location.href = 'account.html'; }, 600);
+          if (r.needsConfirm) {
+            showSignupStep2($('signup-email').value);
+            setMsg('验证码已发送，请查收邮件（含垃圾箱）');
+            return;
+          }
+          // 兼容：个别配置下 signUp 直接登录
+          await finishSignup();
         } finally {
           btn.disabled = false;
         }
+      });
+
+      // 提交验证码完成注册
+      $('signup-code-submit').addEventListener('click', async function () {
+        setMsg('');
+        var code = $('signup-code').value.trim();
+        // 位数由 Supabase 项目决定（6/8 位均可），这里只做宽松校验
+        if (!/^\d{4,10}$/.test(code)) { setMsg('请输入邮件中的数字验证码', true); return; }
+        var btn = $('signup-code-submit');
+        btn.disabled = true;
+        try {
+          var r = await Auth.verifyEmailOtp(signupEmail, code);
+          if (!r.ok) { setMsg(r.message, true); return; }
+          await finishSignup();
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      // 验证码输入框回车提交
+      $('signup-code').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          $('signup-code-submit').click();
+        }
+      });
+
+      // 重新发送验证码：重新走 Turnstile 防刷 → resend
+      $('signup-resend').addEventListener('click', async function () {
+        setMsg('');
+        var btn = $('signup-resend');
+        btn.disabled = true;
+        var tv = await verifyTurnstileToken().catch(function () { return { ok: false, message: '网络异常，请重试' }; });
+        if (!tv.ok) { setMsg(tv.message, true); btn.disabled = false; return; }
+        var r = await Auth.resendSignupCode(signupEmail).catch(function () { return { ok: false, message: '网络异常，请重试' }; });
+        if (!r.ok) { setMsg(r.message, true); btn.disabled = false; return; }
+        setMsg('验证码已重新发送，请查收');
+        startResendCountdown();
+      });
+
+      // 返回修改：回到第一步重新填资料（重置人机验证）
+      $('signup-back').addEventListener('click', function () {
+        $('signup-step2').classList.add('hidden');
+        $('signup-form').classList.remove('hidden');
+        setMsg('');
+        clearInterval(resendTimer);
+        if (turnstileRendered) turnstile.reset(turnstileWidgetEl);
       });
 
       // 找回密码
