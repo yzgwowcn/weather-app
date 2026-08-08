@@ -34,7 +34,9 @@
         <div class="workspace-section destination-field">
           <span class="field-label">目的地</span>
           <div id="dest-list" class="dest-list" role="group" aria-label="选择目的地"></div>
-          <div class="location-search">
+          <div class="dest-tools">
+            <button type="button" id="map-btn" class="map-btn" disabled title="在地图上点选海南任意位置（需配置高德 Key）">🗺️ 地图选点</button>
+            <div class="location-search">
             <div class="location-search-row">
               <input type="search" id="location-search" class="location-search-input" placeholder="搜索任意地点（如 杭州、大理、大阪）" autocomplete="off" aria-label="搜索任意地点">
               <button type="button" id="coord-toggle" class="coord-toggle" aria-expanded="false" title="手动输入经纬度选点">📌 坐标</button>
@@ -46,6 +48,7 @@
               <button type="button" id="coord-confirm" class="coord-confirm">查询此坐标</button>
             </div>
             <ul id="search-results" class="search-results hidden" role="listbox" aria-label="搜索结果"></ul>
+          </div>
           </div>
         </div>
         <div class="workspace-section horizon-field">
@@ -69,7 +72,37 @@
     </footer>
   </div>
 
+  <div id="map-panel" class="map-panel" aria-hidden="true">
+    <div class="map-panel-inner">
+      <div class="map-panel-head">
+        <strong>🗺️ 地图选点</strong>
+        <button type="button" id="map-close" class="map-close" aria-label="关闭地图选点">✕</button>
+      </div>
+      <input type="search" id="map-search" class="map-search" placeholder="搜索海南地点（高德 POI）" autocomplete="off" aria-label="地图内搜索地点">
+      <div id="map-container" class="map-container" aria-label="海南地图，点击放置选点标记"></div>
+      <p id="map-pick-name" class="map-pick-name">点击地图放置选点标记，可拖动 Marker 微调</p>
+      <p id="map-coords" class="map-coords">—</p>
+      <div class="map-actions">
+        <button type="button" id="map-locate" class="map-locate">📍 使用当前位置</button>
+        <button type="button" id="map-confirm" class="map-confirm" disabled>确认查询</button>
+        <button type="button" id="map-cancel" class="map-cancel">取消</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/config.js"></script>
+  <script>
+    // 高德 JS API 条件加载：仅当 config.js 中配置了 key 时才引入（国内地名合规数据源）
+    (function loadAMap() {
+      if (!window.AMAP_CONFIG || !AMAP_CONFIG.key) return;
+      window.AMapSecurityConfig = { securityJsCode: AMAP_CONFIG.securityJsCode || '' };
+      var s = document.createElement('script');
+      s.src = 'https://webapi.amap.com/v2/maps?v=2.0&key=' + encodeURIComponent(AMAP_CONFIG.key) + '&plugin=AMap.Geocoder,AMap.AutoComplete,AMap.Geolocation';
+      s.async = true;
+      s.onload = function () { document.dispatchEvent(new CustomEvent('amap-ready')); };
+      document.head.appendChild(s);
+    })();
+  </script>
   <script src="js/api.js"></script>
   <script src="js/location.js"></script>
   <script src="js/metrics.js"></script>

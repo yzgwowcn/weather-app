@@ -8,6 +8,14 @@ const DESTINATIONS = [
   { id: 'houhai',   name: '后海·分界洲岛',   lat: 18.3,   lon: 109.72,  marine: true  },
 ];
 
+// 高德地图 JS API 配置（地图拖点选点功能）
+// 获取方式：https://console.amap.com/ 创建应用 → 添加「Web端(JS API)」平台 → 复制 Key 与安全密钥
+// 注意：key 为空时地图选点按钮自动禁用，不影响搜索与坐标选点功能
+const AMAP_CONFIG = {
+  key: '',            // 高德 JS API Key
+  securityJsCode: '', // 高德安全密钥（jscode）
+};
+
 // 默认展示未来 7 天（4-7 天属于"可能有变"窗口，符合 skill 时效规则）
 const DEFAULT_DAYS = 7;
 

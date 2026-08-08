@@ -16,6 +16,16 @@
   const coordLonEl = document.getElementById('coord-lon');
   const coordGcjEl = document.getElementById('coord-is-gcj');
   const coordConfirmEl = document.getElementById('coord-confirm');
+  const mapPanelEl = document.getElementById('map-panel');
+  const mapBtnEl = document.getElementById('map-btn');
+  const mapCloseEl = document.getElementById('map-close');
+  const mapContainerEl = document.getElementById('map-container');
+  const mapSearchEl = document.getElementById('map-search');
+  const mapPickNameEl = document.getElementById('map-pick-name');
+  const mapCoordsEl = document.getElementById('map-coords');
+  const mapLocateEl = document.getElementById('map-locate');
+  const mapConfirmEl = document.getElementById('map-confirm');
+  const mapCancelEl = document.getElementById('map-cancel');
   let searchItems = [];
   let requestSeq = 0;
   let abortController = null;
@@ -190,6 +200,47 @@
     chart.querySelector('.cloud-crosshair')?.classList.remove('visible');
     chart.querySelector('.cloud-tooltip')?.classList.remove('visible');
   }
+  function openMapPanel() {
+    if (!Location.isAMapReady()) {
+      toast('高德地图未加载：请在 js/config.js 配置 AMAP_CONFIG.key 后刷新');
+      return;
+    }
+    mapPanelEl.classList.add('open');
+    mapPanelEl.setAttribute('aria-hidden', 'false');
+    mapBtnEl.disabled = true;
+    Location.initMap(mapContainerEl, {
+      onUI: (pick) => {
+        mapPickNameEl.textContent = pick && pick.name
+          ? `${pick.name}${pick.region ? ' · ' + pick.region : ''}`
+          : '点击地图放置选点标记，可拖动 Marker 微调';
+        mapCoordsEl.textContent = pick ? `WGS84 ${Location.coordLabel(pick.lat_wgs, pick.lng_wgs)}（供天气查询）` : '—';
+        mapConfirmEl.disabled = !pick;
+      },
+    });
+    Location.bindMapSearch(mapSearchEl);
+  }
+  function closeMapPanel() {
+    mapPanelEl.classList.remove('open');
+    mapPanelEl.setAttribute('aria-hidden', 'true');
+    mapBtnEl.disabled = !Location.isAMapReady();
+  }
+  function confirmMapPick() {
+    const pick = Location.getMapPick();
+    if (!pick) { toast('请先在地图上放置选点标记'); return; }
+    const name = pick.name ? `${pick.name}（地图选点）` : Location.formatCoordName(pick.lat_wgs, pick.lng_wgs);
+    const outOfRegion = !Location.isInHainan(pick.lat_wgs, pick.lng_wgs);
+    if (outOfRegion) toast('该地点不在海南范围内，预报数据仅供参考');
+    state.customDest = { id: 'custom', name, lat: pick.lat_wgs, lon: pick.lng_wgs, marine: false, outOfRegion, source: 'map' };
+    state.dest = state.customDest;
+    closeMapPanel();
+    renderDestButtons();
+    query();
+  }
+  async function locateCurrent() {
+    const pos = await Location.getCurrentPosition();
+    if (!pos.ok) { toast('定位失败或已拒绝，请检查浏览器定位权限'); return; }
+    Location.focusMapPick(pos.lng_gcj, pos.lat_gcj, 12);
+  }
   async function query() {
     const start = dateStr(0);
     const end = dateStr(state.days - 1);
@@ -251,6 +302,16 @@
       renderDestButtons();
       query();
     });
+    // 地图选点：打开/关闭/确认/定位（高德 JS API，需配置 key）
+    const enableMapBtn = () => { if (Location.isAMapReady()) mapBtnEl.disabled = false; };
+    document.addEventListener('amap-ready', enableMapBtn);
+    mapBtnEl.addEventListener('click', openMapPanel);
+    mapCloseEl.addEventListener('click', closeMapPanel);
+    mapCancelEl.addEventListener('click', closeMapPanel);
+    mapConfirmEl.addEventListener('click', confirmMapPick);
+    mapLocateEl.addEventListener('click', locateCurrent);
+    mapPanelEl.addEventListener('click', (event) => { if (event.target === mapPanelEl) closeMapPanel(); });
+    enableMapBtn();
     searchResultsEl.addEventListener('click', (event) => {
       const itemEl = event.target.closest('.search-item');
       if (itemEl) selectSearchItem(Number(itemEl.dataset.index));

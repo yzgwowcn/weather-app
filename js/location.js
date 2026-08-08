@@ -132,6 +132,99 @@ const Location = (() => {
     return typeof window !== 'undefined' && typeof window.AMap !== 'undefined';
   }
 
+  // ---- 地图拖点选点（高德 JS API 2.0） ----
+  let mapInstance = null;
+  let mapMarker = null;
+  let mapPick = null;
+  let mapReverseTimer = null;
+  let mapCallbacks = null;
+  let mapSearchAuto = null;
+
+  function initMap(containerEl, callbacks = {}) {
+    if (!isAMapReady()) return { ok: false, reason: 'AMap 未加载' };
+    if (mapInstance) return { ok: true, map: mapInstance }; // 已初始化过则复用
+    mapCallbacks = callbacks;
+    mapInstance = new AMap.Map(containerEl, {
+      center: [109.5, 19.0],
+      zoom: 8,
+      viewMode: '2D',
+    });
+    // 点击地图放置选点 Marker（GCJ-02 展示坐标 → WGS84 请求坐标）
+    mapInstance.on('click', (e) => setMapPick(e.lnglat.lng, e.lnglat.lat));
+    return { ok: true, map: mapInstance };
+  }
+
+  function setMapPick(gcjLng, gcjLat) {
+    if (!mapInstance) return;
+    const [wgsLng, wgsLat] = gcj02ToWgs84(gcjLng, gcjLat);
+    if (!mapMarker) {
+      mapMarker = new AMap.Marker({ position: [gcjLng, gcjLat], draggable: true, cursor: 'pointer' });
+      mapMarker.setMap(mapInstance);
+      mapMarker.on('dragend', (e) => setMapPick(e.lnglat.lng, e.lnglat.lat));
+    } else {
+      mapMarker.setPosition([gcjLng, gcjLat]);
+    }
+    mapPick = { lng_gcj: gcjLng, lat_gcj: gcjLat, lng_wgs: wgsLng, lat_wgs: wgsLat, name: '', region: '' };
+    // 逆地理编码：拖动停止后 400ms 防抖（避免频繁请求）
+    clearTimeout(mapReverseTimer);
+    mapReverseTimer = setTimeout(async () => {
+      const info = await reverseGeocode(wgsLat, wgsLng);
+      if (mapPick && Math.abs(mapPick.lat_wgs - wgsLat) < 1e-6 && Math.abs(mapPick.lng_wgs - wgsLng) < 1e-6) {
+        mapPick.name = info.name || '';
+        mapPick.region = info.region || '';
+      }
+      mapCallbacks?.onUI?.(mapPick);
+    }, 400);
+    mapCallbacks?.onUI?.(mapPick);
+  }
+
+  function getMapPick() { return mapPick; }
+
+  function focusMapPick(gcjLng, gcjLat, zoom = 12) {
+    if (!mapInstance) return;
+    mapInstance.setCenter([gcjLng, gcjLat]);
+    mapInstance.setZoom(zoom);
+    setMapPick(gcjLng, gcjLat);
+  }
+
+  // 地图内搜索：AMap.AutoComplete 联想（内部完成认证，无额外签名）
+  function bindMapSearch(inputEl) {
+    if (!isAMapReady()) return null;
+    if (mapSearchAuto) return mapSearchAuto;
+    mapSearchAuto = new AMap.AutoComplete({ city: '海南', input: inputEl });
+    mapSearchAuto.on('select', (e) => {
+      const loc = e.poi?.location;
+      if (loc) focusMapPick(loc.lng, loc.lat);
+    });
+    return mapSearchAuto;
+  }
+
+  // 当前定位：AMap.Geolocation（返回 GCJ-02 展示坐标 + WGS84 请求坐标）
+  function getCurrentPosition() {
+    return new Promise((resolve) => {
+      if (!isAMapReady() || typeof AMap.Geolocation !== 'function') { resolve({ ok: false, reason: 'AMap.Geolocation 不可用' }); return; }
+      const geolocation = new AMap.Geolocation({ enableHighAccuracy: true, timeout: 8000 });
+      geolocation.getCurrentPosition((status, result) => {
+        if (status === 'complete' && result?.position) {
+          const gcjLng = result.position.lng;
+          const gcjLat = result.position.lat;
+          const [wgsLng, wgsLat] = gcj02ToWgs84(gcjLng, gcjLat);
+          resolve({ ok: true, lng_gcj: gcjLng, lat_gcj: gcjLat, lng_wgs: wgsLng, lat_wgs: wgsLat });
+        } else {
+          resolve({ ok: false, reason: '定位失败或已拒绝' });
+        }
+      });
+    });
+  }
+
+  function destroyMap() {
+    clearTimeout(mapReverseTimer);
+    mapMarker = null;
+    mapPick = null;
+    mapCallbacks = null;
+    if (mapInstance) { mapInstance.destroy(); mapInstance = null; }
+  }
+
   return {
     searchPlaces,
     reverseGeocode,
@@ -141,5 +234,12 @@ const Location = (() => {
     gcj02ToWgs84,
     wgs84ToGcj02,
     isAMapReady,
+    initMap,
+    setMapPick,
+    getMapPick,
+    focusMapPick,
+    bindMapSearch,
+    getCurrentPosition,
+    destroyMap,
   };
 })();

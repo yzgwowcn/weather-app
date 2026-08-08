@@ -136,6 +136,12 @@ const server = http.createServer((req, res) => {
   await page.mouse.move(5, 5);
   await page.waitForTimeout(120);
   check('云量曲线点击后详情保留', await page.locator('.forecast-card.selected .cloud-tooltip.visible').count() === 1);
+
+  // 地图选点（未配置高德 Key 时按钮禁用、面板隐藏；配置后 amap-ready 事件启用按钮）
+  check('地图选点按钮存在', await page.locator('#map-btn').count() === 1);
+  const mapBtnDisabled = await page.locator('#map-btn').isDisabled();
+  check('未配置 Key 时地图按钮禁用', mapBtnDisabled, `disabled=${mapBtnDisabled}`);
+  check('地图面板默认隐藏', (await page.locator('#map-panel').getAttribute('aria-hidden')) === 'true');
   const thunderCount = await page.locator('.thunder-window').count();
   check('雷雨徽章渲染正常（0 或含时段文案与图标）', thunderCount === 0 || (/有雷阵雨，注意避雨/.test(await page.locator('.thunder-window').textContent()) && (await page.locator('.thunder-window .thunder-icon').count()) === 1), `thunder-window=${thunderCount}`);
   await page.close();
