@@ -2,5 +2,11 @@
   "buildCommand": "node inject-env.js",
   "outputDirectory": ".",
   "installCommand": "",
-  "framework": null
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/_AMapService/:path*",
+      "destination": "/api/amap?path=:path*"
+    }
+  ]
 }

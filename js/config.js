@@ -9,11 +9,11 @@ const DESTINATIONS = [
 ];
 
 // 高德地图 JS API 配置（地图拖点选点功能）
-// 获取方式：https://console.amap.com/ 创建应用 → 添加「Web端(JS API)」平台 → 复制 Key 与安全密钥
+// 获取方式：https://console.amap.com/ 创建应用 → 添加「Web端(JS API)」平台 → 复制 Key
+// 安全密钥（jscode）不注入前端，由服务端代理 api/amap.mjs 注入
 // 注意：key 为空时地图选点按钮自动禁用，不影响搜索与坐标选点功能
 const AMAP_CONFIG = {
-  key: '__AMAP_KEY__',               // 构建时由 Vercel 环境变量 AMAP_KEY 替换
-  securityJsCode: '__AMAP_SECRET__', // 构建时由 Vercel 环境变量 AMAP_SECRET 替换
+  key: '__AMAP_KEY__', // 构建时由 Vercel 环境变量 AMAP_KEY 替换
 };
 
 // 默认展示未来 7 天（4-7 天属于"可能有变"窗口，符合 skill 时效规则）

@@ -76,6 +76,8 @@ NODE_PATH="$(npm root -g)" node tests/e2e.check.js   # 端到端（真实 API + 
 ```
 weather-app/
 ├── index.html          # 页面骨架（移动端优先，body[data-mood] 初始 neutral；importmap 指向本地 vendor）
+├── api/
+│   └── amap.mjs        # 高德 REST API 服务端代理（Vercel Function，serviceHost 代理，服务端注入 jscode）
 ├── css/
 │   └── style.css       # 毛玻璃视觉系统 + 天气状态机 + reduced-motion + 响应式
 ├── js/
@@ -111,7 +113,7 @@ weather-app/
 
 ## 地图选点配置（可选，Vercel 环境变量注入）
 
-地图拖点选点使用高德 JS API 2.0（面向国内用户，地名数据合规）。**Key 不写入仓库**：仓库内 `js/config.js` 只保留 `__AMAP_KEY__` / `__AMAP_SECRET__` 占位符，部署时由 Vercel 环境变量注入（`npm run build` → `node inject-env.js` 完成替换）。
+地图拖点选点使用高德 JS API 2.0（面向国内用户，地名数据合规）。**Key 与安全密钥都不写入仓库**：仓库内 `js/config.js` 只保留 `__AMAP_KEY__` 占位符，部署时由 Vercel 环境变量注入（`npm run build` → `node inject-env.js` 完成替换）；安全密钥 `AMAP_SECRET`（jscode）仅由服务端 `api/amap.mjs` 通过 `process.env.AMAP_SECRET` 读取，不进入任何静态 HTML/JS/CSS 文件。
 
 ### ① 申请高德 Key
 
@@ -126,8 +128,8 @@ Vercel Dashboard → 项目 → Settings → Environment Variables，新增：
 
 | Name | Value |
 |---|---|
-| `AMAP_KEY` | 高德 JS API Key（32 位） |
-| `AMAP_SECRET` | 高德安全密钥（jscode） |
+| `AMAP_KEY` | 高德 JS API Key（32 位，构建时注入前端 `js/config.js`） |
+| `AMAP_SECRET` | 高德安全密钥 jscode（仅服务端 `api/amap.mjs` 通过 `process.env` 读取） |
 
 Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `package.json` 的 build 脚本会自动执行）。
 
@@ -137,6 +139,7 @@ Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `packa
 - 未配置环境变量时（本地开发 / 构建时无 env），占位符被替换为空字符串，「🗺️ 地图选点」按钮自动禁用，不影响搜索、手动坐标与预设目的地功能。
 - 地图交互：点击地图放置 Marker（可拖动微调），拖动停止后自动逆地理编码显示地名；支持地图内 POI 搜索与「使用当前位置」。
 - 高德坐标（GCJ-02）会自动转换为 WGS84 后再请求 Open-Meteo 天气（`js/location.js` 内置迭代逆转换，精度 <1 米）。
+- 安全模式采用高德官方推荐的 **serviceHost 服务端代理**：前端 `window._AMapSecurityConfig = { serviceHost: window.location.origin + '/_AMapService' }`，JS API 的 Geocoder / AutoComplete / Geolocation 等 REST 请求经 `vercel.json` rewrite 转发到 `api/amap.mjs`（Vercel Function），由服务端注入 `jscode` 后代理到 `https://restapi.amap.com/`；安全密钥不再以明文出现在任何静态文件中。
 - 高德 JS API 通过 `webapi.amap.com` CDN 条件加载，仅在注入真实 Key 后引入；免费配额有限，生产使用请关注控制台用量。
 
 ## 已知限制

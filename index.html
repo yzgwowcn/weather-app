@@ -103,9 +103,9 @@
       // 注意：AMAP_CONFIG 是全局 const（词法绑定），不会挂到 window 上，必须直接访问
       if (typeof AMAP_CONFIG === 'undefined' || !AMAP_CONFIG.key) return;
       if (String(AMAP_CONFIG.key).indexOf('__AMAP_') === 0) return; // 占位符未注入（本地开发/未配置环境变量）
-      window._AMapSecurityConfig = { securityJsCode: AMAP_CONFIG.securityJsCode || '' };
+      window._AMapSecurityConfig = { serviceHost: window.location.origin + '/_AMapService' };
       var s = document.createElement('script');
-      // 高德 JS API 2.0 官方加载地址为 /maps（无 /v2/ 路径），安全密钥须挂 _AMapSecurityConfig（下划线前缀）
+      // 高德 JS API 2.0 官方加载地址为 /maps（无 /v2/ 路径）；REST 请求经 serviceHost 服务端代理转发（api/amap.mjs）
       s.src = 'https://webapi.amap.com/maps?v=2.0&key=' + encodeURIComponent(AMAP_CONFIG.key) + '&plugin=AMap.Geocoder,AMap.AutoComplete,AMap.Geolocation';
       s.async = true;
       s.onload = function () { document.dispatchEvent(new CustomEvent('amap-ready')); };
