@@ -254,9 +254,11 @@
       var resendTimer = null;
 
       // 展示验证码步骤（第一步提交成功、验证码已发送后调用）
+      // 注意：只能隐藏 signup-step1，不能隐藏整个 signup-form——
+      // step2 是 form 的子元素，form 加 hidden 后 step2 即使无 hidden 也不可见（实测 bug）
       function showSignupStep2(email) {
         signupEmail = email.trim().toLowerCase();
-        $('signup-form').classList.add('hidden');
+        $('signup-step1').classList.add('hidden');
         $('signup-step2').classList.remove('hidden');
         $('signup-code-email').textContent = signupEmail;
         $('signup-code').value = '';
@@ -393,7 +395,7 @@
       // 返回修改：回到第一步重新填资料（重置人机验证）
       $('signup-back').addEventListener('click', function () {
         $('signup-step2').classList.add('hidden');
-        $('signup-form').classList.remove('hidden');
+        $('signup-step1').classList.remove('hidden');
         setMsg('');
         clearInterval(resendTimer);
         if (turnstileRendered) turnstile.reset(turnstileWidgetEl);
