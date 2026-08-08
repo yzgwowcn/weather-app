@@ -144,11 +144,20 @@
         turnstileWidgetEl.style.color = '#ff8f8f';
         turnstileWidgetEl.style.fontSize = '13px';
       }
-      function doRender() {
+      function doRender(retries) {
+        retries = retries || 0;
         // 等待一帧确保容器完成布局（注册表单刚从 hidden 切换为可见），避免 Turnstile 在隐藏/未布局容器中静默失败
         requestAnimationFrame(function () {
           if (turnstileRendered) return;
-          if (!turnstileWidgetEl || turnstileWidgetEl.offsetParent === null) return; // 容器仍不可见，等 onload/下次切 tab 兜底
+          if (!turnstileWidgetEl || turnstileWidgetEl.offsetParent === null) {
+            // 容器仍不可见（部分浏览器 display 切换后布局尚未就绪）：逐帧重试，最多 50 帧 ≈ 0.8 秒
+            if (retries < 50) {
+              doRender(retries + 1);
+            } else {
+              turnstileUnavailable('人机验证组件无法显示（容器不可见），请刷新页面重试');
+            }
+            return;
+          }
           turnstile.render('turnstile-widget', {
             sitekey: TURNSTILE_CONFIG.siteKey,
             callback: function (token) { turnstileToken = token; },
