@@ -343,7 +343,57 @@ function renderDayRail(days, selectedDate) {
     </button>`).join('')}</nav>`;
 }
 
-function renderForecastCards(days, selectedDate) {
+// ---- 逐日卡片：当天逐小时云量曲线 -----------------------------------------
+
+// 取综合预报 hourly 中某日全天各小时的云量（当前 API 粒度为 1 小时间隔，24 点/天）
+function cloudCurve(forecast, date) {
+  const h = forecast?.hourly;
+  if (!h?.time) return [];
+  const points = [];
+  h.time.forEach((time, index) => {
+    if (String(time).slice(0, 10) !== date) return;
+    const num = (arr) => { const v = arr?.[index]; return v == null ? null : Number(v); };
+    points.push({
+      hour: Number(String(time).slice(11, 13)),
+      total: num(h.cloud_cover),
+      low: num(h.cloud_cover_low),
+      mid: num(h.cloud_cover_mid),
+      high: num(h.cloud_cover_high),
+    });
+  });
+  return points;
+}
+
+// 当天小曲线：总云量实线 + 低/中/高云（高云虚线），固定 viewBox 自适应宽度
+function renderCloudCurve(points) {
+  if (!points.length) return '<p class="cloud-curve-empty">当天逐小时云量数据暂缺。</p>';
+  const W = 560; const H = 150;
+  const PAD = { top: 12, right: 8, bottom: 24, left: 34 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+  const x = (hour) => PAD.left + hour / 23 * plotW;
+  const y = (v) => PAD.top + (100 - v) / 100 * plotH;
+  const parts = [];
+  [0, 25, 50, 75, 100].forEach((tick) => {
+    parts.push(`<line class="cloud-grid" x1="${PAD.left}" y1="${y(tick)}" x2="${W - PAD.right}" y2="${y(tick)}" />`);
+    parts.push(`<text class="cloud-axis" x="${PAD.left - 6}" y="${y(tick) + 3.5}">${tick}</text>`);
+  });
+  // 白天时段（08–18）浅色带
+  parts.push(`<rect class="cloud-dayband" x="${x(8)}" y="${PAD.top}" width="${x(18) - x(8)}" height="${plotH}" />`);
+  // x 轴小时刻度（每 3 小时）
+  [0, 3, 6, 9, 12, 15, 18, 21].forEach((hour) => {
+    parts.push(`<text class="cloud-axis" x="${x(hour)}" y="${H - 7}" text-anchor="middle">${String(hour).padStart(2, '0')}</text>`);
+  });
+  const line = (key, cls) => {
+    const seg = points.filter((p) => p[key] != null).map((p) => ({ x: x(p.hour), y: y(p[key]) }));
+    if (seg.length > 1) parts.push(`<path class="cloud-line ${cls}" d="${smoothPath(seg)}" />`);
+  };
+  line('total', 'total');
+  SKY_LAYERS.forEach((layer) => line(layer.key, layer.cls));
+  return `<svg class="cloud-curve" viewBox="0 0 ${W} ${H}" role="img" aria-label="当天逐小时云层覆盖率曲线（1 小时间隔，共 ${points.length} 点）">${parts.join('')}</svg>`;
+}
+
+function renderForecastCards(days, selectedDate, cloudCurves = {}) {
   return `<section class="forecast-section"><div class="section-heading"><p class="section-kicker">OUTLOOK</p><h2>逐日判断</h2></div>
     <div class="forecast-list">${days.map((day, index) => {
       const [condition] = weatherMeta(day.code);
@@ -356,7 +406,7 @@ function renderForecastCards(days, selectedDate) {
           <div class="forecast-condition"><strong>${probabilityWord(day.assessment.probability)}</strong><span>${condition} · ${Math.round(day.low)}°–${Math.round(day.high)}°</span></div>
           <div class="forecast-probability"><b>${Metrics.formatPercent(day.assessment.probability)}</b><small>${consistency.text}</small></div>
         </button>
-        ${active ? `<div class="forecast-detail"><div><span>遮蔽云量</span><b>${day.assessment.ec.main ? `${Math.round(day.assessment.ec.main.maskMean)}%` : '—'}</b></div><div><span>降水</span><b>${day.rain == null ? '—' : `${day.rain.toFixed(1)} mm`}</b></div><div><span>风速</span><b>${day.wind == null ? '—' : `${Math.round(day.wind)} km/h`}</b></div><p>${consistency.description}</p></div>` : ''}
+        ${active ? `<div class="forecast-detail"><div><span>遮蔽云量</span><b>${day.assessment.ec.main ? `${Math.round(day.assessment.ec.main.maskMean)}%` : '—'}</b></div><div><span>降水</span><b>${day.rain == null ? '—' : `${day.rain.toFixed(1)} mm`}</b></div><div><span>风速</span><b>${day.wind == null ? '—' : `${Math.round(day.wind)} km/h`}</b></div><p>${consistency.description}</p>${cloudCurves[day.date] ? `<div class="cloud-curve-wrap"><div class="cloud-curve-head"><span>当天逐小时云量</span><small>1 小时间隔 · ${cloudCurves[day.date].length} 点 · 综合预报</small></div>${renderCloudCurve(cloudCurves[day.date])}<div class="cloud-curve-legend"><span class="legend-total">总云量</span><span class="legend-low">低云</span><span class="legend-mid">中云</span><span class="legend-high">高云</span></div></div>` : ''}</div>` : ''}
       </article>`;
     }).join('')}</div></section>`;
 }
@@ -385,10 +435,11 @@ function renderWeatherApp(bundle, destination, requestedDays, selectedDate, ui =
   const assessments = Metrics.buildAssessment(bundle.ensembles, bundle.deterministic, dates);
   const cloudSeries = Metrics.buildCloudSeries(bundle.deterministic['ECMWF IFS'], forecast, dates);
   const days = dates.map((date, index) => ({ ...dailyData(forecast, index), assessment: assessments[date], iconCodes: hourlyCodesFor(forecast, date) }));
+  const cloudCurves = Object.fromEntries(dates.map((date) => [date, cloudCurve(forecast, date)]));
   const currentDate = days.some((day) => day.date === selectedDate) ? selectedDate : days[0].date;
   const selected = days.find((day) => day.date === currentDate);
   const skyView = ui.skyView === 'forecast' ? 'forecast' : 'ec';
   const skyIndex = ui.skyIndex;
   const farNotice = requestedDays > 7 ? '<p class="notice">第 8 天及以后仅适合作趋势参考，临近出行请再次更新。</p>' : '';
-  return `${farNotice}${renderDayRail(days, currentDate)}${renderEcHero(selected, selected.assessment, destination)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderForecastCards(days, currentDate)}${renderMarineCards(bundle.marine, destination)}`;
+  return `${farNotice}${renderDayRail(days, currentDate)}${renderEcHero(selected, selected.assessment, destination)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderForecastCards(days, currentDate, cloudCurves)}${renderMarineCards(bundle.marine, destination)}`;
 }

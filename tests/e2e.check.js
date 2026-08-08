@@ -100,6 +100,24 @@ const server = http.createServer((req, res) => {
     if (await chip.count()) { await chip.click(); await page.waitForTimeout(80); moods.add(await page.getAttribute('body', 'data-mood')); }
   }
   check('日期切换收集到 mood 变化', moods.size >= 1 && [...moods].every((m) => /sunny|cloudy|rain|windy|storm|thunder|neutral/.test(m)), [...moods].join(','));
+
+  // 点击日期不应把页面纵向滚回顶部（回归：scrollIntoView block:'nearest' 曾把页面滚回顶部）
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.waitForTimeout(120);
+  const scrollBefore = await page.evaluate(() => window.scrollY);
+  await page.evaluate(() => {
+    const cards = document.querySelectorAll('.forecast-summary');
+    if (cards.length >= 2) cards[1].click();
+  });
+  await page.waitForTimeout(200);
+  const scrollAfter = await page.evaluate(() => window.scrollY);
+  check('点击日期后页面不滚回顶部', scrollBefore > 0 && scrollAfter > scrollBefore * 0.5, `before=${Math.round(scrollBefore)} after=${Math.round(scrollAfter)}`);
+
+  // 选中日期展开区：当天逐小时云量曲线（总云量+三层云共 4 条线，1 小时间隔 24 点）
+  const curveLines = await page.locator('.forecast-card.selected .cloud-line').count();
+  check('展开区逐小时云量曲线', curveLines === 4, `lines=${curveLines}`);
+  const curveHead = await page.locator('.forecast-card.selected .cloud-curve-head').textContent();
+  check('云量曲线标注 1 小时间隔', /1 小时间隔 · 24 点/.test(curveHead.replace(/\s+/g, ' ')), curveHead.replace(/\s+/g, ' '));
   const thunderCount = await page.locator('.thunder-window').count();
   check('雷雨徽章渲染正常（0 或含时段文案与图标）', thunderCount === 0 || (/有雷阵雨，注意避雨/.test(await page.locator('.thunder-window').textContent()) && (await page.locator('.thunder-window .thunder-icon').count()) === 1), `thunder-window=${thunderCount}`);
   await page.close();

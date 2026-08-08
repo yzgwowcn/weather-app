@@ -90,11 +90,14 @@
     if (newScroll) newScroll.scrollLeft = scrollLeft;
     const newRail = resultEl.querySelector('.date-rail');
     if (newRail) {
-      // 恢复日期条滚动位置；选中日期时将其滚动到可视区域（居中），避免回到最左
+      // 恢复日期条横向滚动位置；选中日期时仅横向居中该 chip（只滚动 rail 容器，
+      // 不调用 scrollIntoView，避免页面被纵向滚回顶部）
       newRail.scrollLeft = railLeft;
       if (state.selectedDate) {
         const chip = newRail.querySelector(`[data-select-date="${state.selectedDate}"]`);
-        chip?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' });
+        if (chip) {
+          newRail.scrollLeft = Math.max(0, chip.offsetLeft - (newRail.clientWidth - chip.offsetWidth) / 2);
+        }
       }
     }
     // 恢复持久选中时刻的详情浮层（点击/键盘选中后跨重渲染保留）

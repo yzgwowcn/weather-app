@@ -46,6 +46,7 @@ const bundle = {
     },
     hourly: {
       time: DAYS.flatMap((d) => allDay(d).time),
+      cloud_cover: DAYS.flatMap(() => Array(24).fill(50)),
       cloud_cover_low: DAYS.flatMap(() => Array(24).fill(20)),
       cloud_cover_mid: DAYS.flatMap(() => Array(24).fill(20)),
       cloud_cover_high: DAYS.flatMap(() => Array(24).fill(90)),
@@ -76,6 +77,12 @@ for (const c of checks) {
 for (const c of ['prob-ring', 'prob-arc', 'prob-track', 'stroke-dasharray="100 100"', 'rotate(-90 60 60)']) {
   if (!html.includes(c)) { console.error('PROB-RING MISSING:', c); process.exit(1); }
 }
+// 逐日卡片展开区：当天逐小时云量曲线（24 点、总云量+三层云、白天带、每 3h 刻度、图例）
+for (const c of ['cloud-curve-wrap', 'cloud-line total', 'cloud-line low', 'cloud-line mid', 'cloud-line high', '1 小时间隔 · 24 点 · 综合预报', 'legend-total', 'legend-low', 'legend-mid', 'legend-high', 'cloud-dayband']) {
+  if (!html.includes(c)) { console.error('CLOUD CURVE MISSING:', c); process.exit(1); }
+}
+if ((html.match(/cloud-line /g) || []).length !== 4) { console.error('CLOUD LINES COUNT FAIL'); process.exit(1); }
+if ((html.match(/cloud-curve-wrap/g) || []).length !== 1) { console.error('CLOUD CURVE WRAP COUNT FAIL（应仅选中卡片展开）'); process.exit(1); }
 const iRail = html.indexOf('date-rail');
 const iHero = html.indexOf('ec-hero');
 const iSky = html.indexOf('sky-section');
