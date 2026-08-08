@@ -1,0 +1,9 @@
+{
+  "name": "weather-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "晴海 · 海南旅行天气判断（Vercel 构建时注入高德地图 Key）",
+  "scripts": {
+    "build": "node inject-env.js"
+  }
+}

@@ -92,9 +92,10 @@
 
   <script src="js/config.js"></script>
   <script>
-    // 高德 JS API 条件加载：仅当 config.js 中配置了 key 时才引入（国内地名合规数据源）
+    // 高德 JS API 条件加载：仅当 Vercel 构建注入真实 key 时才引入（国内地名合规数据源）
     (function loadAMap() {
       if (!window.AMAP_CONFIG || !AMAP_CONFIG.key) return;
+      if (String(AMAP_CONFIG.key).indexOf('__AMAP_') === 0) return; // 占位符未注入（本地开发/未配置环境变量）
       window.AMapSecurityConfig = { securityJsCode: AMAP_CONFIG.securityJsCode || '' };
       var s = document.createElement('script');
       s.src = 'https://webapi.amap.com/v2/maps?v=2.0&key=' + encodeURIComponent(AMAP_CONFIG.key) + '&plugin=AMap.Geocoder,AMap.AutoComplete,AMap.Geolocation';
