@@ -139,6 +139,8 @@ const Location = (() => {
   let mapReverseTimer = null;
   let mapCallbacks = null;
   let mapSearchAuto = null;
+  let satelliteLayer = null;
+  let roadNetLayer = null;
 
   function initMap(containerEl, callbacks = {}) {
     if (!isAMapReady()) return { ok: false, reason: 'AMap 未加载' };
@@ -152,6 +154,21 @@ const Location = (() => {
     // 点击地图放置选点 Marker（GCJ-02 展示坐标 → WGS84 请求坐标）
     mapInstance.on('click', (e) => setMapPick(e.lnglat.lng, e.lnglat.lat));
     return { ok: true, map: mapInstance };
+  }
+
+  // 地图图层切换：satellite = 卫星底图 + 路网文字叠加；standard = 恢复默认底图
+  function setMapLayer(type) {
+    if (!mapInstance) return 'standard';
+    if (type === 'satellite') {
+      if (!satelliteLayer) satelliteLayer = new AMap.TileLayer.Satellite();
+      if (!roadNetLayer) roadNetLayer = new AMap.TileLayer.RoadNet();
+      satelliteLayer.setMap(mapInstance);
+      roadNetLayer.setMap(mapInstance);
+    } else {
+      satelliteLayer?.setMap(null);
+      roadNetLayer?.setMap(null);
+    }
+    return type === 'satellite' ? 'satellite' : 'standard';
   }
 
   function setMapPick(gcjLng, gcjLat) {
@@ -235,6 +252,7 @@ const Location = (() => {
     wgs84ToGcj02,
     isAMapReady,
     initMap,
+    setMapLayer,
     setMapPick,
     getMapPick,
     focusMapPick,

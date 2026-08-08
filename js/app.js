@@ -311,6 +311,17 @@
     mapConfirmEl.addEventListener('click', confirmMapPick);
     mapLocateEl.addEventListener('click', locateCurrent);
     mapPanelEl.addEventListener('click', (event) => { if (event.target === mapPanelEl) closeMapPanel(); });
+    // 地图图层切换（标准 / 卫星）
+    mapPanelEl.addEventListener('click', (event) => {
+      const layerBtn = event.target.closest('[data-layer]');
+      if (!layerBtn || !Location.isAMapReady()) return;
+      Location.setMapLayer(layerBtn.dataset.layer);
+      mapPanelEl.querySelectorAll('.map-layer-btn').forEach((btn) => {
+        const active = btn === layerBtn;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', String(active));
+      });
+    });
     enableMapBtn();
     searchResultsEl.addEventListener('click', (event) => {
       const itemEl = event.target.closest('.search-item');

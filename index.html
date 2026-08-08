@@ -79,7 +79,13 @@
         <button type="button" id="map-close" class="map-close" aria-label="关闭地图选点"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
       <input type="search" id="map-search" class="map-search" placeholder="搜索海南地点（高德 POI）" autocomplete="off" aria-label="地图内搜索地点">
-      <div id="map-container" class="map-container" aria-label="海南地图，点击放置选点标记"></div>
+      <div class="map-container-wrap">
+        <div id="map-container" class="map-container" aria-label="海南地图，点击放置选点标记"></div>
+        <div class="map-layer-switch" role="group" aria-label="地图图层切换">
+          <button type="button" class="map-layer-btn active" data-layer="standard" aria-pressed="true">标准</button>
+          <button type="button" class="map-layer-btn" data-layer="satellite" aria-pressed="false">卫星</button>
+        </div>
+      </div>
       <p id="map-pick-name" class="map-pick-name">点击地图放置选点标记，可拖动 Marker 微调</p>
       <p id="map-coords" class="map-coords">—</p>
       <div class="map-actions">
