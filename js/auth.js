@@ -4,6 +4,31 @@
 (function () {
   'use strict';
 
+  // PKCE 双写 storage：localStorage 优先，cookie 兜底。
+  // 默认 sessionStorage 按标签页隔离导致邮件确认链接（新标签打开）读不到 code_verifier；
+  // localStorage 已覆盖同浏览器场景，cookie 兜底覆盖隐私模式/存储被清等场景。
+  // 注意：两者都按 origin 隔离，邮件链接域名必须与注册页完全一致（含子域）。
+  var pkceStorage = {
+    getItem: function (key) {
+      var v = null;
+      try { v = localStorage.getItem(key); } catch (e) { /* 隐私模式可能抛错 */ }
+      if (v) return v;
+      var esc = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      var m = document.cookie.match(new RegExp('(?:^|;)\\s*' + esc + '=([^;]*)'));
+      return m ? decodeURIComponent(m[1]) : null;
+    },
+    setItem: function (key, value) {
+      try { localStorage.setItem(key, value); } catch (e) { /* 忽略 */ }
+      var d = new Date();
+      d.setTime(d.getTime() + 7 * 86400000); // 7 天，覆盖验证邮件有效期
+      document.cookie = key + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/;SameSite=Lax';
+    },
+    removeItem: function (key) {
+      try { localStorage.removeItem(key); } catch (e) { /* 忽略 */ }
+      document.cookie = key + '=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;SameSite=Lax';
+    },
+  };
+
   function placeholder(v) {
     return typeof v === 'string' && v.indexOf('__SUPABASE_') === 0;
   }
@@ -21,7 +46,7 @@
         flowType: 'pkce',
         persistSession: true,
         autoRefreshToken: true,
-        storage: localStorage,
+        storage: pkceStorage,
       },
     });
   }
