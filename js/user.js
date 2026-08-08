@@ -84,28 +84,32 @@
     return { ok: true, favorites: data || [] };
   }
 
-  // 添加收藏（应用层查重：同名且坐标相近视为已收藏）
+  // 添加收藏（应用层查重：同名且坐标相近视为已收藏；名称 1-15 字）
   async function addFavorite(item) {
     var client = sb();
     var user = currentUser();
     if (!client) return { ok: false, message: '认证服务未配置' };
     if (!user) return { ok: false, message: '未登录' };
-    if (!item || typeof item.name !== 'string' || !item.name
-      || typeof item.lat !== 'number' || typeof item.lon !== 'number') {
-      return { ok: false, message: '收藏数据无效' };
-    }
+    if (!item || typeof item.name !== 'string') return { ok: false, message: '收藏数据无效' };
+    var name = item.name.trim();
+    if (!name) return { ok: false, message: '收藏名称不能为空' };
+    if (name.length > 15) return { ok: false, message: '收藏名称不能超过 15 字' };
+    if (typeof item.lat !== 'number' || typeof item.lon !== 'number') return { ok: false, message: '收藏数据无效' };
     var list = await listFavorites();
     if (list.ok) {
       var dup = list.favorites.some(function (f) {
-        return f.name === item.name && Math.abs(f.lat - item.lat) < 0.001 && Math.abs(f.lon - item.lon) < 0.001;
+        return f.name === name && Math.abs(f.lat - item.lat) < 0.001 && Math.abs(f.lon - item.lon) < 0.001;
       });
       if (dup) return { ok: false, message: '该位置已在收藏中' };
     }
     var { data, error } = await client
       .from('favorites')
-      .insert({ user_id: user.id, name: item.name, lat: item.lat, lon: item.lon, is_gcj: !!item.is_gcj })
+      .insert({ user_id: user.id, name: name, lat: item.lat, lon: item.lon, is_gcj: !!item.is_gcj })
       .select('id, name, lat, lon, is_gcj, created_at');
-    if (error) return { ok: false, message: error.message };
+    if (error) {
+      if (error.code === '23514') return { ok: false, message: '收藏名称不能超过 15 字' }; // 数据库 CHECK 兜底
+      return { ok: false, message: error.message };
+    }
     return { ok: true, favorite: data && data[0] };
   }
 

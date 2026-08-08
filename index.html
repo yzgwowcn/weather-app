@@ -69,6 +69,13 @@
           <button type="button" id="fav-add" class="fav-add" style="padding:7px 14px;border:1px solid rgba(255,255,255,.25);border-radius:999px;background:transparent;color:inherit;cursor:pointer;font-size:13px;">☆ 收藏此位置</button>
           <span id="fav-msg" style="font-size:12px;opacity:.8;" role="status"></span>
         </div>
+        <div id="fav-edit" style="display:none;margin-bottom:8px;">
+          <input type="text" id="fav-name" maxlength="15" placeholder="收藏名称（15 字以内，可自定义备注）" style="width:100%;box-sizing:border-box;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.25);color:inherit;font-size:14px;margin-bottom:8px;">
+          <div style="display:flex;gap:8px;">
+            <button type="button" id="fav-confirm" style="flex:1;padding:8px 0;border:none;border-radius:8px;font-size:14px;background:linear-gradient(135deg,#f0b45a,#e08a3c);color:#1a1a1a;font-weight:600;cursor:pointer;">确认收藏</button>
+            <button type="button" id="fav-cancel" style="flex:1;padding:8px 0;border:none;border-radius:8px;font-size:14px;background:rgba(255,255,255,.12);color:inherit;cursor:pointer;">取消</button>
+          </div>
+        </div>
         <div id="fav-list" style="display:flex;flex-direction:column;gap:6px;font-size:13px;"></div>
       </section>
 
@@ -130,6 +137,10 @@
       var favAdd = document.getElementById('fav-add');
       var favMsg = document.getElementById('fav-msg');
       var favList = document.getElementById('fav-list');
+      var favEdit = document.getElementById('fav-edit');
+      var favName = document.getElementById('fav-name');
+      var favConfirm = document.getElementById('fav-confirm');
+      var favCancel = document.getElementById('fav-cancel');
       if (!favAdd || !favList || typeof User === 'undefined') return;
 
       function escapeHtml(s) {
@@ -181,6 +192,7 @@
         });
       }
 
+      // 点击收藏：展开名称编辑行（预填当前地名，可自定义备注）
       favAdd.addEventListener('click', function () {
         if (!isLoggedIn()) {
           setMsg('请先登录后再收藏');
@@ -189,10 +201,27 @@
         }
         var d = window.__getCurrentDest ? window.__getCurrentDest() : null;
         if (!d) { setMsg('无法获取当前位置'); return; }
-        User.addFavorite({ name: d.name, lat: d.lat, lon: d.lon, is_gcj: !!d.is_gcj }).then(function (r) {
-          setMsg(r.ok ? '已收藏 ' + d.name : r.message);
-          if (r.ok) renderFavs();
+        favName.value = d.name;
+        favEdit.style.display = 'block';
+        favName.focus();
+      });
+      // 确认收藏（前端校验 + 后端 CHECK 兜底）
+      favConfirm.addEventListener('click', function () {
+        var d = window.__getCurrentDest ? window.__getCurrentDest() : null;
+        if (!d) { setMsg('无法获取当前位置'); return; }
+        var name = favName.value.trim();
+        if (!name) { setMsg('收藏名称不能为空'); return; }
+        if (name.length > 15) { setMsg('收藏名称不能超过 15 字'); return; }
+        favConfirm.disabled = true;
+        User.addFavorite({ name: name, lat: d.lat, lon: d.lon, is_gcj: !!d.is_gcj }).then(function (r) {
+          favConfirm.disabled = false;
+          setMsg(r.ok ? '已收藏 ' + name : r.message);
+          if (r.ok) { favEdit.style.display = 'none'; renderFavs(); }
         });
+      });
+      favCancel.addEventListener('click', function () {
+        favEdit.style.display = 'none';
+        setMsg('');
       });
 
       document.addEventListener('auth-change', renderFavs);
