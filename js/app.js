@@ -101,6 +101,17 @@
     renderDestButtons();
     query();
   }
+  // 收藏功能接入点：获取当前选中位置（预设目的地/自定义）
+  window.__getCurrentDest = function () {
+    return { name: state.dest.name, lat: state.dest.lat, lon: state.dest.lon, is_gcj: false };
+  };
+  // 收藏功能接入点：选中收藏项 → 设为当前目的地并立即查询
+  window.__WeatherSelectDest = function (name, lat, lon) {
+    state.customDest = { id: 'custom', name: name, lat: lat, lon: lon, marine: false };
+    state.dest = state.customDest;
+    renderDestButtons();
+    query();
+  };
   function renderResult() {
     const oldScroll = resultEl.querySelector('.sky-scroll');
     const scrollLeft = oldScroll ? oldScroll.scrollLeft : 0;

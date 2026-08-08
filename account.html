@@ -19,6 +19,19 @@
     .account-row { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 14px; }
     .account-row .k { opacity: 0.75; flex-shrink: 0; }
     .account-row .v { word-break: break-all; text-align: right; }
+    .account-row .v .link-btn { background: none; border: none; color: inherit; text-decoration: underline; cursor: pointer; font-size: 13px; opacity: 0.85; padding: 0; }
+    .uname-edit { display: none; margin-top: 10px; }
+    .uname-edit input {
+      width: 100%; box-sizing: border-box; padding: 9px 12px; margin-bottom: 8px;
+      border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.25); color: inherit; font-size: 14px;
+    }
+    .uname-edit .row { display: flex; gap: 8px; }
+    .uname-edit .row button {
+      flex: 1; padding: 8px 0; cursor: pointer; border: none; border-radius: 8px; font-size: 14px;
+    }
+    #uname-save { background: linear-gradient(135deg, #f0b45a, #e08a3c); color: #1a1a1a; font-weight: 600; }
+    #uname-cancel { background: rgba(255,255,255,0.12); color: inherit; }
     .auth-msg { margin-top: 14px; font-size: 13px; min-height: 18px; }
     .auth-msg.error { color: #ff8f8f; }
     .auth-submit {
@@ -41,7 +54,15 @@
       <div class="auth-card">
         <h2 style="margin:0 0 16px;font-size:18px;">我的账户</h2>
         <div class="account-row"><span class="k">邮箱</span><span class="v" id="acc-email">—</span></div>
+        <div class="account-row"><span class="k">用户名</span><span class="v" id="acc-username">—</span></div>
         <div class="account-row"><span class="k">账户 ID（UID）</span><span class="v" id="acc-uid" style="font-family:monospace;">—</span></div>
+        <div class="uname-edit" id="uname-edit">
+          <input type="text" id="uname-input" maxlength="20" placeholder="3-20 位字母/数字/下划线">
+          <div class="row">
+            <button type="button" id="uname-save">保存</button>
+            <button type="button" id="uname-cancel">取消</button>
+          </div>
+        </div>
         <div id="acc-msg" class="auth-msg" role="status"></div>
         <button type="button" class="auth-submit" id="acc-logout">退出登录</button>
         <p class="auth-hint">UID（Supabase user_id）是您在晴海的唯一身份，后续收藏城市、偏好、AI 对话与 Pro 权限均以此关联。</p>
@@ -53,6 +74,7 @@
   <script src="js/config.js"></script>
   <script src="vendor/supabase.min.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/user.js"></script>
   <script>
     (function () {
       'use strict';
@@ -60,6 +82,18 @@
       function setMsg(text, isError) {
         msgEl.textContent = text || '';
         msgEl.className = 'auth-msg' + (isError ? ' error' : '');
+      }
+
+      var usernameEl = document.getElementById('acc-username');
+      var unameEdit = document.getElementById('uname-edit');
+      var unameInput = document.getElementById('uname-input');
+
+      function showUnameEdit() {
+        unameEdit.style.display = 'block';
+        unameInput.focus();
+      }
+      function hideUnameEdit() {
+        unameEdit.style.display = 'none';
       }
 
       (async function main() {
@@ -72,7 +106,31 @@
         }
         document.getElementById('acc-email').textContent = user.email || '—';
         document.getElementById('acc-uid').textContent = user.id;
-        // 已登录时隐藏退出按钮的等待态
+
+        // 加载用户名
+        var profile = await User.getProfile();
+        if (profile.ok && profile.profile) {
+          usernameEl.textContent = profile.profile.username;
+          unameInput.value = profile.profile.username;
+        } else {
+          usernameEl.innerHTML = '未设置 <button type="button" class="link-btn" id="uname-set">设置</button>';
+          document.getElementById('uname-set').addEventListener('click', showUnameEdit);
+        }
+        usernameEl.innerHTML += ' <button type="button" class="link-btn" id="uname-edit-btn">修改</button>';
+        document.getElementById('uname-edit-btn').addEventListener('click', showUnameEdit);
+
+        // 保存用户名
+        document.getElementById('uname-save').addEventListener('click', async function () {
+          var name = unameInput.value.trim();
+          var r = await User.setUsername(name);
+          if (!r.ok) { setMsg(r.message, true); return; }
+          usernameEl.childNodes[0].textContent = name; // 更新显示值（保留修改按钮）
+          hideUnameEdit();
+          setMsg('用户名已更新');
+        });
+        document.getElementById('uname-cancel').addEventListener('click', hideUnameEdit);
+
+        // 退出登录
         var logoutBtn = document.getElementById('acc-logout');
         logoutBtn.addEventListener('click', async function () {
           logoutBtn.disabled = true;

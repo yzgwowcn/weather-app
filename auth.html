@@ -80,6 +80,10 @@
             <input type="email" id="signup-email" autocomplete="email" required>
           </div>
           <div class="auth-field">
+            <label for="signup-username">用户名（可选，3-20 位字母/数字/下划线）</label>
+            <input type="text" id="signup-username" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username">
+          </div>
+          <div class="auth-field">
             <label for="signup-password">密码（至少 6 位）</label>
             <input type="password" id="signup-password" minlength="6" autocomplete="new-password" required>
           </div>
@@ -110,6 +114,7 @@
   <script src="js/config.js"></script>
   <script src="vendor/supabase.min.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/user.js"></script>
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileLoad" async defer></script>
   <script>
     (function () {
@@ -253,6 +258,12 @@
           }
           var r = await Auth.signUp($('signup-email').value, p1);
           if (!r.ok) { setMsg(r.message, true); return; }
+          // 可选：注册时设置用户名
+          var uname = $('signup-username').value.trim();
+          if (uname) {
+            var ur = await User.setUsername(uname);
+            if (!ur.ok) { setMsg('注册成功，但用户名设置失败：' + ur.message, true); return; }
+          }
           setMsg('注册成功，正在跳转…');
           setTimeout(function () { window.location.href = 'account.html'; }, 600);
         } finally {

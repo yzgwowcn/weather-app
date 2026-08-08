@@ -63,6 +63,15 @@
         <button id="query-btn" class="query-btn" type="button">更新判断 <span aria-hidden="true">↗</span></button>
       </section>
 
+      <section class="workspace-section fav-section" aria-label="收藏">
+        <span class="field-label">我的收藏</span>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <button type="button" id="fav-add" class="fav-add" style="padding:7px 14px;border:1px solid rgba(255,255,255,.25);border-radius:999px;background:transparent;color:inherit;cursor:pointer;font-size:13px;">☆ 收藏此位置</button>
+          <span id="fav-msg" style="font-size:12px;opacity:.8;" role="status"></span>
+        </div>
+        <div id="fav-list" style="display:flex;flex-direction:column;gap:6px;font-size:13px;"></div>
+      </section>
+
       <div id="loading" class="loading hidden" role="status"><span class="spinner"></span>正在汇集最新模型数据</div>
       <section id="result" class="result" aria-live="polite"></section>
     </main>
@@ -100,6 +109,7 @@
   <script src="js/config.js"></script>
   <script src="vendor/supabase.min.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/user.js"></script>
   <script>
     // 登录状态驱动头部入口（登录 → 我的账户；未登录 → 登录）
     (function () {
@@ -111,6 +121,82 @@
       }
       document.addEventListener('auth-change', function (e) { update(e.detail && e.detail.user); });
       update(Auth.getUser());
+    })();
+  </script>
+  <script>
+    // 收藏功能：收藏当前选中位置 + 我的收藏列表（登录态联动）
+    (function () {
+      'use strict';
+      var favAdd = document.getElementById('fav-add');
+      var favMsg = document.getElementById('fav-msg');
+      var favList = document.getElementById('fav-list');
+      if (!favAdd || !favList || typeof User === 'undefined') return;
+
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+      function setMsg(text) { favMsg.textContent = text || ''; }
+      function isLoggedIn() {
+        return window.Auth && window.Auth.isReady() && window.Auth.getUser();
+      }
+
+      function renderFavs() {
+        if (!isLoggedIn()) {
+          favList.innerHTML = '<span style="opacity:.65;">登录后可收藏常用位置</span>';
+          return;
+        }
+        User.listFavorites().then(function (r) {
+          if (!r.ok) { favList.innerHTML = '<span style="opacity:.65;">' + escapeHtml(r.message) + '</span>'; return; }
+          if (!r.favorites.length) {
+            favList.innerHTML = '<span style="opacity:.65;">暂无收藏，点击上方「☆ 收藏此位置」保存当前目的地</span>';
+            return;
+          }
+          favList.innerHTML = r.favorites.map(function (f) {
+            return '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between;padding:6px 10px;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(255,255,255,.05);">' +
+              '<button type="button" data-id="' + f.id + '" data-name="' + escapeHtml(f.name) + '" data-lat="' + f.lat + '" data-lon="' + f.lon + '" ' +
+              'style="flex:1;text-align:left;background:none;border:none;color:inherit;cursor:pointer;font-size:13px;padding:0;">📍 ' + escapeHtml(f.name) + '</button>' +
+              '<button type="button" data-id="' + f.id + '" title="取消收藏" ' +
+              'style="background:none;border:none;color:inherit;cursor:pointer;opacity:.6;font-size:13px;padding:0 2px;">✕</button></div>';
+          }).join('');
+          favList.querySelectorAll('button[data-id]').forEach(function (b) {
+            b.addEventListener('click', function () {
+              var id = b.dataset.id;
+              if (b.classList.contains('fav-open')) return;
+              if (b.title === '取消收藏') {
+                b.disabled = true;
+                User.removeFavorite(id).then(function (rr) {
+                  if (!rr.ok) setMsg(rr.message);
+                  renderFavs();
+                });
+                return;
+              }
+              if (window.__WeatherSelectDest) {
+                window.__WeatherSelectDest(b.dataset.name, parseFloat(b.dataset.lat), parseFloat(b.dataset.lon));
+                setMsg('已切换到 ' + b.dataset.name);
+              }
+            });
+          });
+        });
+      }
+
+      favAdd.addEventListener('click', function () {
+        if (!isLoggedIn()) {
+          setMsg('请先登录后再收藏');
+          setTimeout(function () { window.location.href = 'auth.html'; }, 600);
+          return;
+        }
+        var d = window.__getCurrentDest ? window.__getCurrentDest() : null;
+        if (!d) { setMsg('无法获取当前位置'); return; }
+        User.addFavorite({ name: d.name, lat: d.lat, lon: d.lon, is_gcj: !!d.is_gcj }).then(function (r) {
+          setMsg(r.ok ? '已收藏 ' + d.name : r.message);
+          if (r.ok) renderFavs();
+        });
+      });
+
+      document.addEventListener('auth-change', renderFavs);
+      renderFavs();
     })();
   </script>
   <script>

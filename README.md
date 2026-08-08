@@ -175,12 +175,23 @@ Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `packa
 
 ### ③ 行为说明
 
-- 页面：`auth.html`（登录/注册/找回密码三态）、`account.html`（邮箱 + UID + 退出）、`auth/callback.html`（邮箱确认与找回密码回调）。
-- 认证使用 supabase-js（`vendor/supabase.min.js` 本地化，PKCE 流程，会话 localStorage 持久化，刷新不掉线）。
+- 页面：`auth.html`（登录/注册/找回密码三态）、`account.html`（邮箱 + 用户名 + UID + 退出）、`auth/callback.html`（找回密码回调）。
+- 认证使用 supabase-js（`vendor/supabase.min.js` 本地化，implicit 流程，会话 localStorage 持久化，刷新不掉线）。
+- 注册流程：邮箱 + 密码（可选用户名）→ Turnstile 人机验证 → 注册即登录（**已关闭邮箱确认**），无需收邮件验证；找回密码仍走邮件。
 - 注册表单带 Turnstile：前端拿到 token → `POST /api/verify-turnstile`（Vercel Function 用服务端 Secret Key 调 Cloudflare siteverify）→ 通过后才执行 `supabase.auth.signUp()`；Secret Key 不出现在任何静态文件或日志。
-- 邮箱未确认时登录会提示"请查收验证邮件"；找回密码邮件链接进入 `auth/callback.html` 后设置新密码。
 - 未配置环境变量时（本地开发），认证入口按钮保留但表单禁用并提示"认证服务未配置"，不影响天气查询等既有功能。
-- 数据安全：Supabase 表需开启 **RLS** 并按 `user_id = auth.uid()` 配置策略，anon key 才可安全暴露于前端。
+- 数据安全：所有用户表开启 **RLS** 并按 `user_id = auth.uid()` 配置策略，anon key 才可安全暴露于前端。
+
+### ④ 用户数据表（profiles / favorites，已在 Supabase 建好）
+
+| 表 | 列 | 说明 |
+|---|---|---|
+| `profiles` | `user_id`（uuid PK，引用 `auth.users.id`）、`username`（text 唯一）、`created_at` | 用户名；注册时可选填写，账户页可修改 |
+| `favorites` | `id`（uuid PK）、`user_id`（外键）、`name`、`lat`、`lon`、`is_gcj`、`created_at` | 收藏位置；首页「☆ 收藏此位置」与「我的收藏」列表 |
+
+- 两张表均开启 RLS：用户只能读/写 `user_id = auth.uid()` 的自己的行（profiles 3 条策略 + favorites 4 条策略）。
+- `username_taken(p_username)` RPC：security definer 全表检查用户名占用，配合数据库唯一约束双保险。
+- 前端 `js/user.js`（`window.User`）封装所有读写：`getProfile / setUsername / isUsernameTaken / listFavorites / addFavorite / removeFavorite`；收藏项点击即设为当前目的地并查询（`app.js` 暴露 `__getCurrentDest / __WeatherSelectDest` 接入点）。
 
 ## 已知限制
 
