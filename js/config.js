@@ -16,6 +16,20 @@ const AMAP_CONFIG = {
   key: '__AMAP_KEY__', // 构建时由 Vercel 环境变量 AMAP_KEY 替换
 };
 
+// Supabase Auth 配置（注册/登录/找回密码/邮箱确认）
+// 获取方式：https://supabase.com/dashboard → Project Settings → API
+// anon key 设计上可公开（配合 RLS 保护数据）；构建时由 Vercel 环境变量替换
+const SUPABASE_CONFIG = {
+  url: '__SUPABASE_URL__',           // 构建时由 Vercel 环境变量 SUPABASE_URL 替换
+  anonKey: '__SUPABASE_ANON_KEY__',  // 构建时由 Vercel 环境变量 SUPABASE_ANON_KEY 替换
+};
+
+// Cloudflare Turnstile 人机验证（注册表单）
+// 获取方式：https://dash.cloudflare.com → Turnstile → Add Site（Site Key 可公开）
+const TURNSTILE_CONFIG = {
+  siteKey: '__TURNSTILE_SITE_KEY__', // 构建时由 Vercel 环境变量 TURNSTILE_SITE_KEY 替换
+};
+
 // 默认展示未来 7 天（4-7 天属于"可能有变"窗口，符合 skill 时效规则）
 const DEFAULT_DAYS = 7;
 

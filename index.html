@@ -15,6 +15,7 @@
     <header class="site-header">
       <a class="brand" href="#top" aria-label="晴海首页"><span class="brand-mark">◐</span>晴海</a>
       <div class="header-right">
+        <a id="auth-entry" class="auth-entry" href="auth.html" style="font-size:13px;padding:5px 14px;border:1px solid rgba(255,255,255,.28);border-radius:999px;text-decoration:none;color:inherit;white-space:nowrap;flex-shrink:0;">登录</a>
         <p class="header-note">海南旅行天气判断 / Open-Meteo</p>
         <a class="xhs-link" href="https://xhslink.cn/m/4BS8N8iCK3F" target="_blank" rel="noopener" aria-label="我的小红书主页">
           <img class="xhs-logo" src="assets/xhs-logo.png" alt="" width="205" height="96" aria-hidden="true">
@@ -97,6 +98,21 @@
   </div>
 
   <script src="js/config.js"></script>
+  <script src="vendor/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    // 登录状态驱动头部入口（登录 → 我的账户；未登录 → 登录）
+    (function () {
+      var el = document.getElementById('auth-entry');
+      if (!el || typeof Auth === 'undefined') return;
+      function update(user) {
+        if (user) { el.textContent = '我的账户'; el.href = 'account.html'; }
+        else { el.textContent = '登录'; el.href = 'auth.html'; }
+      }
+      document.addEventListener('auth-change', function (e) { update(e.detail && e.detail.user); });
+      update(Auth.getUser());
+    })();
+  </script>
   <script>
     // 高德 JS API 条件加载：仅当 Vercel 构建注入真实 key 时才引入（国内地名合规数据源）
     (function loadAMap() {

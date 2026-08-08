@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 / 注册 · 晴海</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* 认证页：复用站点毛玻璃视觉语言，独立样式不改动 style.css */
+    .auth-page { max-width: 420px; margin: 40px auto; padding: 0 16px; }
+    .auth-card {
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    }
+    .auth-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+    .auth-tab {
+      flex: 1; padding: 8px 0; text-align: center; cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.14); border-radius: 8px;
+      background: transparent; color: inherit; font-size: 14px;
+    }
+    .auth-tab.active { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.35); }
+    .auth-field { margin-bottom: 14px; }
+    .auth-field label { display: block; font-size: 13px; margin-bottom: 6px; opacity: 0.85; }
+    .auth-field input {
+      width: 100%; box-sizing: border-box; padding: 10px 12px;
+      border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.25); color: inherit; font-size: 15px;
+    }
+    .auth-field input:focus { outline: none; border-color: rgba(255,255,255,0.5); }
+    .auth-submit {
+      width: 100%; padding: 11px 0; margin-top: 6px; cursor: pointer;
+      border: none; border-radius: 8px; font-size: 15px;
+      background: linear-gradient(135deg, #f0b45a, #e08a3c); color: #1a1a1a; font-weight: 600;
+    }
+    .auth-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+    .auth-msg { margin-top: 14px; font-size: 13px; min-height: 18px; line-height: 1.5; }
+    .auth-msg.error { color: #ff8f8f; }
+    .auth-msg.ok { color: #8fd6a0; }
+    .auth-hint { margin-top: 14px; font-size: 12px; opacity: 0.7; line-height: 1.6; }
+    .cf-turnstile { margin-top: 4px; }
+    .auth-back { display: inline-block; margin-top: 16px; font-size: 13px; opacity: 0.85; }
+    .auth-back a { color: inherit; }
+  </style>
+</head>
+<body data-mood="neutral">
+  <div class="page-shell">
+    <header class="site-header">
+      <a class="brand" href="index.html" aria-label="晴海首页"><span class="brand-mark">◐</span>晴海</a>
+    </header>
+    <main class="auth-page">
+      <div class="auth-card">
+        <div class="auth-tabs" role="tablist">
+          <button type="button" class="auth-tab active" data-mode="login" role="tab">登录</button>
+          <button type="button" class="auth-tab" data-mode="signup" role="tab">注册</button>
+          <button type="button" class="auth-tab" data-mode="forgot" role="tab">找回密码</button>
+        </div>
+
+        <!-- 登录 -->
+        <form id="login-form" class="auth-form" novalidate>
+          <div class="auth-field">
+            <label for="login-email">邮箱</label>
+            <input type="email" id="login-email" autocomplete="email" required>
+          </div>
+          <div class="auth-field">
+            <label for="login-password">密码</label>
+            <input type="password" id="login-password" autocomplete="current-password" required>
+          </div>
+          <button type="submit" class="auth-submit" id="login-submit">登录</button>
+        </form>
+
+        <!-- 注册（含 Turnstile 人机验证） -->
+        <form id="signup-form" class="auth-form hidden" novalidate>
+          <div class="auth-field">
+            <label for="signup-email">邮箱</label>
+            <input type="email" id="signup-email" autocomplete="email" required>
+          </div>
+          <div class="auth-field">
+            <label for="signup-password">密码（至少 6 位）</label>
+            <input type="password" id="signup-password" minlength="6" autocomplete="new-password" required>
+          </div>
+          <div class="auth-field">
+            <label for="signup-password2">确认密码</label>
+            <input type="password" id="signup-password2" minlength="6" autocomplete="new-password" required>
+          </div>
+          <div id="turnstile-widget" class="cf-turnstile"></div>
+          <button type="submit" class="auth-submit" id="signup-submit">注册</button>
+        </form>
+
+        <!-- 找回密码 -->
+        <form id="forgot-form" class="auth-form hidden" novalidate>
+          <div class="auth-field">
+            <label for="forgot-email">邮箱</label>
+            <input type="email" id="forgot-email" autocomplete="email" required>
+          </div>
+          <button type="submit" class="auth-submit" id="forgot-submit">发送重置邮件</button>
+        </form>
+
+        <div id="auth-msg" class="auth-msg" role="status"></div>
+        <p class="auth-hint" id="auth-hint">注册后需点击邮件中的确认链接完成邮箱验证；您的账户 ID 用于关联收藏与偏好。</p>
+      </div>
+      <p class="auth-back"><a href="index.html">← 返回首页</a></p>
+    </main>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="vendor/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+  <script>
+    (function () {
+      'use strict';
+      var $ = function (id) { return document.getElementById(id); };
+      var msg = $('auth-msg');
+      var hint = $('auth-hint');
+      var currentMode = 'login';
+
+      function setMsg(text, isError) {
+        msg.textContent = text || '';
+        msg.className = 'auth-msg' + (isError ? ' error' : text ? ' ok' : '');
+      }
+
+      // 未注入 Supabase 配置时整体禁用
+      if (!Auth.isReady()) {
+        setMsg('认证服务未配置（构建时未注入 SUPABASE 环境变量），请联系管理员。', true);
+        ['login-submit', 'signup-submit', 'forgot-submit'].forEach(function (id) { $(id).disabled = true; });
+      }
+
+      // Turnstile 显式渲染（仅注册 tab 需要）
+      var turnstileRendered = false;
+      var turnstileToken = '';
+      function renderTurnstile() {
+        if (turnstileRendered) return;
+        if (typeof turnstile === 'undefined' || !TURNSTILE_CONFIG || !TURNSTILE_CONFIG.siteKey) return;
+        if (String(TURNSTILE_CONFIG.siteKey).indexOf('__TURNSTILE_') === 0) return; // 占位符未注入
+        turnstile.render('turnstile-widget', {
+          sitekey: TURNSTILE_CONFIG.siteKey,
+          callback: function (token) { turnstileToken = token; },
+          'error-callback': function () { turnstileToken = ''; },
+          'expired-callback': function () { turnstileToken = ''; },
+        });
+        turnstileRendered = true;
+      }
+
+      // Tab 切换
+      document.querySelectorAll('.auth-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          currentMode = tab.dataset.mode;
+          document.querySelectorAll('.auth-tab').forEach(function (t) { t.classList.toggle('active', t === tab); });
+          $('login-form').classList.toggle('hidden', currentMode !== 'login');
+          $('signup-form').classList.toggle('hidden', currentMode !== 'signup');
+          $('forgot-form').classList.toggle('hidden', currentMode !== 'forgot');
+          setMsg('');
+          hint.classList.toggle('hidden', currentMode !== 'signup');
+          if (currentMode === 'signup') renderTurnstile();
+        });
+      });
+
+      // 登录
+      $('login-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        setMsg('');
+        var btn = $('login-submit');
+        btn.disabled = true;
+        var r = await Auth.signIn($('login-email').value, $('login-password').value);
+        btn.disabled = false;
+        if (!r.ok) { setMsg(r.message, true); return; }
+        setMsg('登录成功，正在跳转…');
+        setTimeout(function () { window.location.href = 'account.html'; }, 600);
+      });
+
+      // 注册：Turnstile → 服务端验证 → Supabase signUp
+      $('signup-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        setMsg('');
+        var p1 = $('signup-password').value;
+        var p2 = $('signup-password2').value;
+        if (p1 !== p2) { setMsg('两次输入的密码不一致', true); return; }
+        if (!turnstileToken) { setMsg('请先完成人机验证', true); return; }
+        var btn = $('signup-submit');
+        btn.disabled = true;
+        try {
+          var vr = await fetch('/api/verify-turnstile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: turnstileToken }),
+          }).then(function (r) { return r.json(); }).catch(function () { return { success: false }; });
+          if (!vr.success) { setMsg('人机验证未通过，请重试', true); if (turnstileRendered) turnstile.reset('turnstile-widget'); return; }
+          var r = await Auth.signUp($('signup-email').value, p1);
+          if (!r.ok) { setMsg(r.message, true); return; }
+          setMsg(r.message);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      // 找回密码
+      $('forgot-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        setMsg('');
+        var btn = $('forgot-submit');
+        btn.disabled = true;
+        var r = await Auth.resetPasswordForEmail($('forgot-email').value);
+        btn.disabled = false;
+        if (!r.ok) { setMsg(r.message, true); return; }
+        setMsg('重置邮件已发送，请查收（含垃圾箱）');
+      });
+
+      // URL 带 mode 参数时直接切 tab（如从回调页跳回）
+      var m = new URLSearchParams(window.location.search).get('mode');
+      if (m === 'signup' || m === 'forgot') {
+        document.querySelector('.auth-tab[data-mode="' + m + '"]').click();
+      }
+    })();
+  </script>
+</body>
+</html>

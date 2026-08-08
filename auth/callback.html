@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>处理中 · 晴海</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .auth-page { max-width: 420px; margin: 40px auto; padding: 0 16px; }
+    .auth-card {
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    }
+    .auth-msg { font-size: 14px; line-height: 1.6; min-height: 20px; }
+    .auth-msg.error { color: #ff8f8f; }
+    .auth-msg.ok { color: #8fd6a0; }
+    .auth-field { margin-bottom: 14px; }
+    .auth-field label { display: block; font-size: 13px; margin-bottom: 6px; opacity: 0.85; }
+    .auth-field input {
+      width: 100%; box-sizing: border-box; padding: 10px 12px;
+      border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.25); color: inherit; font-size: 15px;
+    }
+    .auth-submit {
+      width: 100%; padding: 11px 0; margin-top: 6px; cursor: pointer;
+      border: none; border-radius: 8px; font-size: 15px;
+      background: linear-gradient(135deg, #f0b45a, #e08a3c); color: #1a1a1a; font-weight: 600;
+    }
+    .auth-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+    .hidden { display: none; }
+    .auth-back { display: inline-block; margin-top: 16px; font-size: 13px; opacity: 0.85; }
+    .auth-back a { color: inherit; }
+  </style>
+</head>
+<body data-mood="neutral">
+  <div class="page-shell">
+    <header class="site-header">
+      <a class="brand" href="../index.html" aria-label="晴海首页"><span class="brand-mark">◐</span>晴海</a>
+    </header>
+    <main class="auth-page">
+      <div class="auth-card">
+        <div id="cb-status" class="auth-msg" role="status">正在处理确认链接…</div>
+        <!-- 找回密码第二步：设置新密码 -->
+        <form id="reset-form" class="hidden" novalidate>
+          <div class="auth-field">
+            <label for="new-password">新密码（至少 6 位）</label>
+            <input type="password" id="new-password" minlength="6" autocomplete="new-password" required>
+          </div>
+          <div class="auth-field">
+            <label for="new-password2">确认新密码</label>
+            <input type="password" id="new-password2" minlength="6" autocomplete="new-password" required>
+          </div>
+          <button type="submit" class="auth-submit" id="reset-submit">保存新密码</button>
+        </form>
+      </div>
+      <p class="auth-back"><a href="../index.html">← 返回首页</a></p>
+    </main>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../vendor/supabase.min.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var statusEl = document.getElementById('cb-status');
+      var resetForm = document.getElementById('reset-form');
+
+      function setMsg(text, isError) {
+        statusEl.textContent = text || '';
+        statusEl.className = 'auth-msg' + (isError ? ' error' : text ? ' ok' : '');
+      }
+
+      (async function main() {
+        if (!Auth.isReady()) { setMsg('认证服务未配置（构建时未注入 SUPABASE 环境变量），请联系管理员。', true); return; }
+        var r = await Auth.handleCallback(window.location);
+        if (!r.ok) { setMsg(r.message, true); return; }
+        if (r.type === 'confirm') {
+          setMsg('邮箱确认成功，正在跳转…');
+          setTimeout(function () { window.location.href = '../index.html'; }, 800);
+          return;
+        }
+        if (r.type === 'recovery') {
+          setMsg('请设置您的新密码');
+          resetForm.classList.remove('hidden');
+          return;
+        }
+        setMsg('未知的回调类型', true);
+      })();
+
+      // 找回密码第二步：保存新密码
+      resetForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var p1 = document.getElementById('new-password').value;
+        var p2 = document.getElementById('new-password2').value;
+        if (p1 !== p2) { setMsg('两次输入的密码不一致', true); return; }
+        var btn = document.getElementById('reset-submit');
+        btn.disabled = true;
+        var r = await Auth.updatePassword(p1);
+        btn.disabled = false;
+        if (!r.ok) { setMsg(r.message, true); return; }
+        setMsg('密码已更新，正在跳转…');
+        setTimeout(function () { window.location.href = '../auth.html'; }, 800);
+      });
+    })();
+  </script>
+</body>
+</html>

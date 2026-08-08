@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>我的账户 · 晴海</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .auth-page { max-width: 420px; margin: 40px auto; padding: 0 16px; }
+    .auth-card {
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    }
+    .account-row { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 14px; }
+    .account-row .k { opacity: 0.75; flex-shrink: 0; }
+    .account-row .v { word-break: break-all; text-align: right; }
+    .auth-msg { margin-top: 14px; font-size: 13px; min-height: 18px; }
+    .auth-msg.error { color: #ff8f8f; }
+    .auth-submit {
+      width: 100%; padding: 11px 0; margin-top: 18px; cursor: pointer;
+      border: none; border-radius: 8px; font-size: 15px;
+      background: rgba(255,255,255,0.14); color: inherit;
+    }
+    .auth-submit:hover { background: rgba(255,255,255,0.22); }
+    .auth-hint { margin-top: 14px; font-size: 12px; opacity: 0.7; line-height: 1.6; }
+    .auth-back { display: inline-block; margin-top: 16px; font-size: 13px; opacity: 0.85; }
+    .auth-back a { color: inherit; }
+  </style>
+</head>
+<body data-mood="neutral">
+  <div class="page-shell">
+    <header class="site-header">
+      <a class="brand" href="index.html" aria-label="晴海首页"><span class="brand-mark">◐</span>晴海</a>
+    </header>
+    <main class="auth-page">
+      <div class="auth-card">
+        <h2 style="margin:0 0 16px;font-size:18px;">我的账户</h2>
+        <div class="account-row"><span class="k">邮箱</span><span class="v" id="acc-email">—</span></div>
+        <div class="account-row"><span class="k">账户 ID（UID）</span><span class="v" id="acc-uid" style="font-family:monospace;">—</span></div>
+        <div id="acc-msg" class="auth-msg" role="status"></div>
+        <button type="button" class="auth-submit" id="acc-logout">退出登录</button>
+        <p class="auth-hint">UID（Supabase user_id）是您在晴海的唯一身份，后续收藏城市、偏好、AI 对话与 Pro 权限均以此关联。</p>
+      </div>
+      <p class="auth-back"><a href="index.html">← 返回首页</a></p>
+    </main>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="vendor/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var msgEl = document.getElementById('acc-msg');
+      function setMsg(text, isError) {
+        msgEl.textContent = text || '';
+        msgEl.className = 'auth-msg' + (isError ? ' error' : '');
+      }
+
+      (async function main() {
+        if (!Auth.isReady()) { setMsg('认证服务未配置（构建时未注入 SUPABASE 环境变量），请联系管理员。', true); return; }
+        var user = await Auth.refreshUser();
+        if (!user) {
+          setMsg('未登录，正在跳转到登录页…');
+          setTimeout(function () { window.location.href = 'auth.html'; }, 800);
+          return;
+        }
+        document.getElementById('acc-email').textContent = user.email || '—';
+        document.getElementById('acc-uid').textContent = user.id;
+        // 已登录时隐藏退出按钮的等待态
+        var logoutBtn = document.getElementById('acc-logout');
+        logoutBtn.addEventListener('click', async function () {
+          logoutBtn.disabled = true;
+          await Auth.signOut();
+          setMsg('已退出登录，正在跳转…');
+          setTimeout(function () { window.location.href = 'index.html'; }, 600);
+        });
+      })();
+    })();
+  </script>
+</body>
+</html>

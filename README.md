@@ -76,19 +76,25 @@ NODE_PATH="$(npm root -g)" node tests/e2e.check.js   # 端到端（真实 API + 
 ```
 weather-app/
 ├── index.html          # 页面骨架（移动端优先，body[data-mood] 初始 neutral；importmap 指向本地 vendor）
+├── auth.html           # 登录 / 注册（含 Cloudflare Turnstile 人机验证）/ 找回密码
+├── account.html        # 最简账户页（邮箱 + UID + 退出登录）
+├── auth/
+│   └── callback.html   # 邮箱确认与找回密码回调（PKCE code → 会话；recovery → 设置新密码）
 ├── api/
-│   └── amap.mjs        # 高德 REST API 服务端代理（Vercel Function，serviceHost 代理，服务端注入 jscode）
+│   ├── amap.mjs        # 高德 REST API 服务端代理（Vercel Function，serviceHost 代理，服务端注入 jscode）
+│   └── verify-turnstile.mjs  # Cloudflare Turnstile 服务端验证（Vercel Function，secret 仅服务端）
 ├── css/
 │   └── style.css       # 毛玻璃视觉系统 + 天气状态机 + reduced-motion + 响应式
 ├── js/
-│   ├── config.js       # 预设目的地坐标 + 默认参数
+│   ├── config.js       # 预设目的地坐标 + 默认参数 + AMAP/SUPABASE/TURNSTILE 构建注入配置
+│   ├── auth.js         # Supabase Auth 封装（注册/登录/退出/找回密码/会话监听，window.Auth）
 │   ├── api.js          # 综合预报、多模型（含三层云）、集合预报与海况请求
 │   ├── metrics.js      # EC 主结论、加权遮蔽、成员一致性、外部验证、云图序列、天气状态机
 │   ├── render.js       # 首屏区块 + SVG 天空剖面 + 视图切换（只消费结构化日级结果）
 │   ├── rain.js         # Canvas 雨滴特效（雨滴/涟漪/闪电，零依赖）
 │   ├── fluid-glass.js  # 流体玻璃背景（reactbits FluidGlass 的 vanilla three.js 移植）
 │   └── app.js          # 主控制器（选择→查询→渲染 + 图表交互 + mood/雨效应用）
-├── vendor/             # 本地化 lottie-web 播放器（lottie.min.js）
+├── vendor/             # 本地化第三方库（lottie.min.js、supabase.min.js）
 ├── assets/
 │   ├── lottie/         # meteocons Lottie 天气动画（基础 + 组合：partly-cloudy-day-drizzle 等）
 │   ├── icons/          # 雷雨徽章静态 SVG（lightning-bolt）
@@ -141,6 +147,40 @@ Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `packa
 - 高德坐标（GCJ-02）会自动转换为 WGS84 后再请求 Open-Meteo 天气（`js/location.js` 内置迭代逆转换，精度 <1 米）。
 - 安全模式采用高德官方推荐的 **serviceHost 服务端代理**：前端 `window._AMapSecurityConfig = { serviceHost: window.location.origin + '/_AMapService' }`，JS API 的 Geocoder / AutoComplete / Geolocation 等 REST 请求经 `vercel.json` rewrite 转发到 `api/amap.mjs`（Vercel Function），由服务端注入 `jscode` 后代理到 `https://restapi.amap.com/`；安全密钥不再以明文出现在任何静态文件中。
 - 高德 JS API 通过 `webapi.amap.com` CDN 条件加载，仅在注入真实 Key 后引入；免费配额有限，生产使用请关注控制台用量。
+
+## 账户系统（Supabase Auth + Resend + Cloudflare Turnstile）
+
+注册/登录/退出/找回密码/邮箱确认，用户唯一身份为 **Supabase `user_id`（UID，UUID）**——后续收藏城市、用户偏好、AI 对话、DeepSeek 用量、Pro 权限、支付订单等表统一用该 UID 关联，**不用邮箱作为数据库主键**。注册用户 A/B 各自得到独立 UID，登录状态互不影响。
+
+注册流程：`注册 → Turnstile 人机验证 → Supabase 创建用户 → Resend 发送验证邮件 → 点击确认链接（/auth/callback.html）→ 登录`。
+
+### ① 服务端依赖配置（一次性）
+
+| 服务 | 配置 |
+|---|---|
+| Resend | 注册账号 → Domains 验证发件域名（SPF/DKIM）→ 创建 API Key（Sending access） |
+| Supabase | 创建项目 → Authentication → SMTP Settings 填 Resend（host `smtp.resend.com`、port `465`、username `resend`、password 为 Resend API Key）→ 开启 Email 确认 → Site URL 填生产域名 → Redirect URLs 添加 `https://<域名>/auth/callback.html` |
+| Cloudflare Turnstile | Add Site（域名填生产域名，Mode 选 Managed）→ 记录 Site Key 与 Secret Key |
+
+### ② 配置 Vercel 环境变量
+
+在「地图选点配置」的变量之外，追加：
+
+| Name | Value | 说明 |
+|---|---|---|
+| `SUPABASE_URL` | `https://<项目号>.supabase.co` | 前端公开，构建时注入 `js/config.js` |
+| `SUPABASE_ANON_KEY` | `sb_publishable_...` 或 `eyJ...` anon key | 前端公开（配合 RLS 保护数据） |
+| `TURNSTILE_SITE_KEY` | Turnstile Site Key（`0x4...`） | 前端公开，构建时注入 |
+| `CLOUDFLARE_TURNSTILE_SECRET` | Turnstile Secret Key | **仅服务端** `api/verify-turnstile.mjs` 读取，不进静态文件 |
+
+### ③ 行为说明
+
+- 页面：`auth.html`（登录/注册/找回密码三态）、`account.html`（邮箱 + UID + 退出）、`auth/callback.html`（邮箱确认与找回密码回调）。
+- 认证使用 supabase-js（`vendor/supabase.min.js` 本地化，PKCE 流程，会话 localStorage 持久化，刷新不掉线）。
+- 注册表单带 Turnstile：前端拿到 token → `POST /api/verify-turnstile`（Vercel Function 用服务端 Secret Key 调 Cloudflare siteverify）→ 通过后才执行 `supabase.auth.signUp()`；Secret Key 不出现在任何静态文件或日志。
+- 邮箱未确认时登录会提示"请查收验证邮件"；找回密码邮件链接进入 `auth/callback.html` 后设置新密码。
+- 未配置环境变量时（本地开发），认证入口按钮保留但表单禁用并提示"认证服务未配置"，不影响天气查询等既有功能。
+- 数据安全：Supabase 表需开启 **RLS** 并按 `user_id = auth.uid()` 配置策略，anon key 才可安全暴露于前端。
 
 ## 已知限制
 
