@@ -36,6 +36,12 @@ const skyIdx = css.indexOf('.sky-scroll');
 if (skyIdx === -1) { console.error('sky-scroll missing'); process.exit(1); }
 const skyBlock = css.slice(skyIdx, css.indexOf('}', skyIdx));
 if (!skyBlock.includes('border-radius') || !skyBlock.includes('overflow-x: auto')) { console.error('sky-scroll rounded scroll container missing'); process.exit(1); }
+// 云量曲线滚动容器：与天空剖面同规格（圆角深底横向滚动）
+const cloudIdx = css.indexOf('.cloud-scroll');
+if (cloudIdx === -1) { console.error('cloud-scroll missing'); process.exit(1); }
+const cloudBlock = css.slice(cloudIdx, css.indexOf('}', cloudIdx));
+if (!cloudBlock.includes('border-radius') || !cloudBlock.includes('overflow-x: auto')) { console.error('cloud-scroll rounded scroll container missing'); process.exit(1); }
+if (!css.includes('.cloud-tooltip') || !css.includes('.cloud-crosshair') || !css.includes('.cloud-hit')) { console.error('cloud curve interactive styles missing'); process.exit(1); }
 
 const start = css.indexOf('@media (prefers-reduced-motion: reduce)');
 let depth = 0;

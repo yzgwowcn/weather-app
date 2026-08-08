@@ -50,7 +50,8 @@ const bundle = {
       cloud_cover_low: DAYS.flatMap(() => Array(24).fill(20)),
       cloud_cover_mid: DAYS.flatMap(() => Array(24).fill(20)),
       cloud_cover_high: DAYS.flatMap(() => Array(24).fill(90)),
-      precipitation: DAYS.flatMap(() => Array(24).fill(0)),
+      // 第二天 08–14 时有降雨（云量曲线降雨柱 fixture）
+      precipitation: [...Array(24).fill(0), ...Array(24).fill(0).map((_, i) => (i >= 8 && i <= 14 ? [1.2, 2.5, 3.1, 2.2, 1.0, 0.4, 0.2][i - 8] : 0)), ...Array(24).fill(0)],
       wind_speed_10m: DAYS.flatMap(() => Array(24).fill(20)),
     },
   },
@@ -77,12 +78,20 @@ for (const c of checks) {
 for (const c of ['prob-ring', 'prob-arc', 'prob-track', 'stroke-dasharray="100 100"', 'rotate(-90 60 60)']) {
   if (!html.includes(c)) { console.error('PROB-RING MISSING:', c); process.exit(1); }
 }
-// 逐日卡片展开区：当天逐小时云量曲线（24 点、总云量+三层云、白天带、每 3h 刻度、图例）
-for (const c of ['cloud-curve-wrap', 'cloud-line total', 'cloud-line low', 'cloud-line mid', 'cloud-line high', '1 小时间隔 · 24 点 · 综合预报', 'legend-total', 'legend-low', 'legend-mid', 'legend-high', 'cloud-dayband']) {
+// 逐日卡片展开区：当天逐小时低云/中云/降雨量曲线（横向滚动 + 命中条 + 准星/tooltip）
+for (const c of ['cloud-scroll', 'cloud-chart', 'cloud-line low', 'cloud-line mid', 'cloud-hit', 'cloud-crosshair', 'cloud-tooltip', '1 小时间隔 · 24 点 · 综合预报', 'legend-low', 'legend-mid', 'legend-precip']) {
   if (!html.includes(c)) { console.error('CLOUD CURVE MISSING:', c); process.exit(1); }
 }
-if ((html.match(/cloud-line /g) || []).length !== 4) { console.error('CLOUD LINES COUNT FAIL'); process.exit(1); }
-if ((html.match(/cloud-curve-wrap/g) || []).length !== 1) { console.error('CLOUD CURVE WRAP COUNT FAIL（应仅选中卡片展开）'); process.exit(1); }
+// 选中第二天（有降雨）验证曲线细节：低云/中云 2 条线、24 条命中、7 根降雨柱
+const htmlC = renderWeatherApp(bundle, dest, 3, DAYS[1], {});
+for (const c of ['cloud-line low', 'cloud-line mid', 'cloud-bar', 'data-date="2026-08-09"']) {
+  if (!htmlC.includes(c)) { console.error('CLOUD CURVE DAY2 MISSING:', c); process.exit(1); }
+}
+if (htmlC.includes('cloud-line total') || htmlC.includes('cloud-line high') || htmlC.includes('legend-total') || htmlC.includes('legend-high')) { console.error('CLOUD CURVE LEGACY CLASSES REMAIN'); process.exit(1); }
+if ((htmlC.match(/class="cloud-line/g) || []).length !== 2) { console.error('CLOUD LINES COUNT FAIL（应为 2 条：低云/中云）'); process.exit(1); }
+if ((htmlC.match(/class="cloud-hit"/g) || []).length !== 24) { console.error('CLOUD HIT COUNT FAIL（应为 24 条）'); process.exit(1); }
+if ((htmlC.match(/class="cloud-bar"/g) || []).length !== 7) { console.error('CLOUD BAR COUNT FAIL（应为 7 根降雨柱）'); process.exit(1); }
+if ((htmlC.match(/cloud-curve-wrap/g) || []).length !== 1) { console.error('CLOUD CURVE WRAP COUNT FAIL（应仅选中卡片展开）'); process.exit(1); }
 const iRail = html.indexOf('date-rail');
 const iHero = html.indexOf('ec-hero');
 const iSky = html.indexOf('sky-section');

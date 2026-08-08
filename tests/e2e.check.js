@@ -113,11 +113,29 @@ const server = http.createServer((req, res) => {
   const scrollAfter = await page.evaluate(() => window.scrollY);
   check('点击日期后页面不滚回顶部', scrollBefore > 0 && scrollAfter > scrollBefore * 0.5, `before=${Math.round(scrollBefore)} after=${Math.round(scrollAfter)}`);
 
-  // 选中日期展开区：当天逐小时云量曲线（总云量+三层云共 4 条线，1 小时间隔 24 点）
+  // 选中日期展开区：当天逐小时低云/中云/降雨量曲线（低云+中云 2 条线，1 小时间隔 24 点）
   const curveLines = await page.locator('.forecast-card.selected .cloud-line').count();
-  check('展开区逐小时云量曲线', curveLines === 4, `lines=${curveLines}`);
+  check('展开区云量曲线两条线', curveLines === 2, `lines=${curveLines}`);
   const curveHead = await page.locator('.forecast-card.selected .cloud-curve-head').textContent();
   check('云量曲线标注 1 小时间隔', /1 小时间隔 · 24 点/.test(curveHead.replace(/\s+/g, ' ')), curveHead.replace(/\s+/g, ' '));
+
+  // 云量曲线悬浮详情（同天空剖面交互）：移入命中条 → tooltip 显示低云/中云/降雨
+  const cloudChart = page.locator('.forecast-card.selected [data-cloud-chart]');
+  await cloudChart.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(120);
+  const cloudBox = await cloudChart.boundingBox();
+  const cloudHitX = Number(await cloudChart.locator('.cloud-hit').nth(9).getAttribute('data-x'));
+  await page.mouse.move(cloudBox.x + cloudHitX, cloudBox.y + 80);
+  await page.waitForTimeout(150);
+  check('云量曲线悬浮详情', await page.locator('.forecast-card.selected .cloud-tooltip.visible').count() === 1);
+  const cloudTip = await page.locator('.forecast-card.selected .cloud-tooltip').textContent();
+  check('云量详情含低云/中云/降雨', /低云.*中云.*降雨/.test(cloudTip.replace(/\s+/g, ' ')), cloudTip.replace(/\s+/g, ' '));
+  // 点击持久显示：pointerdown 后移开鼠标，详情保留
+  await page.mouse.click(cloudBox.x + cloudHitX, cloudBox.y + 80);
+  await page.waitForTimeout(120);
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(120);
+  check('云量曲线点击后详情保留', await page.locator('.forecast-card.selected .cloud-tooltip.visible').count() === 1);
   const thunderCount = await page.locator('.thunder-window').count();
   check('雷雨徽章渲染正常（0 或含时段文案与图标）', thunderCount === 0 || (/有雷阵雨，注意避雨/.test(await page.locator('.thunder-window').textContent()) && (await page.locator('.thunder-window .thunder-icon').count()) === 1), `thunder-window=${thunderCount}`);
   await page.close();
@@ -158,6 +176,21 @@ const server = http.createServer((req, res) => {
   await mobile.touchscreen.tap(mChartBox.x + mHitX, mChartBox.y + 100);
   await mobile.waitForTimeout(150);
   check('移动端点击显示详情', await mobile.locator('.sky-view-pane:not([hidden]) .sky-tooltip.visible').count() === 1, `visible=${await mobile.locator('.sky-view-pane:not([hidden]) .sky-tooltip.visible').count()}`);
+
+  // 移动端：云量曲线横向滚动（24h 固定宽 > 视口）+ 点击显示详情（触屏点击即见）
+  const cloudScrollable = await mobile.evaluate(() => {
+    const el = document.querySelector('.forecast-card.selected .cloud-scroll');
+    return el ? { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth } : null;
+  });
+  check('移动端云量曲线可横向滚动', cloudScrollable && cloudScrollable.scrollWidth > cloudScrollable.clientWidth, JSON.stringify(cloudScrollable));
+  const mCloudChart = mobile.locator('.forecast-card.selected [data-cloud-chart]');
+  await mCloudChart.scrollIntoViewIfNeeded();
+  await mobile.waitForTimeout(120);
+  const mCloudBox = await mCloudChart.boundingBox();
+  const mCloudX = Number(await mCloudChart.locator('.cloud-hit').nth(4).getAttribute('data-x'));
+  await mobile.touchscreen.tap(mCloudBox.x + mCloudX, mCloudBox.y + 80);
+  await mobile.waitForTimeout(150);
+  check('移动端云量曲线点击显示详情', await mobile.locator('.forecast-card.selected .cloud-tooltip.visible').count() === 1);
   await mobile.close();
 
   // reduced-motion

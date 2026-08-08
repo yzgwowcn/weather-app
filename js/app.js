@@ -2,7 +2,7 @@
 // 并把渲染层输出的 weatherMood 应用到页面背景状态机。
 (() => {
   'use strict';
-  const state = { dest: DESTINATIONS[0], days: DEFAULT_DAYS, bundle: null, selectedDate: null, skyView: 'ec', skyIndex: null, customDest: null };
+  const state = { dest: DESTINATIONS[0], days: DEFAULT_DAYS, bundle: null, selectedDate: null, skyView: 'ec', skyIndex: null, cloudPick: null, customDest: null };
   const destListEl = document.getElementById('dest-list');
   const daysGroupEl = document.getElementById('days-group');
   const queryBtnEl = document.getElementById('query-btn');
@@ -106,6 +106,12 @@
       const hit = chart?.querySelector(`.sky-hit[data-index="${state.skyIndex}"]`);
       if (hit) updateSkyCursor(chart, hit);
     }
+    // 恢复云量曲线持久选中（仅当展开区日期匹配时）
+    if (state.cloudPick) {
+      const cloudChart = resultEl.querySelector(`.cloud-chart[data-date="${state.cloudPick.date}"]`);
+      const cloudHit = cloudChart?.querySelector(`.cloud-hit[data-index="${state.cloudPick.index}"]`);
+      if (cloudHit) updateCloudCursor(cloudChart, cloudHit);
+    }
   }
   // 悬停/触控提示：更新图表准星与数值卡，不触发整页重渲染
   function updateSkyCursor(chart, hit) {
@@ -134,6 +140,31 @@
   function hideSkyCursor(chart) {
     chart.querySelector('.sky-crosshair')?.classList.remove('visible');
     chart.querySelector('.sky-tooltip')?.classList.remove('visible');
+  }
+  // 悬停/触控提示：云量曲线准星与数值卡（低云/中云/降雨量），不触发整页重渲染
+  function updateCloudCursor(chart, hit) {
+    const crosshair = chart.querySelector('.cloud-crosshair');
+    const tooltip = chart.querySelector('.cloud-tooltip');
+    if (!crosshair || !tooltip) return;
+    const x = Number(hit.dataset.x);
+    const d = hit.dataset;
+    crosshair.style.transform = `translateX(${x}px)`;
+    crosshair.classList.add('visible');
+    const fmt = (value, unit) => (value === '' ? '—' : `${value}${unit}`);
+    tooltip.innerHTML = `
+      <strong>${d.time}</strong>
+      <span>低云 <b>${fmt(d.low, '%')}</b></span>
+      <span>中云 <b>${fmt(d.mid, '%')}</b></span>
+      <span>降雨 <b>${fmt(d.precip, ' mm')}</b></span>`;
+    const chartRect = chart.getBoundingClientRect();
+    const tooltipWidth = tooltip.offsetWidth;
+    const left = Math.min(Math.max(x, tooltipWidth / 2 + 6), chartRect.width - tooltipWidth / 2 - 6);
+    tooltip.style.left = `${left}px`;
+    tooltip.classList.add('visible');
+  }
+  function hideCloudCursor(chart) {
+    chart.querySelector('.cloud-crosshair')?.classList.remove('visible');
+    chart.querySelector('.cloud-tooltip')?.classList.remove('visible');
   }
   async function query() {
     const start = dateStr(0);
@@ -188,42 +219,73 @@
       renderResult();
     });
 
-    // 悬停提示（鼠标移动不重渲染）
+    // 悬停提示（鼠标移动不重渲染）：天空剖面与云量曲线共用委托
     resultEl.addEventListener('pointermove', (event) => {
       const hit = event.target.closest('.sky-hit');
-      if (!hit) return;
-      updateSkyCursor(hit.closest('[data-sky-chart]'), hit);
+      if (hit) { updateSkyCursor(hit.closest('[data-sky-chart]'), hit); return; }
+      const cloudHit = event.target.closest('.cloud-hit');
+      if (cloudHit) updateCloudCursor(cloudHit.closest('[data-cloud-chart]'), cloudHit);
     });
     // 离开图表隐藏提示（未点击选中时隐藏；点击选中后详情保留，直到切换日期/视图）
     resultEl.addEventListener('pointerout', (event) => {
       const chart = event.target.closest('[data-sky-chart]');
       if (chart && state.skyIndex == null && (!event.relatedTarget || !chart.contains(event.relatedTarget))) hideSkyCursor(chart);
+      const cloudChart = event.target.closest('[data-cloud-chart]');
+      if (cloudChart && state.cloudPick == null && (!event.relatedTarget || !cloudChart.contains(event.relatedTarget))) hideCloudCursor(cloudChart);
     });
     // 触控/点击选中时刻：持久化准星并直接显示详情（不整页重渲染，移动端点击即见）
     resultEl.addEventListener('pointerdown', (event) => {
       const hit = event.target.closest('.sky-hit');
-      if (!hit || !state.bundle) return;
-      state.skyIndex = Number(hit.dataset.index);
-      updateSkyCursor(hit.closest('[data-sky-chart]'), hit);
+      if (hit && state.bundle) {
+        state.skyIndex = Number(hit.dataset.index);
+        updateSkyCursor(hit.closest('[data-sky-chart]'), hit);
+        return;
+      }
+      const cloudHit = event.target.closest('.cloud-hit');
+      if (cloudHit && state.bundle) {
+        const cloudChart = cloudHit.closest('[data-cloud-chart]');
+        state.cloudPick = { date: cloudChart.dataset.date, index: Number(cloudHit.dataset.index) };
+        updateCloudCursor(cloudChart, cloudHit);
+      }
     });
-    // 键盘焦点：左右方向键在小时刻度间移动
+    // 键盘焦点：左右方向键在小时刻度间移动（天空剖面与云量曲线）
     resultEl.addEventListener('keydown', (event) => {
-      const chart = event.target.closest('[data-sky-chart]');
-      if (!chart || !state.bundle) return;
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-      event.preventDefault();
-      const hits = chart.querySelectorAll('.sky-hit');
-      if (!hits.length) return;
-      const current = state.skyIndex == null ? 0 : state.skyIndex;
-      const next = event.key === 'ArrowRight' ? Math.min(hits.length - 1, current + 1) : Math.max(0, current - 1);
-      state.skyIndex = next;
-      renderResult();
-      const newChart = resultEl.querySelector('[data-sky-chart]');
-      newChart?.focus();
-      const newHits = newChart?.querySelectorAll('.sky-hit') || [];
-      if (newHits[next]) {
-        const scroll = newChart.closest('.sky-scroll');
-        if (scroll) scroll.scrollLeft = Math.max(0, Number(newHits[next].dataset.x) - scroll.clientWidth / 2);
+      if (!state.bundle) return;
+      const skyChart = event.target.closest('[data-sky-chart]');
+      if (skyChart) {
+        event.preventDefault();
+        const hits = skyChart.querySelectorAll('.sky-hit');
+        if (!hits.length) return;
+        const current = state.skyIndex == null ? 0 : state.skyIndex;
+        const next = event.key === 'ArrowRight' ? Math.min(hits.length - 1, current + 1) : Math.max(0, current - 1);
+        state.skyIndex = next;
+        renderResult();
+        const newChart = resultEl.querySelector('[data-sky-chart]');
+        newChart?.focus();
+        const newHits = newChart?.querySelectorAll('.sky-hit') || [];
+        if (newHits[next]) {
+          const scroll = newChart.closest('.sky-scroll');
+          if (scroll) scroll.scrollLeft = Math.max(0, Number(newHits[next].dataset.x) - scroll.clientWidth / 2);
+        }
+        return;
+      }
+      const cloudChart = event.target.closest('[data-cloud-chart]');
+      if (cloudChart) {
+        event.preventDefault();
+        const hits = cloudChart.querySelectorAll('.cloud-hit');
+        if (!hits.length) return;
+        const current = state.cloudPick && state.cloudPick.date === cloudChart.dataset.date ? state.cloudPick.index : 0;
+        const next = event.key === 'ArrowRight' ? Math.min(hits.length - 1, current + 1) : Math.max(0, current - 1);
+        state.cloudPick = { date: cloudChart.dataset.date, index: next };
+        renderResult();
+        const newChart = resultEl.querySelector(`.cloud-chart[data-date="${state.cloudPick.date}"]`);
+        newChart?.focus();
+        const newHits = newChart?.querySelectorAll('.cloud-hit') || [];
+        if (newHits[next]) {
+          const scroll = newChart.closest('.cloud-scroll');
+          if (scroll) scroll.scrollLeft = Math.max(0, Number(newHits[next].dataset.x) - scroll.clientWidth / 2);
+        }
       }
     });
 

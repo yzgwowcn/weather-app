@@ -505,28 +505,54 @@ button { font: inherit; }
 .forecast-detail b { display: block; font-size: 16px; }
 .forecast-detail p { margin: 2px 0 0; color: rgba(226, 233, 240, .8); font-size: 13px; }
 
-/* 选中卡片展开区：当天逐小时云量曲线 */
+/* 选中卡片展开区：当天逐小时低云/中云/降雨量曲线（横向滚动，交互同天空剖面） */
 .cloud-curve-wrap { grid-column: 1 / -1; margin-top: 10px; padding: 10px 0 0; border-top: 1px solid rgba(255, 255, 255, .08); }
 .cloud-curve-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding-top: 0 !important; }
 .cloud-curve-head span { font-size: 12.5px; font-weight: 750; color: rgba(230, 236, 242, .92); }
 .cloud-curve-head small { font-size: 11.5px; color: var(--muted); }
-.cloud-curve { display: block; width: 100%; height: auto; margin-top: 4px; }
+.cloud-scroll {
+  overflow-x: auto; padding-bottom: 8px; margin-top: 4px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: rgba(8, 16, 28, .45); /* 深色底随容器圆角裁剪，滚动到最右也是圆角 */
+  scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .25) transparent;
+}
+.cloud-chart { position: relative; width: max-content; min-width: 100%; outline: none; border-radius: var(--r-md); }
+.cloud-chart:focus-visible { box-shadow: 0 0 0 2px rgba(125, 180, 255, .55); }
+.cloud-svg { display: block; }
 .cloud-grid { stroke: rgba(255, 255, 255, .08); stroke-width: 1; }
 .cloud-dayband { fill: rgba(255, 255, 255, .05); }
 .cloud-axis { fill: rgba(255, 255, 255, .42); font-size: 10px; }
-.cloud-line { fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.cloud-line.total { stroke: #f5d68a; stroke-width: 2.4; }
+.cloud-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .cloud-line.low { stroke: #7db4ff; }
 .cloud-line.mid { stroke: #4fd8c4; }
-.cloud-line.high { stroke: #b79cff; stroke-width: 1.4; stroke-dasharray: 4 4; }
+.cloud-bar { fill: rgba(125, 180, 255, .5); rx: 2; }
+.cloud-hit { stroke: rgba(255, 255, 255, .02); stroke-width: 14; pointer-events: stroke; cursor: crosshair; }
+.cloud-crosshair {
+  position: absolute; top: 14px; bottom: 26px; left: 0; width: 1px;
+  background: rgba(255, 255, 255, .85); box-shadow: 0 0 8px rgba(125, 180, 255, .85);
+  opacity: 0; pointer-events: none; z-index: 3;
+}
+.cloud-crosshair.visible { opacity: 1; }
+.cloud-tooltip {
+  position: absolute; top: 6px; left: 0; z-index: 4; min-width: 150px; padding: 9px 12px;
+  border-radius: 11px; background: rgba(9, 17, 30, .86); border: 1px solid rgba(255, 255, 255, .18);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  color: var(--ink); font-size: 13px; line-height: 1.8;
+  opacity: 0; pointer-events: none; transform: translateX(-50%);
+  transition: opacity .12s ease; box-shadow: var(--shadow);
+}
+.cloud-tooltip.visible { opacity: 1; }
+.cloud-tooltip strong { display: block; margin-bottom: 3px; color: #fff; font-size: 12.5px; }
+.cloud-tooltip span { display: flex; justify-content: space-between; gap: 14px; color: var(--muted); }
+.cloud-tooltip b { color: var(--ink); font-weight: 700; }
+.cloud-note { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
 .cloud-curve-empty { grid-column: 1 / -1; margin: 10px 0 0; color: var(--muted); font-size: 13px; }
 .cloud-curve-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; font-size: 11.5px; color: rgba(226, 233, 240, .78); }
 .cloud-curve-legend span { display: inline-flex; align-items: center; gap: 5px; padding-top: 0 !important; }
 .cloud-curve-legend span::before { content: ''; width: 14px; height: 3px; border-radius: 2px; }
-.legend-total::before { background: #f5d68a; }
 .legend-low::before { background: #7db4ff; }
 .legend-mid::before { background: #4fd8c4; }
-.legend-high::before { background: #b79cff; }
+.legend-precip::before { background: rgba(125, 180, 255, .6); width: 6px; height: 10px; }
 
 /* ---- 海况 ---- */
 .marine-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 8px; }

@@ -345,7 +345,7 @@ function renderDayRail(days, selectedDate) {
 
 // ---- 逐日卡片：当天逐小时云量曲线 -----------------------------------------
 
-// 取综合预报 hourly 中某日全天各小时的云量（当前 API 粒度为 1 小时间隔，24 点/天）
+// 取综合预报 hourly 中某日全天各小时的云量与降雨（当前 API 粒度为 1 小时间隔，24 点/天）
 function cloudCurve(forecast, date) {
   const h = forecast?.hourly;
   if (!h?.time) return [];
@@ -355,42 +355,57 @@ function cloudCurve(forecast, date) {
     const num = (arr) => { const v = arr?.[index]; return v == null ? null : Number(v); };
     points.push({
       hour: Number(String(time).slice(11, 13)),
-      total: num(h.cloud_cover),
+      time: String(time),
       low: num(h.cloud_cover_low),
       mid: num(h.cloud_cover_mid),
-      high: num(h.cloud_cover_high),
+      precipitation: num(h.precipitation),
     });
   });
   return points;
 }
 
-// 当天小曲线：总云量实线 + 低/中/高云（高云虚线），固定 viewBox 自适应宽度
+// 当天逐小时曲线：低云/中云（左轴 %）+ 降雨柱状（高度按当天最大值归一化），固定像素宽横向滚动
 function renderCloudCurve(points) {
   if (!points.length) return '<p class="cloud-curve-empty">当天逐小时云量数据暂缺。</p>';
-  const W = 560; const H = 150;
-  const PAD = { top: 12, right: 8, bottom: 24, left: 34 };
-  const plotW = W - PAD.left - PAD.right;
+  const STEP = 30; const H = 180;
+  const PAD = { top: 14, right: 12, bottom: 26, left: 36 };
+  const W = PAD.left + points.length * STEP + PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
-  const x = (hour) => PAD.left + hour / 23 * plotW;
+  const xc = (hour) => PAD.left + (hour + 0.5) * STEP;
   const y = (v) => PAD.top + (100 - v) / 100 * plotH;
+  const maxPrecip = Math.max(0, ...points.map((p) => p.precipitation ?? 0));
   const parts = [];
   [0, 25, 50, 75, 100].forEach((tick) => {
     parts.push(`<line class="cloud-grid" x1="${PAD.left}" y1="${y(tick)}" x2="${W - PAD.right}" y2="${y(tick)}" />`);
     parts.push(`<text class="cloud-axis" x="${PAD.left - 6}" y="${y(tick) + 3.5}">${tick}</text>`);
   });
   // 白天时段（08–18）浅色带
-  parts.push(`<rect class="cloud-dayband" x="${x(8)}" y="${PAD.top}" width="${x(18) - x(8)}" height="${plotH}" />`);
+  parts.push(`<rect class="cloud-dayband" x="${PAD.left + 8 * STEP}" y="${PAD.top}" width="${10 * STEP}" height="${plotH}" />`);
   // x 轴小时刻度（每 3 小时）
   [0, 3, 6, 9, 12, 15, 18, 21].forEach((hour) => {
-    parts.push(`<text class="cloud-axis" x="${x(hour)}" y="${H - 7}" text-anchor="middle">${String(hour).padStart(2, '0')}</text>`);
+    parts.push(`<text class="cloud-axis" x="${xc(hour)}" y="${H - 7}" text-anchor="middle">${String(hour).padStart(2, '0')}</text>`);
   });
-  const line = (key, cls) => {
-    const seg = points.filter((p) => p[key] != null).map((p) => ({ x: x(p.hour), y: y(p[key]) }));
+  // 降雨柱状（归一化到当天最大降雨，精确数值在 tooltip 中展示）
+  if (maxPrecip > 0) {
+    points.forEach((p) => {
+      if (p.precipitation == null || p.precipitation <= 0) return;
+      const barW = 11;
+      const barH = Math.max(2, p.precipitation / maxPrecip * plotH);
+      parts.push(`<rect class="cloud-bar" x="${(xc(p.hour) - barW / 2).toFixed(1)}" y="${(PAD.top + plotH - barH).toFixed(1)}" width="${barW}" height="${barH.toFixed(1)}" />`);
+    });
+  }
+  // 低云/中云曲线（高云与总云量不参与逐日判断，不展示）
+  [['low', 'low'], ['mid', 'mid']].forEach(([key, cls]) => {
+    const seg = points.filter((p) => p[key] != null).map((p) => ({ x: xc(p.hour), y: y(p[key]) }));
     if (seg.length > 1) parts.push(`<path class="cloud-line ${cls}" d="${smoothPath(seg)}" />`);
-  };
-  line('total', 'total');
-  SKY_LAYERS.forEach((layer) => line(layer.key, layer.cls));
-  return `<svg class="cloud-curve" viewBox="0 0 ${W} ${H}" role="img" aria-label="当天逐小时云层覆盖率曲线（1 小时间隔，共 ${points.length} 点）">${parts.join('')}</svg>`;
+  });
+  // 不可见命中区：每小时一条透明竖条，事件委托读取 dataset（与天空剖面一致）
+  points.forEach((p, i) => {
+    parts.push(`<line class="cloud-hit" data-index="${i}" data-x="${xc(p.hour)}" data-time="${p.time}" data-hour="${p.hour}"
+      data-low="${p.low ?? ''}" data-mid="${p.mid ?? ''}" data-precip="${p.precipitation == null ? '' : p.precipitation.toFixed(1)}"
+      x1="${xc(p.hour)}" y1="${PAD.top}" x2="${xc(p.hour)}" y2="${PAD.top + plotH}" />`);
+  });
+  return `<svg class="cloud-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="当天逐小时低云、中云与降雨量曲线（1 小时间隔，共 ${points.length} 点）">${parts.join('')}</svg>`;
 }
 
 function renderForecastCards(days, selectedDate, cloudCurves = {}) {
@@ -406,7 +421,7 @@ function renderForecastCards(days, selectedDate, cloudCurves = {}) {
           <div class="forecast-condition"><strong>${probabilityWord(day.assessment.probability)}</strong><span>${condition} · ${Math.round(day.low)}°–${Math.round(day.high)}°</span></div>
           <div class="forecast-probability"><b>${Metrics.formatPercent(day.assessment.probability)}</b><small>${consistency.text}</small></div>
         </button>
-        ${active ? `<div class="forecast-detail"><div><span>遮蔽云量</span><b>${day.assessment.ec.main ? `${Math.round(day.assessment.ec.main.maskMean)}%` : '—'}</b></div><div><span>降水</span><b>${day.rain == null ? '—' : `${day.rain.toFixed(1)} mm`}</b></div><div><span>风速</span><b>${day.wind == null ? '—' : `${Math.round(day.wind)} km/h`}</b></div><p>${consistency.description}</p>${cloudCurves[day.date] ? `<div class="cloud-curve-wrap"><div class="cloud-curve-head"><span>当天逐小时云量</span><small>1 小时间隔 · ${cloudCurves[day.date].length} 点 · 综合预报</small></div>${renderCloudCurve(cloudCurves[day.date])}<div class="cloud-curve-legend"><span class="legend-total">总云量</span><span class="legend-low">低云</span><span class="legend-mid">中云</span><span class="legend-high">高云</span></div></div>` : ''}</div>` : ''}
+        ${active ? `<div class="forecast-detail"><div><span>遮蔽云量</span><b>${day.assessment.ec.main ? `${Math.round(day.assessment.ec.main.maskMean)}%` : '—'}</b></div><div><span>降水</span><b>${day.rain == null ? '—' : `${day.rain.toFixed(1)} mm`}</b></div><div><span>风速</span><b>${day.wind == null ? '—' : `${Math.round(day.wind)} km/h`}</b></div><p>${consistency.description}</p>${cloudCurves[day.date] ? `<div class="cloud-curve-wrap"><div class="cloud-curve-head"><span>当天逐小时低云 · 中云 · 降雨量</span><small>1 小时间隔 · ${cloudCurves[day.date].length} 点 · 综合预报</small></div><div class="cloud-scroll"><div class="cloud-chart" data-cloud-chart data-date="${day.date}" tabindex="0" role="application" aria-label="当天逐小时低云、中云与降雨量图，左右方向键移动准星">${renderCloudCurve(cloudCurves[day.date])}<div class="cloud-crosshair" aria-hidden="true"></div><div class="cloud-tooltip" role="status"></div></div></div><p class="cloud-note">低云与中云按百分比（左轴），降雨量为柱状（高度按当天最大值归一化），悬停或点击查看精确数值；横向滚动查看全部时段。</p><div class="cloud-curve-legend"><span class="legend-low">低云</span><span class="legend-mid">中云</span><span class="legend-precip">降雨量</span></div></div>` : ''}</div>` : ''}
       </article>`;
     }).join('')}</div></section>`;
 }
