@@ -80,8 +80,9 @@
             <input type="email" id="signup-email" autocomplete="email" required>
           </div>
           <div class="auth-field">
-            <label for="signup-username">用户名（可选，3-20 位字母/数字/下划线）</label>
-            <input type="text" id="signup-username" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username">
+            <label for="signup-username">用户名（可选，建议使用小红书昵称）</label>
+            <input type="text" id="signup-username" maxlength="20" autocomplete="username" placeholder="2-20 位中文/字母/数字/下划线">
+            <p style="margin:6px 0 0;font-size:12px;opacity:.7;">💡 建议使用您的小红书用户名称，方便识别</p>
           </div>
           <div class="auth-field">
             <label for="signup-password">密码（至少 6 位）</label>
@@ -105,7 +106,7 @@
         </form>
 
         <div id="auth-msg" class="auth-msg" role="status"></div>
-        <p class="auth-hint" id="auth-hint">注册后需点击邮件中的确认链接完成邮箱验证；您的账户 ID 用于关联收藏与偏好。</p>
+        <p class="auth-hint" id="auth-hint">您的账户 ID 用于关联收藏与偏好。</p>
       </div>
       <p class="auth-back"><a href="index.html">← 返回首页</a></p>
     </main>

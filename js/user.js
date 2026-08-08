@@ -15,9 +15,9 @@
   }
 
   // ---- 用户名 ----
-  // 校验规则：3-20 位字母/数字/下划线
+  // 校验规则：2-20 位中文/字母/数字/下划线（支持小红书昵称等中文用户名）
   function isValidUsername(name) {
-    return typeof name === 'string' && /^[A-Za-z0-9_]{3,20}$/.test(name);
+    return typeof name === 'string' && /^[\u4e00-\u9fa5A-Za-z0-9_]{2,20}$/.test(name);
   }
 
   // 获取当前用户 profile（无记录返回 profile: null）
@@ -50,7 +50,7 @@
     var user = currentUser();
     if (!client) return { ok: false, message: '认证服务未配置' };
     if (!user) return { ok: false, message: '未登录' };
-    if (!isValidUsername(name)) return { ok: false, message: '用户名需为 3-20 位字母/数字/下划线' };
+    if (!isValidUsername(name)) return { ok: false, message: '用户名需为 2-20 位中文/字母/数字/下划线' };
     var current = await getProfile();
     if (current.ok && current.profile && current.profile.username === name) {
       return { ok: true }; // 未变化
