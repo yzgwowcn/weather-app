@@ -190,7 +190,7 @@ button { font: inherit; }
 /* 小红书主页链接（官方 logo 图 + 深色玻璃胶囊，红色 logo 自带品牌色） */
 .xhs-link {
   display: inline-flex; align-items: center; gap: 8px;
-  padding: 6px 13px 6px 7px; border-radius: 99px; text-decoration: none;
+  padding: 6px 13px 6px 7px; border-radius: 99px; text-decoration: none; white-space: nowrap;
   background: rgba(255, 255, 255, .06);
   color: rgba(226, 233, 240, .92); font-size: 12.5px; font-weight: 700;
   border: 1px solid rgba(255, 255, 255, .16);
@@ -225,6 +225,28 @@ button { font: inherit; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .28); transition: background .3s ease; }
 .source-status.live .status-dot { background: var(--green); box-shadow: 0 0 8px rgba(111, 216, 180, .6); }
 .source-status.dead .status-dot { background: var(--red); }
+.model-row.live .status-dot { background: var(--green); }
+.model-row.dead .status-dot { background: var(--red); }
+/* 状态灯呼吸：live 态柔光脉动（reduced-motion 由全局 @media 自动关闭） */
+@keyframes status-breathe {
+  0%, 100% { box-shadow: 0 0 3px rgba(111, 216, 180, .35); }
+  50% { box-shadow: 0 0 10px rgba(111, 216, 180, .95); }
+}
+.source-status.live .status-dot, .model-row.live .status-dot { animation: status-breathe 2.2s ease-in-out infinite; }
+/* 各模型数据时效表：模型名 + 状态灯 · 更新到 · 多久前 */
+.model-table { margin-top: 13px; display: flex; flex-direction: column; }
+.model-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
+  padding: 5px 0; font-size: 12px; border-top: 1px dashed rgba(255, 255, 255, .12);
+}
+.model-row:first-child { border-top: 0; }
+.model-name { display: inline-flex; align-items: center; gap: 6px; color: rgba(226, 233, 240, .85); font-weight: 650; white-space: nowrap; }
+.model-name .status-dot { width: 6px; height: 6px; flex-shrink: 0; }
+.model-upto { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.model-ago { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.model-row.live .model-upto, .model-row.live .model-ago { color: rgba(226, 233, 240, .78); }
+.model-row.dead .model-upto, .model-row.dead .model-ago { color: rgba(255, 143, 135, .8); }
+.model-row.placeholder { display: block; padding: 4px 0; border-top: 0; color: var(--muted); opacity: .7; font-size: 12px; }
 
 /* ---- 查询面板（亚克力：半透明 + backdrop-filter 模糊） ---- */
 .workspace {
@@ -613,17 +635,16 @@ button { font: inherit; }
 .date-chip.active span { color: #4a5a6c; }
 .date-chip.active small { color: #2f6fd6; }
 .forecast-section, .marine-section { padding: 46px 0 0; }
-.forecast-list { display: flex; flex-direction: column; gap: 10px; }
-.forecast-card {
-  border: 1px solid transparent; border-radius: var(--r-md);
+.forecast-list {
+  border: 1px solid transparent; border-radius: var(--r-lg);
   background: var(--glass-border);
   backdrop-filter: blur(14px) saturate(1.4);
   -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  box-shadow: var(--glass-highlight);
-  overflow: hidden; /* 展开详情跟随卡片圆角裁剪 */
-  transition: box-shadow .18s ease;
+  box-shadow: var(--shadow), var(--glass-highlight);
+  overflow: hidden; /* 展开详情跟随大框圆角裁剪 */
 }
-.forecast-card.selected { box-shadow: var(--shadow), var(--glass-highlight); }
+.forecast-card { border-bottom: 1px solid var(--line); }
+.forecast-card:last-child { border-bottom: 0; }
 .forecast-summary {
   display: grid; grid-template-columns: 150px 1fr auto auto; gap: 12px; align-items: center;
   grid-template-areas: "date cond prob icons";
@@ -739,10 +760,17 @@ button { font: inherit; }
 @media (max-width: 560px) {
   .page-shell { width: min(100% - 24px, 1180px); }
   .site-header { min-height: 62px; }
+  .header-right { gap: 8px; }
+  .auth-entry { padding: 5px 11px; }
+  .xhs-link { padding: 5px 10px 5px 6px; }
+  .xhs-logo { height: 18px; }
+  /* 窄屏只留 logo + 「我的小红书」，品牌名收进下一层 */
+  .xhs-brand, .xhs-sep { display: none; }
   .intro { padding: 44px 0 26px; gap: 22px; }
   .intro h1 { font-size: 54px; }
   .intro-copy { font-size: 15px; line-height: 1.65; }
   .intro-source { font-size: 12px; }
+  .model-row { gap: 6px; font-size: 11.5px; }
   .workspace { grid-template-columns: 1fr; padding: 13px; }
   .horizon-field { padding: 0 2px; }
   .query-btn { width: 100%; margin: 14px 0 0; }
@@ -770,6 +798,12 @@ button { font: inherit; }
 @media (max-width: 420px) {
   .eyebrow-line { display: none; }
   .eyebrow { gap: 0; }
+}
+
+/* 超窄屏头部：小红书按钮只留 logo 圆形胶囊 */
+@media (max-width: 380px) {
+  .xhs-sub { display: none; }
+  .xhs-link { padding: 5px 6px 5px 5px; }
 }
 
 /* ---- 地图选点（高德 JS API） ---- */

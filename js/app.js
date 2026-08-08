@@ -112,6 +112,32 @@
     renderDestButtons();
     query();
   };
+  // 各模型数据时效表：模型名（状态灯：正常绿 / error 红）· 更新到（hourly 末项）· 多久前（fetchedAt 距今）
+  function renderModelTable() {
+    const wrap = document.getElementById('model-table');
+    if (!wrap) return;
+    const det = state.bundle && state.bundle.deterministic;
+    if (!det) {
+      wrap.innerHTML = '<div class="model-row placeholder"><span>查询后显示各模型数据时效</span></div>';
+      return;
+    }
+    const now = Date.now();
+    const rows = ['ECMWF IFS', 'NOAA GFS', 'JMA GSM', 'CMA GRAPES'].map(function (name) {
+      const m = det[name];
+      if (!m || m.error || !m.hourly || !m.hourly.time || !m.hourly.time.length) {
+        return '<div class="model-row dead"><span class="model-name"><i class="status-dot" aria-hidden="true"></i>' + name + '</span><span class="model-upto">未返回</span><span class="model-ago">—</span></div>';
+      }
+      const last = String(m.hourly.time[m.hourly.time.length - 1]).slice(5, 16).replace('T', ' ');
+      let ago = '—';
+      const fetched = m.fetchedAt ? Date.parse(m.fetchedAt) : NaN;
+      if (Number.isFinite(fetched)) {
+        const mins = Math.max(0, Math.round((now - fetched) / 60000));
+        ago = mins < 60 ? mins + ' 分钟前' : Math.floor(mins / 60) + ' 小时前';
+      }
+      return '<div class="model-row live"><span class="model-name"><i class="status-dot" aria-hidden="true"></i>' + name + '</span><span class="model-upto">' + last + '</span><span class="model-ago">' + ago + '</span></div>';
+    });
+    wrap.innerHTML = rows.join('');
+  }
   // 首屏数据来源状态：未查询 / 更新至（取 hourly 最后时间戳）/ 暂不可用
   function updateDataStatus() {
     const el = document.getElementById('data-status');
@@ -124,10 +150,11 @@
     if (!textEl) return;
     if (!ok) {
       textEl.textContent = f && f.error ? '数据：暂不可用' : '数据：尚未查询';
-      return;
+    } else {
+      const last = String(f.hourly.time[f.hourly.time.length - 1]).slice(0, 16).replace('T', ' ');
+      textEl.textContent = '数据更新至 ' + last + '（北京时间）';
     }
-    const last = String(f.hourly.time[f.hourly.time.length - 1]).slice(0, 16).replace('T', ' ');
-    textEl.textContent = '数据更新至 ' + last + '（北京时间）';
+    renderModelTable();
   }
   function renderResult() {
     const oldScroll = resultEl.querySelector('.sky-scroll');
