@@ -38,12 +38,14 @@
 
   var client = null;
   if (isConfigured && typeof supabase !== 'undefined' && supabase.createClient) {
-    // PKCE 流程：确认/找回密码邮件链接带 code，由回调页 exchangeCodeForSession 换取会话。
-    // storage 必须用 localStorage：默认 sessionStorage 按标签页隔离，
-    // 邮件确认链接在新标签打开时读不到 code_verifier（报 PKCE code verifier not found）。
+    // implicit 流程：确认/找回密码链接直接携带 token（URL hash），由 createClient 的
+    // detectSessionInUrl 自动建立会话，不依赖 code_verifier 客户端存储——
+    // PKCE 的 code_verifier 存在客户端存储中，邮件确认链接若在另一浏览器/内置 webview
+    // （如 QQ 邮箱 APP）打开会读不到，报 "PKCE code verifier not found in storage"。
+    // implicit 仅在邮箱确认这类一次性场景使用；token 处理后被 supabase-js 从 URL 移除。
     client = supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
       auth: {
-        flowType: 'pkce',
+        flowType: 'implicit',
         persistSession: true,
         autoRefreshToken: true,
         storage: pkceStorage,
@@ -107,19 +109,45 @@
     return { ok: true };
   }
 
-  // 回调处理：PKCE code → 确认会话；type=recovery → 返回类型让页面显示改密表单
+  // 回调处理：兼容三种情况
+  // 1) PKCE 旧链接：?code=... → exchangeCodeForSession
+  // 2) implicit 链接：URL hash 携带 token，createClient 的 detectSessionInUrl 已自动建立会话
+  // 3) 找回密码：type=recovery → 返回类型让页面显示改密表单
   async function handleCallback(url) {
     if (!client) return { ok: false, message: '认证未配置' };
     var params = new URLSearchParams(url.search);
+    var type = params.get('type') || '';
+    if (type === 'recovery') {
+      // 等待 supabase-js 处理 hash token（detectSessionInUrl），recovery 需要已登录态才能改密
+      var sess = await waitForSession(3000);
+      if (!sess) return { ok: false, message: '重置链接无效或已过期，请重新发起找回密码' };
+      return { ok: true, type: 'recovery' };
+    }
     var code = params.get('code');
     if (code) {
       var exchange = await client.auth.exchangeCodeForSession(code);
       if (exchange.error) return { ok: false, message: exchange.error.message };
       return { ok: true, type: 'confirm' };
     }
-    var type = params.get('type') || '';
-    if (type === 'recovery') return { ok: true, type: 'recovery' };
+    // implicit 确认链接：hash 带 access_token，等待会话建立
+    var session = await waitForSession(3000);
+    if (session) return { ok: true, type: 'confirm' };
     return { ok: false, message: '链接无效或已过期，请重新操作' };
+  }
+
+  // 轮询等待会话就绪（implicit 流程 supabase-js 异步处理 URL hash token）
+  function waitForSession(timeoutMs) {
+    return new Promise(function (resolve) {
+      var start = Date.now();
+      var timer = setInterval(function () {
+        var s = client.auth.getSession();
+        var session = s && s.data && s.data.session;
+        if (session || Date.now() - start > timeoutMs) {
+          clearInterval(timer);
+          resolve(session || null);
+        }
+      }, 150);
+    });
   }
 
   // 设置新密码（找回密码流程第二步）
