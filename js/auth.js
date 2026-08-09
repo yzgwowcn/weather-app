@@ -162,30 +162,42 @@
     return description ? description : ('登录失败（' + code + '）');
   }
 
-  // 回调处理：兼容四种情况
+  // 回调处理：兼容五种情况
   // 0) OAuth 失败回跳：query 带 error / error_description（如邮箱已注册冲突）→ 立即返回中文错误，不等会话
-  // 1) implicit：URL hash 携带 token，createClient 的 detectSessionInUrl 自动建立会话（等待 10s）
-  // 2) PKCE 旧链接：?code=... → exchangeCodeForSession
-  // 3) 找回密码：type=recovery → 返回类型让页面显示改密表单
+  // 1) OAuth 回跳：hash 带 access_token → 显式 setSession 建会话（不依赖 detectSessionInUrl 时序，失败重试 1 次）
+  // 2) implicit 确认链接：hash 带 token → detectSessionInUrl 异步建会话（事件驱动等待，30s）
+  // 3) PKCE 旧链接：?code=... → exchangeCodeForSession
+  // 4) 找回密码：type=recovery → 返回类型让页面显示改密表单
   async function handleCallback(url) {
     if (!client) return { ok: false, message: '认证未配置' };
     var params = new URLSearchParams(url.search);
     var err = params.get('error');
     if (err) {
-      // OAuth 失败回跳（如该邮箱已有密码账号）：立即返回，避免进入 10s 会话等待
+      // OAuth 失败回跳（如该邮箱已有密码账号）：立即返回，避免进入会话等待
       return { ok: false, message: oauthErrorText(err, params.get('error_description') || '') };
     }
     var type = params.get('type') || '';
     if (type === 'recovery') {
       // 等待 supabase-js 处理 hash token（detectSessionInUrl），recovery 需要已登录态才能改密
-      var rs = await waitForSession(10000);
+      var rs = await waitForSession(30000);
       if (!rs) return { ok: false, message: '重置链接无效或已过期，请重新发起找回密码' };
       return { ok: true, type: 'recovery' };
     }
-    // implicit 确认链接：hash 带 access_token，优先等会话建立（detectSessionInUrl 异步处理）
-    var sess = await waitForSession(10000);
+    // OAuth 回跳（google/github）：hash 携带 access_token。显式 setSession 建会话——
+    // detectSessionInUrl 需先请求 /auth/v1/user 验证 token，国内访问 Supabase 慢时可能超过 10s，
+    // 旧实现纯轮询 10s 会误报「链接无效或已过期」（实测：回调页报错但回首页已登录）。
+    var hashParams = new URLSearchParams((url.hash || '').replace(/^#/, ''));
+    var accessToken = hashParams.get('access_token');
+    if (accessToken) {
+      var st = await setSessionFromHash(accessToken, hashParams.get('refresh_token') || undefined);
+      if (st) {
+        var sp = (st.user && st.user.app_metadata && st.user.app_metadata.provider) || '';
+        return { ok: true, type: 'confirm', provider: sp || 'email' };
+      }
+    }
+    // implicit 确认链接：hash 带 token，等待 detectSessionInUrl 异步建会话（事件驱动，30s）
+    var sess = await waitForSession(30000);
     if (sess) {
-      // app_metadata.provider 区分登录来源：google / github / email，供回调页决定跳转目标
       var provider = (sess.user && sess.user.app_metadata && sess.user.app_metadata.provider) || 'email';
       return { ok: true, type: 'confirm', provider: provider };
     }
@@ -196,21 +208,65 @@
       if (exchange.error) return { ok: false, message: exchange.error.message };
       return { ok: true, type: 'confirm', provider: 'email' };
     }
-    return { ok: false, message: '链接无效或已过期，请重新操作' };
+    // 区分错误：带过 OAuth token 但最终未建成会话 → 网络慢；否则 → 链接无效
+    return {
+      ok: false,
+      message: accessToken
+        ? '登录确认超时（网络较慢），请返回首页查看是否已登录；若未登录请重新发起登录'
+        : '链接无效或已过期，请重新操作',
+    };
   }
 
-  // 轮询等待会话就绪（implicit 流程 supabase-js 异步处理 URL hash token）
+  // OAuth 回跳 hash token → 显式建会话（setSession 内部会调 /auth/v1/user 验证；网络失败重试 1 次）
+  async function setSessionFromHash(accessToken, refreshToken) {
+    for (var i = 0; i < 2; i++) {
+      var r = await client.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      }).catch(function () { return { error: { message: 'network' }, data: null }; });
+      if (r && !r.error && r.data && r.data.session) return r.data.session;
+      if (i === 0) await sleep(1000);
+    }
+    return null;
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  // 等待会话就绪：onAuthStateChange 事件驱动（SIGNED_IN/INITIAL_SESSION 一到立即返回）+ 轮询兜底。
+  // 原因：detectSessionInUrl 需先请求 /auth/v1/user 验证 token 才写入 storage，国内访问 Supabase
+  // 可能超过 10s，纯轮询会误报「链接无效或已过期」（用户已登录但回调页报错）。
   function waitForSession(timeoutMs) {
     return new Promise(function (resolve) {
       var start = Date.now();
-      var timer = setInterval(function () {
+      var timer = null;
+      var unsub = null;
+      var settled = false;
+      function done(session) {
+        if (settled) return;
+        settled = true;
+        clearInterval(timer);
+        if (unsub) unsub();
+        resolve(session || null);
+      }
+      // 事件驱动：会话建立后 SDK 会触发 SIGNED_IN / INITIAL_SESSION
+      var sub = client.auth.onAuthStateChange(function (event, session) {
+        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) done(session);
+      });
+      // v2 返回 { data: { subscription: { unsubscribe } } }；兼容直接返回 Subscription 的形态
+      unsub = function () {
+        try {
+          var s = sub && ((sub.data && sub.data.subscription) || sub);
+          if (s && s.unsubscribe) s.unsubscribe();
+        } catch (e) { /* 忽略 */ }
+      };
+      // 轮询兜底：会话在订阅建立前已存在（如 setSession 失败但 detectSessionInUrl 已完成），或事件未触发
+      timer = setInterval(function () {
         var s = client.auth.getSession();
         var session = s && s.data && s.data.session;
-        if (session || Date.now() - start > timeoutMs) {
-          clearInterval(timer);
-          resolve(session || null);
-        }
-      }, 150);
+        if (session || Date.now() - start > timeoutMs) done(session);
+      }, 200);
     });
   }
 
