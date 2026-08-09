@@ -156,6 +156,9 @@ body[data-mood="storm"]::after {
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
+  /* 周围渐隐：地图边缘径向淡出，融入页面背景（仅桌面端展示，移动端 display:none） */
+  -webkit-mask-image: radial-gradient(ellipse 70% 64% at 50% 50%, #000 52%, transparent 76%);
+  mask-image: radial-gradient(ellipse 70% 64% at 50% 50%, #000 52%, transparent 76%);
 }
 .region-map-svg {
   position: absolute;
@@ -188,27 +191,25 @@ body[data-mood="storm"]::after {
   cursor: zoom-out;
 }
 .region-shape {
-  fill: rgba(125, 180, 255, .10);
-  stroke: rgba(195, 222, 255, .55);
-  stroke-width: .35;
+  fill: rgba(125, 180, 255, .08);
+  stroke: rgba(205, 228, 255, .45);
+  stroke-width: .2;
   stroke-linejoin: round;
 }
-/* 目的地光点：全部目的地小点，当前选中大点 + 呼吸 + 名称标签（由 js/region-map.js 生成） */
-.map-dot { fill: rgba(170, 212, 255, .85); transition: fill .3s ease; }
-.map-dot.current { fill: #ffd27a; animation: dot-breathe 2.4s ease-in-out infinite; }
+/* 目的地光点：全部目的地小点，当前选中大点 + 呼吸 + 名称标签（由 js/region-map.js 生成）；
+   白色细描边让光点在浅色地图/背景上仍清晰 */
+.map-dot { fill: rgba(176, 216, 255, .9); stroke: rgba(255, 255, 255, .35); stroke-width: .1; transition: fill .3s ease; }
+.map-dot.current { fill: #ffd27a; stroke: rgba(255, 242, 205, .65); animation: dot-breathe 2.4s ease-in-out infinite; }
 .map-dot-label { fill: rgba(255, 255, 255, .92); font-weight: 700; letter-spacing: .02em; paint-order: stroke; stroke: rgba(10, 20, 36, .55); stroke-width: .55; }
 @keyframes dot-breathe {
   0%, 100% { opacity: 1; }
   50% { opacity: .55; }
 }
 @media (max-width: 760px) {
-  /* 移动端：地图居中偏内（避免被推出屏幕右缘），退为弱背景水印 */
-  .region-map-svg { left: 50%; right: auto; height: 46vh; opacity: .5 !important; transform: translate(-50%, -50%); }
-  .region-map-svg.active { opacity: .5 !important; transform: translate(-50%, -50%); }
-  /* 定位视图同样居中，保留放大过渡 */
-  .region-map-detail { transform: translate(-50%, -50%) scale(1.3); }
-  .region-map-detail.active { transform: translate(-50%, -50%) scale(1); }
-  .map-dot-label { display: none; }
+  /* 移动端不做任何地图展示：彻底隐藏（微信/夸克弱机加载提速、零地图渲染开销） */
+  #region-map { display: none; }
+  /* 移动端暂停背景漂移动画（sun-drift/cloud-drift/wind-sweep 等），降低低端机 GPU 负担 */
+  body::before, body::after { animation: none !important; }
 }
 
 /* ---- 减弱动态偏好：关闭动效，仅保留必要指示 ---- */
@@ -232,7 +233,9 @@ button { font: inherit; }
   -webkit-backdrop-filter: blur(10px);
   /* 顶栏底色明显提亮（比内容区亮两级，深蓝玻璃） */
   background: rgba(58, 80, 120, .85);
+  overflow-x: clip; /* 窄屏（微信/夸克内置浏览器）防子项溢出产生横向滚动 */
 }
+html, body { overflow-x: hidden; }
 /* 顶栏内容容器：全宽 header 内居中限宽，任意窗口宽度自适应 */
 .site-header-inner {
   width: min(100% - 24px, 1180px);
@@ -247,10 +250,10 @@ button { font: inherit; }
   border-radius: 50%; background: linear-gradient(135deg, #6ea8ff, #3f7fe0); color: #fff; font-size: 15px;
   box-shadow: 0 4px 14px rgba(80, 140, 240, .4);
 }
-/* 区域切换按钮：顶栏左上角 brand 旁（玻璃胶囊，与小红书链接同款视觉） */
+/* 区域切换按钮：顶栏左上角 brand 旁（玻璃胶囊，与小红书链接同款视觉；与 xhs-link 统一胶囊高度） */
 .region-toggle {
   order: 0; display: inline-flex; align-items: center;
-  padding: 5px 12px; border-radius: 99px; cursor: pointer; white-space: nowrap;
+  min-height: 34px; padding: 0 12px; border-radius: 99px; cursor: pointer; white-space: nowrap;
   border: 1px solid rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .06);
   color: rgba(226, 233, 240, .92); font-size: 12px; font-weight: 700; font-family: inherit;
   box-shadow: var(--glass-highlight);
@@ -335,7 +338,7 @@ button { font: inherit; }
 /* 小红书主页链接（官方 logo 图 + 深色玻璃胶囊，红色 logo 自带品牌色；桌面端 order 2 靠右，移动端 order 1 紧随 logo） */
 .xhs-link {
   order: 2; display: inline-flex; align-items: center; gap: 8px;
-  padding: 6px 13px 6px 7px; border-radius: 99px; text-decoration: none; white-space: nowrap;
+  min-height: 34px; padding: 0 13px 0 7px; border-radius: 99px; text-decoration: none; white-space: nowrap;
   background: rgba(255, 255, 255, .06);
   color: rgba(226, 233, 240, .92); font-size: 12.5px; font-weight: 700;
   border: 1px solid rgba(255, 255, 255, .16);
@@ -917,13 +920,15 @@ button { font: inherit; }
   .site-header { min-height: 62px; }
   .site-header-inner { gap: 10px; }
   /* 移动端布局对齐参考站：左 logo + 小红书，右汉堡；中间胶囊隐藏 */
-  .xhs-link { order: 1; padding: 5px 10px 5px 6px; }
+  .xhs-link { order: 1; padding: 0 10px 0 5px; min-height: 30px; }
+  /* 移动端隐藏「我的小红书」文字，只留 logo + 品牌字（窄屏不挤占汉堡空间） */
+  .xhs-sub { display: none; }
   /* 移动端区域切换按钮缩小，保持左上角「品牌 + 切换」紧凑布局 */
-  .region-toggle { padding: 4px 9px; font-size: 11px; }
-  /* 移动端保留小红书 logo（18px）与「海南旅行天气判断」「我的小红书」文字 */
+  .region-toggle { padding: 0 9px; font-size: 11px; min-height: 30px; }
+  /* 移动端保留小红书 logo（18px）与「海南旅行天气判断」文字 */
   .xhs-logo { display: block; height: 18px; }
   .header-center { display: none; }
-  .hamburger-btn { margin-left: auto; }
+  .hamburger-btn { margin-left: auto; flex-shrink: 0; }
   .intro { padding: 44px 0 26px; gap: 22px; }
   .intro h1 { font-size: 54px; }
   /* 移动端标题去标点：居中两行无标点，重心更正 */
@@ -954,16 +959,17 @@ button { font: inherit; }
   .section-heading h2 { font-size: 26px; }
 }
 
-/* 超窄屏：隐藏 eyebrow 两侧横线，避免挤压换行 */
+/* 超窄屏（≤420px，含微信/夸克内置浏览器 320px 视口）：小红书只留 logo 胶囊，确保汉堡可见 */
 @media (max-width: 420px) {
   .eyebrow-line { display: none; }
   .eyebrow { gap: 0; }
+  .xhs-brand { display: none; }
+  .xhs-link { padding: 0 8px 0 5px; gap: 0; }
 }
 
 /* 超窄屏头部：保留完整小红书文字（logo 已隐藏，空间足够） */
 @media (max-width: 380px) {
-  .xhs-brand { display: none; }
-  .xhs-link { padding: 5px 10px 5px 8px; }
+  .xhs-link { padding: 0 8px 0 5px; }
 }
 
 /* ---- 地图选点（高德 JS API） ---- */
