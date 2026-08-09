@@ -187,29 +187,18 @@ button { font: inherit; }
 .forecast-date small, .forecast-probability small { color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
 /* 中部账户入口：三栏布局的中间栏（flex 居中；桌面端 order 1 居中，移动端隐藏） */
 .header-center { order: 1; flex: 1; display: flex; justify-content: center; position: relative; min-width: 0; padding: 0 8px; }
-.account-wrap { position: relative; min-width: 0; }
-/* 昵称截断：窄屏只显示部分 */
-#account-label { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* 等级徽章：FREE 中性灰 / PRO 暖金 / ULTRA 紫渐变 */
-.plan-badge {
-  display: inline-block; margin-left: 7px; padding: 1px 7px; border-radius: 6px;
-  font-size: 10px; font-weight: 800; letter-spacing: .08em; line-height: 1.6;
-  flex-shrink: 0;
-}
-.plan-badge.free { background: rgba(160, 170, 180, .16); color: #aab4c0; border: 1px solid rgba(160, 170, 180, .3); }
-.plan-badge.pro { background: rgba(240, 180, 90, .16); color: #f0b45a; border: 1px solid rgba(240, 180, 90, .4); }
-.plan-badge.ultra { background: linear-gradient(135deg, rgba(183, 156, 255, .24), rgba(140, 110, 255, .2)); color: #cbb9ff; border: 1px solid rgba(183, 156, 255, .45); }
-/* 账户面板：body 层 fixed 定位（桌面端居中于视口顶部，对齐中间按钮；移动端右侧抽屉） */
+/* 账户面板：统一右侧抽屉（桌面端与移动端一致），毛玻璃暖金视觉 */
 .account-panel {
-  position: fixed; top: 86px; left: 50%; transform: translateX(-50%);
-  z-index: 60; width: 300px; padding: 16px;
+  position: fixed; top: 0; right: 0; bottom: 0; left: auto;
+  z-index: 60; width: 320px; max-width: 86vw; height: 100%;
+  padding: 20px 16px; overflow-y: auto;
   background: rgba(255, 255, 255, .08);
   backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  border: 1px solid rgba(255, 255, 255, .14); border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, .14); border-radius: 16px 0 0 16px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, .3);
-  animation: panel-in .18s ease;
+  animation: drawer-in .22s ease;
 }
-@keyframes panel-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes drawer-in { from { transform: translateX(100%); } to { transform: none; } }
 .panel-head {
   display: flex; align-items: center; justify-content: space-between;
   padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, .1);
@@ -258,26 +247,16 @@ button { font: inherit; }
 /* 移动端抽屉遮罩（桌面端不显示） */
 .panel-mask { display: none; position: fixed; inset: 0; z-index: 55; background: rgba(0, 0, 0, .45); }
 .panel-mask.show { display: block; }
-/* 移动端汉堡入口（桌面端隐藏） */
+/* 汉堡入口（桌面端与移动端均显示，order 3 贴最右） */
 .hamburger-btn {
-  order: 3; display: none; align-items: center; justify-content: center;
+  order: 3; display: inline-flex; align-items: center; justify-content: center;
   width: 38px; height: 38px; border-radius: 10px; cursor: pointer;
   border: 1px solid rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .06);
   color: rgba(226, 233, 240, .92);
   transition: transform .18s ease, filter .18s ease, border-color .18s ease;
 }
 .hamburger-btn:hover { filter: brightness(1.1); border-color: rgba(255, 255, 255, .3); }
-/* 账户/登录入口：与小红书按钮同款玻璃胶囊，风格统一（现为 button 元素） */
-.auth-entry {
-  display: inline-flex; align-items: center;
-  padding: 6px 14px; border-radius: 99px; text-decoration: none; white-space: nowrap;
-  background: rgba(255, 255, 255, .06);
-  color: rgba(226, 233, 240, .92); font-size: 12.5px; font-weight: 700;
-  border: 1px solid rgba(255, 255, 255, .16);
-  box-shadow: var(--glass-highlight);
-  transition: transform .18s ease, filter .18s ease, border-color .18s ease;
-  font-family: inherit; cursor: pointer; line-height: 1.5;
-}
+/* 账户/登录入口样式已移除（桌面与移动端统一为右上汉堡） */
 /* 小红书主页链接（官方 logo 图 + 深色玻璃胶囊，红色 logo 自带品牌色；桌面端 order 2 靠右，移动端 order 1 紧随 logo） */
 .xhs-link {
   order: 2; display: inline-flex; align-items: center; gap: 8px;
@@ -292,8 +271,8 @@ button { font: inherit; }
 .xhs-sep { width: 1px; height: 13px; background: rgba(255, 255, 255, .22); }
 .xhs-sub { font-weight: 700; color: #fff; font-size: 13px; }
 .xhs-logo { height: 21px; width: auto; border-radius: 5px; display: block; }
-.auth-entry:hover, .xhs-link:hover { filter: brightness(1.1); transform: translateY(-1px); border-color: rgba(255, 255, 255, .3); }
-.auth-entry:focus-visible, .xhs-link:focus-visible { outline: 2px solid rgba(255, 255, 255, .7); outline-offset: 2px; }
+.xhs-link:hover { filter: brightness(1.1); transform: translateY(-1px); border-color: rgba(255, 255, 255, .3); }
+.xhs-link:focus-visible { outline: 2px solid rgba(255, 255, 255, .7); outline-offset: 2px; }
 
 /* ---- 首屏标语（大屏两栏铺开：左标题右说明，整体居中；窄屏回落单栏居中） ---- */
 .intro {
@@ -359,9 +338,12 @@ button { font: inherit; }
 .dest-list, .days-group { display: flex; flex-wrap: wrap; gap: 6px; }
 .dest-btn, .days-btn {
   min-height: 34px; padding: 6px 10px; border: 1px solid transparent; border-radius: var(--r-sm);
-  background: transparent; color: rgba(222, 230, 238, .75); cursor: pointer; font-size: 13px;
+  background: transparent; cursor: pointer; font-size: 13px;
   transition: background .18s ease, border-color .18s ease, color .18s ease;
 }
+/* 地点未选中纯白：保证部分晴天背景下可读性（天数按钮保持原灰白） */
+.dest-btn { color: rgba(255, 255, 255, .96); }
+.days-btn { color: rgba(222, 230, 238, .75); }
 .dest-btn:hover, .days-btn:hover, .dest-btn:focus-visible, .days-btn:focus-visible { border-color: rgba(125, 180, 255, .55); outline: none; background: rgba(125, 180, 255, .08); }
 .dest-btn.active, .days-btn.active { background: rgba(238, 242, 246, .94); color: #101c2c; font-weight: 700; }
 /* 登录门槛：未登录时 14 天按钮点击 toast 提示（不再禁用，样式保留 aria-disabled 无视觉差异） */
@@ -859,17 +841,7 @@ button { font: inherit; }
   /* 移动端保留小红书 logo（18px）与「海南旅行天气判断」「我的小红书」文字 */
   .xhs-logo { display: block; height: 18px; }
   .header-center { display: none; }
-  .hamburger-btn { display: inline-flex; margin-left: auto; }
-  /* 右侧滑出抽屉（覆盖桌面 fixed 居中定位） */
-  .account-panel {
-    position: fixed; top: 0; right: 0; bottom: 0; left: auto;
-    transform: none;
-    width: 320px; max-width: 86vw; height: 100%;
-    border-radius: 16px 0 0 16px; padding: 20px 16px;
-    overflow-y: auto;
-    animation: drawer-in .22s ease;
-  }
-  @keyframes drawer-in { from { transform: translateX(100%); } to { transform: none; } }
+  .hamburger-btn { margin-left: auto; }
   .intro { padding: 44px 0 26px; gap: 22px; }
   .intro h1 { font-size: 54px; }
   /* 移动端标题去标点：居中两行无标点，重心更正 */
@@ -898,12 +870,6 @@ button { font: inherit; }
   .forecast-detail b { font-size: 14px; }
   .forecast-detail p { font-size: 12px; }
   .section-heading h2 { font-size: 26px; }
-}
-
-/* 桌面端：中间登录按钮横向加宽（高度与两侧胶囊一致，仅加宽） */
-@media (min-width: 561px) {
-  .header-center .auth-entry { min-width: 190px; justify-content: center; padding: 6px 36px; }
-  #account-label { max-width: 210px; }
 }
 
 /* 超窄屏：隐藏 eyebrow 两侧横线，避免挤压换行 */
