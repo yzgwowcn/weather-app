@@ -1,5 +1,10 @@
 # 更新日志
 
+## v1.22.1（2026-08-09）
+
+### 修复
+- **高德 SDK 日志上报 400 报错**：JS API 2.0 初始化/错误日志经 `serviceHost` 发送到 `/_AMapService/v3/log/*`，原先不在 `api/amap.mjs` 的 `ALLOWED_PATHS` 白名单 → 代理返回 `400 INVALID_PATH`，DevTools 报「no data found for resource with given identifier」（功能不受影响，纯报错噪音）。已放行 `v3/log/init` 与 `v3/log/error`（轻量免费无配额风险），沿用服务端 `jscode` 注入；线上实测带 Origin 请求返回 200 并透传上游响应
+
 ## v1.22（2026-08-09）
 
 ### 修复
