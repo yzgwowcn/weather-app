@@ -167,6 +167,8 @@ button { font: inherit; }
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  /* 顶栏底色提亮：与内容区拉开层次（半透明深蓝玻璃） */
+  background: rgba(34, 48, 76, .78);
 }
 .brand { order: 0; color: var(--ink); text-decoration: none; font-size: 19px; font-weight: 800; letter-spacing: -.06em; }
 .brand-mark {
@@ -190,10 +192,10 @@ button { font: inherit; }
 .plan-badge.free { background: rgba(160, 170, 180, .16); color: #aab4c0; border: 1px solid rgba(160, 170, 180, .3); }
 .plan-badge.pro { background: rgba(240, 180, 90, .16); color: #f0b45a; border: 1px solid rgba(240, 180, 90, .4); }
 .plan-badge.ultra { background: linear-gradient(135deg, rgba(183, 156, 255, .24), rgba(140, 110, 255, .2)); color: #cbb9ff; border: 1px solid rgba(183, 156, 255, .45); }
-/* 账户下拉面板：毛玻璃暖金视觉，与登录页 auth-card 同源 */
+/* 账户面板：body 层 fixed 定位（桌面端居中于视口顶部，对齐中间按钮；移动端右侧抽屉） */
 .account-panel {
-  position: absolute; top: calc(100% + 10px); right: 0; z-index: 60;
-  width: 300px; padding: 16px;
+  position: fixed; top: 86px; left: 50%; transform: translateX(-50%);
+  z-index: 60; width: 300px; padding: 16px;
   background: rgba(255, 255, 255, .08);
   backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
   border: 1px solid rgba(255, 255, 255, .14); border-radius: 16px;
@@ -846,14 +848,14 @@ button { font: inherit; }
   .site-header { min-height: 62px; gap: 10px; }
   /* 移动端布局对齐参考站：左 logo + 小红书，右汉堡；中间胶囊隐藏 */
   .xhs-link { order: 1; padding: 5px 10px 5px 6px; }
-  .xhs-logo { height: 18px; }
-  /* 窄屏只留 logo + 「我的小红书」，品牌名收进下一层 */
-  .xhs-brand, .xhs-sep { display: none; }
+  /* 移动端移除小红书 logo 图，保留「海南旅行天气判断」与「我的小红书」文字 */
+  .xhs-logo { display: none; }
   .header-center { display: none; }
   .hamburger-btn { display: inline-flex; margin-left: auto; }
-  /* 右侧滑出抽屉 */
+  /* 右侧滑出抽屉（覆盖桌面 fixed 居中定位） */
   .account-panel {
     position: fixed; top: 0; right: 0; bottom: 0; left: auto;
+    transform: none;
     width: 320px; max-width: 86vw; height: 100%;
     border-radius: 16px 0 0 16px; padding: 20px 16px;
     overflow-y: auto;
@@ -902,10 +904,10 @@ button { font: inherit; }
   .eyebrow { gap: 0; }
 }
 
-/* 超窄屏头部：小红书按钮只留 logo 圆形胶囊 */
+/* 超窄屏头部：保留完整小红书文字（logo 已隐藏，空间足够） */
 @media (max-width: 380px) {
-  .xhs-sub { display: none; }
-  .xhs-link { padding: 5px 6px 5px 5px; }
+  .xhs-brand { display: none; }
+  .xhs-link { padding: 5px 10px 5px 8px; }
 }
 
 /* ---- 地图选点（高德 JS API） ---- */

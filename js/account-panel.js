@@ -96,13 +96,13 @@
   function openPanel() {
     panel.classList.remove('hidden');
     setExpanded(true);
-    if (mask) mask.classList.add('show');
+    if (mask) { mask.classList.remove('hidden'); mask.classList.add('show'); }
     renderPanel();
   }
   function closePanel() {
     panel.classList.add('hidden');
     setExpanded(false);
-    if (mask) mask.classList.remove('show');
+    if (mask) { mask.classList.add('hidden'); mask.classList.remove('show'); }
   }
 
   // 保存偏好（默认城市 / 温度单位），成功后通知首页
@@ -133,10 +133,10 @@
   btn.addEventListener('click', togglePanel);
   if (hamburger) hamburger.addEventListener('click', togglePanel);
   if (panelClose) panelClose.addEventListener('click', closePanel);
-  // 点击面板外关闭（含移动端遮罩）
+  // 点击面板外关闭（面板已移出 wrap，需同时排除面板本体与汉堡）
   document.addEventListener('click', function (e) {
     if (panel.classList.contains('hidden')) return;
-    if (!wrap.contains(e.target) && !(hamburger && hamburger.contains(e.target))) closePanel();
+    if (!wrap.contains(e.target) && !panel.contains(e.target) && !(hamburger && hamburger.contains(e.target))) closePanel();
   });
   citySelect.addEventListener('change', savePrefs);
   tempSelect.addEventListener('change', savePrefs);

@@ -63,12 +63,15 @@
     }
   }
 
-  // ---- 默认城市：登录用户设置过默认城市后，进入网站自动选中并查询 ----
+  // ---- 默认城市：登录用户设置过默认城市后，进入网站自动选中并查询（auth 异步就绪后经 auth-change 触发） ----
+  let defaultCityApplied = false;
   function applyDefaultCity() {
+    if (defaultCityApplied) return;
     if (!isLoggedIn()) return;
     window.User.getPreferences().then(function (r) {
-      if (!r.ok || !r.preferences || !r.preferences.default_city) return;
+      if (!r.ok || !r.preferences || !r.preferences.default_city) { defaultCityApplied = true; return; }
       const dest = DESTINATIONS.find((d) => d.id === r.preferences.default_city);
+      defaultCityApplied = true;
       if (!dest) return;
       state.dest = dest;
       renderDestButtons();
@@ -363,8 +366,11 @@
     renderDestButtons();
     applyDayAccess();
     applyDefaultCity();
-    // 登录状态变化（登录/退出）时动态刷新 14 天门槛
-    document.addEventListener('auth-change', applyDayAccess);
+    // 登录状态变化（登录/退出）：刷新 14 天门槛；登录后应用默认城市（auth.js 异步初始化完成后触发）
+    document.addEventListener('auth-change', function (e) {
+      applyDayAccess();
+      if (e.detail && e.detail.user) applyDefaultCity();
+    });
     // 设置面板保存默认城市后：立即切换目的地并重新查询
     document.addEventListener('pref-saved', (e) => {
       const city = e.detail && e.detail.default_city;
