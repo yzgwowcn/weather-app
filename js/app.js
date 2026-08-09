@@ -44,7 +44,7 @@
     el._timer = setTimeout(() => el.classList.remove('visible'), 2600);
   }
 
-  // ---- 登录门槛：未登录仅可查 3/7 天，登录后才解锁 14 天（纯前端产品引导，Auth 由 auth.js 提供） ----
+  // ---- 登录门槛：未登录仅可查 3/7 天，点击 14 天时 toast 提示登录（不再禁用，保证点击可感知） ----
   function isLoggedIn() {
     return !!(window.Auth && window.Auth.isReady && window.Auth.isReady() && window.Auth.getUser());
   }
@@ -52,7 +52,6 @@
     const loggedIn = isLoggedIn();
     daysGroupEl.querySelectorAll('.days-btn').forEach((button) => {
       if (Number(button.dataset.days) >= 14) {
-        button.disabled = !loggedIn;
         button.title = loggedIn ? '' : '登录后可查看 14 天预报';
         button.setAttribute('aria-disabled', String(!loggedIn));
       }
@@ -62,6 +61,19 @@
       state.days = 7;
       daysGroupEl.querySelectorAll('.days-btn').forEach((item) => item.classList.toggle('active', Number(item.dataset.days) === 7));
     }
+  }
+
+  // ---- 默认城市：登录用户设置过默认城市后，进入网站自动选中并查询 ----
+  function applyDefaultCity() {
+    if (!isLoggedIn()) return;
+    window.User.getPreferences().then(function (r) {
+      if (!r.ok || !r.preferences || !r.preferences.default_city) return;
+      const dest = DESTINATIONS.find((d) => d.id === r.preferences.default_city);
+      if (!dest) return;
+      state.dest = dest;
+      renderDestButtons();
+      query();
+    });
   }
 
   function dateStr(offsetDays) {
@@ -350,9 +362,25 @@
   function init() {
     renderDestButtons();
     applyDayAccess();
+    applyDefaultCity();
     // 登录状态变化（登录/退出）时动态刷新 14 天门槛
     document.addEventListener('auth-change', applyDayAccess);
+    // 设置面板保存默认城市后：立即切换目的地并重新查询
+    document.addEventListener('pref-saved', (e) => {
+      const city = e.detail && e.detail.default_city;
+      if (!city) return;
+      const dest = DESTINATIONS.find((d) => d.id === city);
+      if (!dest) return;
+      state.dest = dest;
+      renderDestButtons();
+      query();
+    });
     daysGroupEl.querySelectorAll('.days-btn').forEach((button) => button.addEventListener('click', () => {
+      // 登录门槛：未登录点击 14 天 → toast 提示，不切换
+      if (Number(button.dataset.days) >= 14 && !isLoggedIn()) {
+        toast('登录后可查看 14 天预报');
+        return;
+      }
       state.days = Number(button.dataset.days);
       daysGroupEl.querySelectorAll('.days-btn').forEach((item) => item.classList.toggle('active', item === button));
     }));

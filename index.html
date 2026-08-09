@@ -14,8 +14,40 @@
   <div class="page-shell">
     <header class="site-header">
       <a class="brand" href="#top" aria-label="晴海首页"><span class="brand-mark">◐</span>晴海</a>
+      <!-- 中部：账户入口（未登录=登录；已登录=昵称+等级徽章，点击展开账户/设置面板） -->
+      <div class="header-center">
+        <div class="account-wrap" id="account-wrap">
+          <button type="button" class="auth-entry" id="account-btn" aria-haspopup="true" aria-expanded="false">
+            <span id="account-label">登录</span>
+            <span id="account-badge" class="plan-badge hidden" aria-hidden="true">FREE</span>
+          </button>
+          <div id="account-panel" class="account-panel hidden" role="dialog" aria-label="账户与设置">
+            <div class="panel-section">
+              <div class="panel-row"><span class="k">邮箱</span><span class="v" id="panel-email">—</span></div>
+              <div class="panel-row"><span class="k">用户名</span><span class="v" id="panel-username">—</span></div>
+              <div class="panel-row"><span class="k">等级</span><span class="v" id="panel-plan">—</span></div>
+            </div>
+            <div class="panel-section">
+              <div class="panel-row panel-col">
+                <label class="k" for="panel-city">默认城市</label>
+                <select id="panel-city" class="panel-select">
+                  <option value="">未设置</option>
+                </select>
+              </div>
+              <div class="panel-row panel-col">
+                <label class="k" for="panel-temp">温度单位</label>
+                <select id="panel-temp" class="panel-select">
+                  <option value="celsius">摄氏度 ℃</option>
+                  <option value="fahrenheit">华氏度 ℉</option>
+                </select>
+              </div>
+              <p class="panel-hint" id="panel-hint" role="status"></p>
+            </div>
+            <button type="button" class="panel-btn" id="panel-logout">退出登录</button>
+          </div>
+        </div>
+      </div>
       <div class="header-right">
-        <a id="auth-entry" class="auth-entry" href="auth.html">登录</a>
         <a class="xhs-link" href="https://xhslink.cn/m/4BS8N8iCK3F" target="_blank" rel="noopener" aria-label="我的小红书主页 · 海南旅行天气判断">
           <img class="xhs-logo" src="assets/xhs-logo.png" alt="" width="205" height="96" aria-hidden="true">
           <span class="xhs-brand">海南旅行天气判断</span>
@@ -129,19 +161,7 @@
   <script src="vendor/supabase.min.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/user.js"></script>
-  <script>
-    // 登录状态驱动头部入口（登录 → 我的账户；未登录 → 登录）
-    (function () {
-      var el = document.getElementById('auth-entry');
-      if (!el || typeof Auth === 'undefined') return;
-      function update(user) {
-        if (user) { el.textContent = '我的账户'; el.href = 'account.html'; }
-        else { el.textContent = '登录'; el.href = 'auth.html'; }
-      }
-      document.addEventListener('auth-change', function (e) { update(e.detail && e.detail.user); });
-      update(Auth.getUser());
-    })();
-  </script>
+  <script src="js/account-panel.js"></script>
   <script>
     // 收藏功能：收藏当前选中位置 + 我的收藏列表（登录态联动）
     (function () {

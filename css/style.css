@@ -177,7 +177,52 @@ button { font: inherit; }
 .field-label, .section-kicker, .metric-tile span, .forecast-detail span,
 .forecast-date small, .forecast-probability small { color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
 .header-right { display: flex; align-items: center; gap: 16px; }
-/* 账户/登录入口：与小红书按钮同款玻璃胶囊，风格统一 */
+/* 中部账户入口：三栏布局的中间栏（flex 居中） */
+.header-center { flex: 1; display: flex; justify-content: center; position: relative; min-width: 0; padding: 0 8px; }
+.account-wrap { position: relative; min-width: 0; }
+/* 昵称截断：窄屏只显示部分 */
+#account-label { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 等级徽章：FREE 中性灰 / PRO 暖金 / ULTRA 紫渐变 */
+.plan-badge {
+  display: inline-block; margin-left: 7px; padding: 1px 7px; border-radius: 6px;
+  font-size: 10px; font-weight: 800; letter-spacing: .08em; line-height: 1.6;
+  flex-shrink: 0;
+}
+.plan-badge.free { background: rgba(160, 170, 180, .16); color: #aab4c0; border: 1px solid rgba(160, 170, 180, .3); }
+.plan-badge.pro { background: rgba(240, 180, 90, .16); color: #f0b45a; border: 1px solid rgba(240, 180, 90, .4); }
+.plan-badge.ultra { background: linear-gradient(135deg, rgba(183, 156, 255, .24), rgba(140, 110, 255, .2)); color: #cbb9ff; border: 1px solid rgba(183, 156, 255, .45); }
+/* 账户下拉面板 */
+.account-panel {
+  position: absolute; top: calc(100% + 10px); right: 0; z-index: 60;
+  width: 300px; padding: 14px;
+  background: rgba(16, 26, 40, .94); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, .14); border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .45);
+}
+.panel-section { padding: 4px 0 12px; }
+.panel-section + .panel-section { border-top: 1px solid rgba(255, 255, 255, .09); padding-top: 12px; }
+.panel-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 13px; }
+.panel-row .k { opacity: .72; flex-shrink: 0; }
+.panel-row .v { word-break: break-all; text-align: right; }
+.panel-col { flex-direction: column; gap: 5px; }
+.panel-col .k { font-size: 12px; }
+.panel-select {
+  width: 100%; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .2); background: rgba(0, 0, 0, .28); color: inherit; font-size: 13px;
+  font-family: inherit;
+}
+.panel-select:focus { outline: none; border-color: rgba(255, 255, 255, .5); }
+.panel-hint { min-height: 16px; margin: 6px 0 0; font-size: 12px; opacity: .75; }
+.panel-hint.ok { color: #8fd6a0; }
+.panel-hint.error { color: #ff8f8f; }
+.panel-btn {
+  width: 100%; padding: 9px 0; margin-top: 4px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .2); border-radius: 8px;
+  background: rgba(255, 255, 255, .07); color: inherit; font-size: 13px; font-family: inherit;
+}
+.panel-btn:hover { background: rgba(255, 255, 255, .13); }
+.panel-btn.danger { color: #ffb3ac; border-color: rgba(255, 143, 135, .35); }
+/* 账户/登录入口：与小红书按钮同款玻璃胶囊，风格统一（现为 button 元素） */
 .auth-entry {
   display: inline-flex; align-items: center;
   padding: 6px 14px; border-radius: 99px; text-decoration: none; white-space: nowrap;
@@ -186,6 +231,7 @@ button { font: inherit; }
   border: 1px solid rgba(255, 255, 255, .16);
   box-shadow: var(--glass-highlight);
   transition: transform .18s ease, filter .18s ease, border-color .18s ease;
+  font-family: inherit; cursor: pointer; line-height: 1.5;
 }
 /* 小红书主页链接（官方 logo 图 + 深色玻璃胶囊，红色 logo 自带品牌色） */
 .xhs-link {
@@ -273,9 +319,7 @@ button { font: inherit; }
 }
 .dest-btn:hover, .days-btn:hover, .dest-btn:focus-visible, .days-btn:focus-visible { border-color: rgba(125, 180, 255, .55); outline: none; background: rgba(125, 180, 255, .08); }
 .dest-btn.active, .days-btn.active { background: rgba(238, 242, 246, .94); color: #101c2c; font-weight: 700; }
-/* 登录门槛：未登录时 14 天按钮禁用（登录后可解锁） */
-.days-btn:disabled { opacity: .45; cursor: not-allowed; }
-.days-btn:disabled:hover, .days-btn:disabled:focus-visible { border-color: transparent; background: transparent; }
+/* 登录门槛：未登录时 14 天按钮点击 toast 提示（不再禁用，样式保留 aria-disabled 无视觉差异） */
 .dest-tag { margin-left: 5px; color: inherit; font-size: 10px; opacity: .78; }
 /* 自定义地点按钮：绿色强调，区别于预设暖金色 */
 .dest-btn.custom { border-color: rgba(111, 216, 180, .45); color: var(--green); }
@@ -766,6 +810,12 @@ button { font: inherit; }
   .site-header { min-height: 62px; }
   .header-right { gap: 8px; }
   .auth-entry { padding: 5px 11px; }
+  #account-label { max-width: 72px; }
+  /* 账户面板窄屏全宽下拉，避免溢出 */
+  .account-panel {
+    position: fixed; left: 12px; right: 12px; top: 68px; width: auto;
+    max-height: calc(100vh - 84px); overflow-y: auto;
+  }
   .xhs-link { padding: 5px 10px 5px 6px; }
   .xhs-logo { height: 18px; }
   /* 窄屏只留 logo + 「我的小红书」，品牌名收进下一层 */
