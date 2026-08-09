@@ -1,5 +1,15 @@
 # 更新日志
 
+## v1.20（2026-08-09）
+
+### 变更
+- **用户设置新增「默认区域」**：账户面板可设置默认区域（未设置默认海南省 / 海南省 / 四川省），保存后**下次进入/登录自动切换**到所选区域（偏好优先于 localStorage 记忆；未设置则维持现状——localStorage 记忆上次手动切换，首访默认海南）；保存提示「下次进入/登录时自动切换」
+- **数据库迁移 `supabase/migrations/005_user_preferences_default_region.sql`**：`user_preferences` 新增 `default_region` 列 + CHECK 白名单（`NULL`/`hainan`/`sichuan`），RLS 四策略与 GRANT 原样不动（列继承表级权限，无提权面）；**需在 Supabase Dashboard → SQL Editor 手动执行本文件**
+- **地图选点视角随区域**：四川模式打开地图默认成都居中（zoom 7 可见全省），海南模式维持三亚视角；已打开过的地图实例在区域切换后自动调整视角
+- **区域-城市偏好联动**：设置面板修改默认区域时「默认城市」下拉即时重建为对应区域城市，原选中城市跨区域不存在时自动回落「未设置」，避免「区域=四川、城市=海南」不一致偏好
+- **安全加固**：`default_region` 仅接受字符串 `hainan`/`sichuan`（前端白名单 + 数据库 CHECK 双保险）；`default_city` 增加类型与 50 字长度上限防垃圾数据入库；偏好应用置位标志前置到请求发出前，阻断 init/auth-change 重复请求与在途回调覆盖用户显式切换
+- 新增 `tests/user-plan.test.js` 用例：`default_region` 非法值拒绝 / 合法值入库与 null 清除 / 读取透传
+
 ## v1.19（2026-08-09）
 
 ### 变更

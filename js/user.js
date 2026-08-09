@@ -160,7 +160,7 @@
     if (!user) return { ok: false, message: '未登录' };
     var { data, error } = await client
       .from('user_preferences')
-      .select('default_city, temp_unit, travel_prefs, updated_at')
+      .select('default_region, default_city, temp_unit, travel_prefs, updated_at')
       .eq('user_id', user.id)
       .maybeSingle();
     if (error) return { ok: false, message: error.message };
@@ -175,8 +175,25 @@
     if (!user) return { ok: false, message: '未登录' };
     if (!prefs || typeof prefs !== 'object') return { ok: false, message: '偏好数据无效' };
     var patch = {};
+    if ('default_region' in prefs) {
+      // 默认区域白名单：null 清除；仅字符串 hainan / sichuan 合法（与数据库 CHECK 约束一致，双保险）
+      if (prefs.default_region == null) {
+        patch.default_region = null;
+      } else if (typeof prefs.default_region !== 'string' || (prefs.default_region !== 'hainan' && prefs.default_region !== 'sichuan')) {
+        return { ok: false, message: '默认区域无效' };
+      } else {
+        patch.default_region = prefs.default_region;
+      }
+    }
     if ('default_city' in prefs) {
-      patch.default_city = prefs.default_city == null ? null : String(prefs.default_city);
+      // 默认城市：null 清除；仅接受有限长度字符串，防垃圾数据入库（有效 ID 由下游按当前区域查表兜底）
+      if (prefs.default_city == null) {
+        patch.default_city = null;
+      } else if (typeof prefs.default_city !== 'string' || prefs.default_city.length > 50) {
+        return { ok: false, message: '默认城市无效' };
+      } else {
+        patch.default_city = prefs.default_city;
+      }
     }
     if ('temp_unit' in prefs) {
       var tu = String(prefs.temp_unit);

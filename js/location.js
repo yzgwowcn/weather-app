@@ -169,14 +169,36 @@ const Location = (() => {
   let mapSearchItems = [];
   let satelliteLayer = null;
   let roadNetLayer = null;
+  let mapViewRegion = null; // 当前地图视角所属区域（区域切换后复用实例时调整视角）
+
+  // 地图默认视角随区域：hainan 与历史一致；sichuan 成都居中、zoom 7 可见全省
+  const REGION_MAP_CENTER = {
+    hainan: { center: [109.5, 19.0], zoom: 8 },
+    sichuan: { center: [104.06, 30.57], zoom: 7 },
+  };
+  function currentMapView() {
+    const region = (typeof CURRENT_REGION !== 'undefined' && CURRENT_REGION) || 'hainan';
+    return REGION_MAP_CENTER[region] || REGION_MAP_CENTER.hainan;
+  }
 
   function initMap(containerEl, callbacks = {}) {
     if (!isAMapReady()) return { ok: false, reason: 'AMap 未加载' };
-    if (mapInstance) return { ok: true, map: mapInstance }; // 已初始化过则复用
+    const view = currentMapView();
+    const region = (typeof CURRENT_REGION !== 'undefined' && CURRENT_REGION) || 'hainan';
+    if (mapInstance) {
+      // 已初始化过：区域切换后再次打开，视角随区域调整（不重建实例，保留用户已有交互状态）
+      if (mapViewRegion !== region) {
+        mapInstance.setCenter(view.center);
+        mapInstance.setZoom(view.zoom);
+        mapViewRegion = region;
+      }
+      return { ok: true, map: mapInstance };
+    }
     mapCallbacks = callbacks;
+    mapViewRegion = region;
     mapInstance = new AMap.Map(containerEl, {
-      center: [109.5, 19.0],
-      zoom: 8,
+      center: view.center,
+      zoom: view.zoom,
       viewMode: '2D',
     });
     // 点击地图放置选点 Marker（GCJ-02 展示坐标 → WGS84 请求坐标）
@@ -318,6 +340,10 @@ const Location = (() => {
     mapMarker = null;
     mapPick = null;
     mapCallbacks = null;
+    mapViewRegion = null;
+    satelliteLayer = null;
+    roadNetLayer = null;
+    mapSearchBound = false;
     if (mapInstance) { mapInstance.destroy(); mapInstance = null; }
   }
 

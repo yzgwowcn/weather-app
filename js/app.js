@@ -70,8 +70,8 @@
     if (next === state.region || !REGIONS[next]) return;
     state.region = next;
     CURRENT_REGION = next;
-    // 切换即显式进入该区域默认状态：阻止在途 applyDefaultCity 异步回调覆盖目的地（竞态防护）
-    defaultCityApplied = true;
+    // 切换即显式进入该区域默认状态：阻止在途偏好回调覆盖目的地（竞态防护）
+    savedPrefsApplied = true;
     try { localStorage.setItem(REGION_STORAGE_KEY, next); } catch (e) { /* 存储不可用：仅本次会话生效 */ }
     // 切换后进入该区域默认目的地（成都·市区 / 三亚·亚龙湾），清除自定义选点
     state.dest = REGIONS[next][0];
@@ -116,19 +116,36 @@
     }
   }
 
-  // ---- 默认城市：登录用户设置过默认城市后，进入网站自动选中并查询（auth 异步就绪后经 auth-change 触发） ----
-  let defaultCityApplied = false;
-  function applyDefaultCity() {
-    if (defaultCityApplied) return;
+  // ---- 登录偏好：默认区域 + 默认城市（auth 异步就绪后经 auth-change 触发）----
+  // 优先级：偏好区域 > localStorage 记忆；偏好未设置时保持现状（未设置即默认海南省）
+  let savedPrefsApplied = false;
+  function applySavedPrefs() {
+    if (savedPrefsApplied) return;
     if (!isLoggedIn()) return;
+    savedPrefsApplied = true; // 在请求发出前置位：无论成败只应用一次，同时阻断 init/auth-change 重复请求与在途回调覆盖显式切换
     window.User.getPreferences().then(function (r) {
-      if (!r.ok || !r.preferences || !r.preferences.default_city) { defaultCityApplied = true; return; }
+      if (!r.ok || !r.preferences) return;
+      let changed = false;
+      const region = r.preferences.default_region;
+      if ((region === 'hainan' || region === 'sichuan') && region !== state.region) {
+        state.region = region;
+        CURRENT_REGION = region;
+        try { localStorage.setItem(REGION_STORAGE_KEY, region); } catch (e) { /* 存储不可用：仅本次生效 */ }
+        state.dest = REGIONS[region][0];
+        state.customDest = null;
+        applyRegionTexts();
+        changed = true;
+      }
       const dest = currentDestinations().find((d) => d.id === r.preferences.default_city);
-      defaultCityApplied = true;
-      if (!dest) return;
-      state.dest = dest;
-      renderDestButtons();
-      query();
+      if (dest && dest.id !== state.dest.id) {
+        state.dest = dest;
+        changed = true;
+      }
+      if (changed) {
+        renderDestButtons();
+        document.dispatchEvent(new CustomEvent('region-change', { detail: { region: state.region } }));
+        query();
+      }
     });
   }
 
@@ -424,11 +441,11 @@
     applyRegionTexts();
     renderDestButtons();
     applyDayAccess();
-    applyDefaultCity();
-    // 登录状态变化（登录/退出）：刷新 14 天门槛；登录后应用默认城市（auth.js 异步初始化完成后触发）
+    applySavedPrefs();
+    // 登录状态变化（登录/退出）：刷新 14 天门槛；登录后应用默认区域与默认城市（auth.js 异步初始化完成后触发）
     document.addEventListener('auth-change', function (e) {
       applyDayAccess();
-      if (e.detail && e.detail.user) applyDefaultCity();
+      if (e.detail && e.detail.user) applySavedPrefs();
     });
     // 设置面板保存默认城市后：立即切换目的地并重新查询
     document.addEventListener('pref-saved', (e) => {

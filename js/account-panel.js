@@ -11,6 +11,7 @@
   var userEl = document.getElementById('panel-user');
   var panelClose = document.getElementById('panel-close');
   var citySelect = document.getElementById('panel-city');
+  var regionSelect = document.getElementById('panel-region');
   var tempSelect = document.getElementById('panel-temp');
   var hint = document.getElementById('panel-hint');
   if (!hamburger || !panel) return;
@@ -57,6 +58,7 @@
     window.User.getPreferences().then(function (r) {
       if (!isLoggedIn()) return;
       var prefs = r.ok ? r.preferences : null;
+      if (regionSelect) regionSelect.value = (prefs && prefs.default_region) ? prefs.default_region : '';
       citySelect.value = (prefs && prefs.default_city) ? prefs.default_city : '';
       tempSelect.value = (prefs && prefs.temp_unit) ? prefs.temp_unit : 'celsius';
     });
@@ -76,11 +78,13 @@
     if (mask) { mask.classList.add('hidden'); mask.classList.remove('show'); }
   }
 
-  // 保存偏好（默认城市 / 温度单位），成功后通知首页
+  // 保存偏好（默认区域 / 默认城市 / 温度单位），成功后通知首页
+  // 默认区域按需求「下次进入/登入自动切换」：本次会话不立即切换，仅入库
   function savePrefs() {
     hint.className = 'panel-hint';
     hint.textContent = '';
     window.User.savePreferences({
+      default_region: regionSelect ? (regionSelect.value || null) : undefined,
       default_city: citySelect.value || null,
       temp_unit: tempSelect.value,
     }).then(function (r) {
@@ -90,8 +94,13 @@
         return;
       }
       hint.className = 'panel-hint ok';
-      hint.textContent = '已保存';
-      document.dispatchEvent(new CustomEvent('pref-saved', { detail: { default_city: citySelect.value || '' } }));
+      hint.textContent = (regionSelect && regionSelect.value) ? '已保存，默认区域将在下次进入/登录时自动切换' : '已保存';
+      document.dispatchEvent(new CustomEvent('pref-saved', {
+        detail: {
+          default_city: citySelect.value || '',
+          default_region: regionSelect ? (regionSelect.value || '') : '',
+        },
+      }));
     });
   }
 
@@ -107,6 +116,14 @@
     if (!panel.contains(e.target) && !hamburger.contains(e.target)) closePanel();
   });
   citySelect.addEventListener('change', savePrefs);
+  // 默认区域变更：立即重建城市下拉为所选区域（未设置→当前会话区域），避免「区域=四川、城市=海南」不一致偏好；
+  // 原选中城市在新区域不存在时自动回落「未设置」，随后一并保存
+  if (regionSelect) regionSelect.addEventListener('change', function () {
+    var prev = citySelect.value;
+    fillCityOptions(regionSelect.value || undefined);
+    citySelect.value = prev;
+    savePrefs();
+  });
   tempSelect.addEventListener('change', savePrefs);
   document.getElementById('panel-logout').addEventListener('click', function () {
     window.Auth.signOut().then(closePanel);
@@ -114,10 +131,11 @@
   // 登录/退出状态变化：收起面板（内容在下次展开时重新渲染）
   document.addEventListener('auth-change', closePanel);
 
-  // 默认城市下拉：填充当前区域预设目的地（区域切换后重建，保留原选中值）
-  function fillCityOptions() {
+  // 默认城市下拉：填充指定区域（缺省用当前会话区域）的预设目的地；区域切换后重建，保留原选中值
+  function fillCityOptions(region) {
+    var r = region || ((typeof CURRENT_REGION !== 'undefined' && CURRENT_REGION) || 'hainan');
     citySelect.innerHTML = '<option value="">未设置</option>';
-    var list = (typeof REGIONS !== 'undefined' && CURRENT_REGION && REGIONS[CURRENT_REGION]) ? REGIONS[CURRENT_REGION] : [];
+    var list = (typeof REGIONS !== 'undefined' && REGIONS[r]) ? REGIONS[r] : [];
     list.forEach(function (d) {
       var opt = document.createElement('option');
       opt.value = d.id;

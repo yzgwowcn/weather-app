@@ -76,6 +76,56 @@ t('pro 无 pro_expires_at → 视为已过期', function () {
 });
 
 // ---- savePreferences 校验与 upsert ----
+t('default_region 非法值被拒（不触库）', async function () {
+  mockUser = { id: 'u1' };
+  mockClient = { from: function () { throw new Error('不应触库'); } };
+  const r = await User.savePreferences({ default_region: 'beijing' });
+  assert.strictEqual(r.ok, false);
+  assert.ok(r.message.indexOf('默认区域无效') !== -1, r.message);
+});
+t('default_region 合法值走 upsert 且 null 可清除', async function () {
+  mockUser = { id: 'u1' };
+  let rows = [];
+  mockClient = {
+    from: function (t) {
+      assert.strictEqual(t, 'user_preferences');
+      return {
+        upsert: function (row, opts) { rows.push({ row: row, opts: opts }); return Promise.resolve({ error: null }); },
+      };
+    },
+  };
+  let r = await User.savePreferences({ default_region: 'sichuan', default_city: 'chengdu' });
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(rows[0].row.default_region, 'sichuan');
+  assert.strictEqual(rows[0].row.default_city, 'chengdu');
+  assert.strictEqual(rows[0].opts.onConflict, 'user_id');
+  r = await User.savePreferences({ default_region: null });
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(rows[1].row.default_region, null);
+});
+t('getPreferences 透传 default_region', async function () {
+  mockUser = { id: 'u1' };
+  let table = null;
+  mockClient = {
+    from: function (t) {
+      table = t;
+      return {
+        select: function () { return this; },
+        eq: function () { return this; },
+        maybeSingle: function () {
+          return Promise.resolve({
+            data: { default_region: 'sichuan', default_city: 'chengdu', temp_unit: 'celsius', travel_prefs: {}, updated_at: '2026-08-09T00:00:00Z' },
+            error: null,
+          });
+        },
+      };
+    },
+  };
+  const r = await User.getPreferences();
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(table, 'user_preferences');
+  assert.strictEqual(r.preferences.default_region, 'sichuan');
+});
 t('temp_unit 非法值被拒（不触库）', async function () {
   mockUser = { id: 'u1' };
   mockClient = { from: function () { throw new Error('不应触库'); } };
