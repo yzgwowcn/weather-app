@@ -5,10 +5,15 @@
   'use strict';
 
   var btn = document.getElementById('account-btn');
+  var hamburger = document.getElementById('account-hamburger');
+  var mask = document.getElementById('panel-mask');
   var label = document.getElementById('account-label');
   var badge = document.getElementById('account-badge');
   var panel = document.getElementById('account-panel');
   var wrap = document.getElementById('account-wrap');
+  var guestEl = document.getElementById('panel-guest');
+  var userEl = document.getElementById('panel-user');
+  var panelClose = document.getElementById('panel-close');
   var citySelect = document.getElementById('panel-city');
   var tempSelect = document.getElementById('panel-temp');
   var hint = document.getElementById('panel-hint');
@@ -57,10 +62,13 @@
     });
   }
 
-  // 渲染面板内容（详情 + 偏好当前值）
+  // 渲染面板内容：未登录显示登录引导，已登录显示详情 + 设置
   function renderPanel() {
+    var loggedIn = isLoggedIn();
+    guestEl.classList.toggle('hidden', loggedIn);
+    userEl.classList.toggle('hidden', !loggedIn);
+    if (!loggedIn) return;
     var user = window.Auth.getUser();
-    if (!user) return;
     document.getElementById('panel-email').textContent = user.email || '—';
     document.getElementById('panel-username').textContent = '—';
     document.getElementById('panel-plan').textContent = '—';
@@ -80,14 +88,21 @@
     hint.textContent = '';
   }
 
+  function setExpanded(expanded) {
+    btn.setAttribute('aria-expanded', String(expanded));
+    if (hamburger) hamburger.setAttribute('aria-expanded', String(expanded));
+  }
+
   function openPanel() {
     panel.classList.remove('hidden');
-    btn.setAttribute('aria-expanded', 'true');
+    setExpanded(true);
+    if (mask) mask.classList.add('show');
     renderPanel();
   }
   function closePanel() {
     panel.classList.add('hidden');
-    btn.setAttribute('aria-expanded', 'false');
+    setExpanded(false);
+    if (mask) mask.classList.remove('show');
   }
 
   // 保存偏好（默认城市 / 温度单位），成功后通知首页
@@ -111,14 +126,17 @@
   }
 
   // ---- 事件 ----
-  btn.addEventListener('click', function () {
-    if (!isLoggedIn()) { window.location.href = 'auth.html'; return; }
+  // 桌面「登录/昵称」与移动端汉堡统一：未登录也展开面板（登录引导），不再直接跳转
+  function togglePanel() {
     if (panel.classList.contains('hidden')) openPanel(); else closePanel();
-  });
-  // 点击面板外关闭
+  }
+  btn.addEventListener('click', togglePanel);
+  if (hamburger) hamburger.addEventListener('click', togglePanel);
+  if (panelClose) panelClose.addEventListener('click', closePanel);
+  // 点击面板外关闭（含移动端遮罩）
   document.addEventListener('click', function (e) {
     if (panel.classList.contains('hidden')) return;
-    if (!wrap.contains(e.target)) closePanel();
+    if (!wrap.contains(e.target) && !(hamburger && hamburger.contains(e.target))) closePanel();
   });
   citySelect.addEventListener('change', savePrefs);
   tempSelect.addEventListener('change', savePrefs);
