@@ -108,6 +108,9 @@
   async function handleSearchInput() {
     const q = searchInputEl.value.trim();
     if (!q) { closeSearchResults(); return; }
+    // 请求发出前先给出反馈（防抖 + 网络请求期间），避免界面看起来"没反应"
+    searchResultsEl.innerHTML = '<li class="search-empty">搜索中…</li>';
+    searchResultsEl.classList.remove('hidden');
     const results = await Location.searchPlaces(q); // 防抖集中在 Location 层
     if (searchInputEl.value.trim() !== q) return; // 过期响应不再覆盖新输入与结果
     searchItems = results;

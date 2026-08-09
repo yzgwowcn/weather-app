@@ -1,5 +1,6 @@
 // 地点服务层：地名搜索、逆地理编码、坐标工具与海南范围判断。
-// 第一步：Photon（已有）搜索 + 手动坐标；第二步：高德 JS API 增强（AutoComplete/Geocoder/Geolocation）。
+// 地名搜索：高德 inputtips（Vercel 部署时经 /_AMapService 代理）优先 + Photon 兜底；
+// 地图选点/逆地理/定位走高德 JS API（AMap.AutoComplete/Geocoder/Geolocation）。
 // 纯函数部分可在 Node 测试中直接加载（不依赖 DOM / AMap）。
 const Location = (() => {
   'use strict';
@@ -34,7 +35,17 @@ const Location = (() => {
       searchTimer = setTimeout(async () => {
         try {
           const results = await API.searchLocation(q);
-          resolve(results.map((item) => ({ ...item, inHainan: isInHainan(item.lat, item.lon) })));
+          resolve(results.map((item) => {
+            // 高德通道返回 GCJ-02 坐标，统一换算为 WGS84（Photon 已是 WGS84）
+            let lat = item.lat;
+            let lon = item.lon;
+            if (item.gcj) {
+              const [wgsLon, wgsLat] = gcj02ToWgs84(lon, lat);
+              lat = wgsLat;
+              lon = wgsLon;
+            }
+            return { ...item, lat, lon, inHainan: isInHainan(lat, lon) };
+          }));
         } catch {
           resolve([]);
         }
@@ -204,11 +215,11 @@ const Location = (() => {
     setMapPick(gcjLng, gcjLat);
   }
 
-  // 地图内搜索：AMap.AutoComplete 联想（内部完成认证，无额外签名）
+  // 地图内搜索：AMap.AutoComplete 联想（内部完成认证，无额外签名；全国范围，选中后地图自动定位）
   function bindMapSearch(inputEl) {
     if (!isAMapReady()) return null;
     if (mapSearchAuto) return mapSearchAuto;
-    mapSearchAuto = new AMap.AutoComplete({ city: '海南', input: inputEl });
+    mapSearchAuto = new AMap.AutoComplete({ input: inputEl }); // 不带 city 即全国搜索
     mapSearchAuto.on('select', (e) => {
       const loc = e.poi?.location;
       if (loc) focusMapPick(loc.lng, loc.lat);

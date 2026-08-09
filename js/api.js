@@ -111,20 +111,53 @@ const API = (() => {
     const meta = MODEL_META[id];
     return safeRequest(`https://api.open-meteo.com/data/${meta.name}/static/meta.json`, meta.name, signal);
   }
-  // 地名搜索（Photon / OpenStreetMap）：返回 [{ name, region, lat, lon }]
-  // 注意 Photon 坐标顺序为 [lng, lat]；查询失败或为空时返回空数组，不抛错。
+  // ---- 地名搜索（高德 inputtips 优先，Photon 兜底）----
+  // 高德通道：经 /_AMapService 代理（Vercel 部署时可用），国内节点快、中文地名全；
+  //           key 未注入（本地开发）或代理失败/超时 → 返回 null 交给调用方回退。
+  //          高德坐标为 GCJ-02，条目带 gcj: true，由 Location 层统一换算为 WGS84。
+  // Photon 通道：photon.komoot.io（OSM 全球地名），坐标顺序 [lng, lat]，返回 WGS84（gcj: false）。
+  // 查询失败或为空时返回空数组/空列表，不抛错。
+  const SEARCH_TIMEOUT_MS = 8000; // 单通道 8s 超时，避免网络挂起时界面长时间无响应
+  function fetchJsonWithTimeout(url, ms) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    return getJSON(url, controller.signal).finally(() => clearTimeout(timer));
+  }
+  function amapKeyReady() {
+    return typeof AMAP_CONFIG !== 'undefined' && AMAP_CONFIG.key
+      && String(AMAP_CONFIG.key).indexOf('__AMAP_') !== 0; // 占位符未注入视为不可用
+  }
+  async function searchLocationAmap(q) {
+    if (!amapKeyReady()) return null;
+    const url = `/_AMapService/v3/assistant/inputtips?${query({ key: AMAP_CONFIG.key, keywords: q, datatype: 'all', limit: 8 })}`;
+    const data = await fetchJsonWithTimeout(url, SEARCH_TIMEOUT_MS);
+    if (!data || data.status !== '1' || !Array.isArray(data.tips)) return null;
+    return data.tips.map((tip) => {
+      const [lon, lat] = String(tip.location || '').split(',').map(Number);
+      const city = Array.isArray(tip.city) ? tip.city[0] : (tip.city || '');
+      const region = [city, tip.district].filter(Boolean).join(' · ');
+      return { name: tip.name || '', region, lat, lon, gcj: true };
+    }).filter((item) => item.name && Number.isFinite(item.lat) && Number.isFinite(item.lon));
+  }
+  async function searchLocationPhoton(q) {
+    const url = `https://photon.komoot.io/api/?${query({ q: q, limit: 5 })}`;
+    const data = await fetchJsonWithTimeout(url, SEARCH_TIMEOUT_MS);
+    return (data.features || []).map((feature) => {
+      const p = feature.properties || {};
+      const [lon, lat] = feature.geometry?.coordinates || [null, null];
+      const region = [p.state, p.country].filter(Boolean).join(' · ');
+      return { name: p.name || '', region, lat, lon, gcj: false };
+    }).filter((item) => item.name && Number.isFinite(item.lat) && Number.isFinite(item.lon));
+  }
   async function searchLocation(q) {
     const trimmed = String(q || '').trim();
     if (!trimmed) return [];
     try {
-      const url = `https://photon.komoot.io/api/?${query({ q: trimmed, limit: 5 })}`;
-      const data = await getJSON(url);
-      return (data.features || []).map((feature) => {
-        const p = feature.properties || {};
-        const [lon, lat] = feature.geometry?.coordinates || [null, null];
-        const region = [p.state, p.country].filter(Boolean).join(' · ');
-        return { name: p.name || '', region, lat, lon };
-      }).filter((item) => item.name && Number.isFinite(item.lat) && Number.isFinite(item.lon));
+      const amapResults = await searchLocationAmap(trimmed);
+      if (amapResults) return amapResults; // 高德成功（含空结果）即采用
+    } catch { /* 代理不可用/超时/异常：回退 Photon */ }
+    try {
+      return await searchLocationPhoton(trimmed);
     } catch {
       return [];
     }
