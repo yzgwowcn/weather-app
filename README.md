@@ -163,13 +163,13 @@ Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `packa
 - 注册流程：邮箱 + 密码（可选用户名）→ Turnstile 人机验证 → `supabase.auth.signUp()` 发送验证码邮件（**已开启邮箱确认**，未确认用户无法登录）→ 页面切到第二步输入邮件中的验证码 → `verifyOtp` 验证通过即登录；找回密码仍走邮件链接。
 - 注册表单带 Turnstile：前端拿到 token → `POST /api/verify-turnstile`（Vercel Function 用服务端 Secret Key 调 Cloudflare siteverify）→ 通过后才执行 `supabase.auth.signUp()`；Secret Key 不出现在任何静态文件或日志。
 - 未配置环境变量时（本地开发），认证入口按钮保留但表单禁用并提示"认证服务未配置"，不影响天气查询等既有功能。
-- 数据安全：所有用户表开启 **RLS** 并按 `user_id = auth.uid()` 配置策略，anon key 才可安全暴露于前端。
+- 数据安全：所有用户表开启 **RLS** 并按 `user_id = auth.uid()` 配置策略；`profiles` 进一步使用列级权限，仅允许登录用户写入 `username`，会员等级、有效期与额度只能由可信服务端管理。anon key 才可安全暴露于前端。
 - 管理端聚合视图 `user_favorites_view` 已迁至非 API 暴露的 `_admin` schema 并以 `security_invoker` 语义重建，**仅 `service_role` 可查**（SQL Editor 可直接 `SELECT * FROM _admin.user_favorites_view;`）；历史问题：public 下的旧视图曾因被误授 anon/authenticated 权限而可绕过 RLS 泄露全部用户邮箱/收藏，修复详见 `supabase/migrations/004_fix_user_favorites_view_security.sql`（003 已废弃，勿再执行）。
 
 ### ④ 用户数据表（profiles / favorites，已在 Supabase 建好）
 
 - `profiles`：用户名（注册时可选填，账户页可修改）；`favorites`：收藏位置（名称 + 坐标 + 是否高德坐标）。
-- 两张表均开启 RLS，按 `user_id = auth.uid()` 隔离，用户只能读写自己的行；`username_taken` RPC 做用户名占用检查。
+- 两张表均开启 RLS，按 `user_id = auth.uid()` 隔离；`profiles` 的登录用户写权限仅限 `username`，不能自行修改会员等级、有效期或额度；`username_taken` RPC 做用户名占用检查。
 - 读写封装在 `js/user.js`（`window.User`）：`getProfile / setUsername / listFavorites / addFavorite / removeFavorite`；收藏项点击即设为当前目的地并查询。
 
 ### ⑤ 验证码注册 · Supabase 控制台配置清单（一次性）

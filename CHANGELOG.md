@@ -1,5 +1,15 @@
 # 更新日志
 
+## v1.23.1（2026-08-10）
+
+### 安全修复
+- **阻止普通用户自行修改会员等级与额度**：新增 `supabase/migrations/006_lock_profile_entitlements.sql`，撤销 `profiles` 对 anon 的全部访问；authenticated 仅保留读取、插入 `user_id/username` 和更新 `username`，无法再通过 Data API 写入 `plan`、会员有效期、`ai_quota` 或 `ai_used`
+- **纵深防御**：新增 `_admin.guard_profile_entitlements` 更新触发器，即使后续误恢复宽泛表权限，anon/authenticated 篡改权益字段仍会以 `42501` 拒绝；service_role 与注册建档触发器不受影响
+- 新增 `tests/profile-permissions.test.js`，锁定 profiles 最小列权限、权益字段触发器和 service_role 管理权限，防止后续 migration 回退安全边界
+
+### 文档
+- 新增 `DEEPSEEK_REMEDIATION_PLAN.md`，记录 CAPTCHA、密码策略、函数权限、RLS 性能、最小授权、移动端界面与自动化测试的后续落地步骤
+
 ## v1.23（2026-08-09）
 
 ### 修复
