@@ -44,6 +44,26 @@
     el._timer = setTimeout(() => el.classList.remove('visible'), 2600);
   }
 
+  // ---- 登录门槛：未登录仅可查 3/7 天，登录后才解锁 14 天（纯前端产品引导，Auth 由 auth.js 提供） ----
+  function isLoggedIn() {
+    return !!(window.Auth && window.Auth.isReady && window.Auth.isReady() && window.Auth.getUser());
+  }
+  function applyDayAccess() {
+    const loggedIn = isLoggedIn();
+    daysGroupEl.querySelectorAll('.days-btn').forEach((button) => {
+      if (Number(button.dataset.days) >= 14) {
+        button.disabled = !loggedIn;
+        button.title = loggedIn ? '' : '登录后可查看 14 天预报';
+        button.setAttribute('aria-disabled', String(!loggedIn));
+      }
+    });
+    // 异常状态防御：未登录时若选中 14 天则强制回退 7 天
+    if (!loggedIn && state.days >= 14) {
+      state.days = 7;
+      daysGroupEl.querySelectorAll('.days-btn').forEach((item) => item.classList.toggle('active', Number(item.dataset.days) === 7));
+    }
+  }
+
   function dateStr(offsetDays) {
     const date = new Date();
     date.setDate(date.getDate() + offsetDays);
@@ -301,6 +321,11 @@
     Location.focusMapPick(pos.lng_gcj, pos.lat_gcj, 12);
   }
   async function query() {
+    // 登录门槛守卫：未登录时 14 天请求强制回退 7 天
+    if (!isLoggedIn() && state.days >= 14) {
+      state.days = 7;
+      applyDayAccess();
+    }
     const start = dateStr(0);
     const end = dateStr(state.days - 1);
     const seq = ++requestSeq;
@@ -324,6 +349,9 @@
   }
   function init() {
     renderDestButtons();
+    applyDayAccess();
+    // 登录状态变化（登录/退出）时动态刷新 14 天门槛
+    document.addEventListener('auth-change', applyDayAccess);
     daysGroupEl.querySelectorAll('.days-btn').forEach((button) => button.addEventListener('click', () => {
       state.days = Number(button.dataset.days);
       daysGroupEl.querySelectorAll('.days-btn').forEach((item) => item.classList.toggle('active', item === button));

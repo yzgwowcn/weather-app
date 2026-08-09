@@ -62,6 +62,7 @@
         <h2 style="margin:0 0 16px;font-size:18px;">我的账户</h2>
         <div class="account-row"><span class="k">邮箱</span><span class="v" id="acc-email">—</span></div>
         <div class="account-row"><span class="k">用户名</span><span class="v" id="acc-username">—</span></div>
+        <div class="account-row"><span class="k">当前等级</span><span class="v" id="acc-plan">—</span></div>
         <div class="account-row"><span class="k">账户 ID（UID）</span><span class="v" id="acc-uid" style="font-family:monospace;">—</span></div>
         <div class="uname-edit" id="uname-edit">
           <label for="uname-input">用户名（2-20 位中文/字母/数字/下划线）</label>
@@ -90,6 +91,13 @@
         msgEl.className = 'auth-msg' + (isError ? ' error' : '');
       }
 
+      function fmtDate(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        var p = function (n) { return (n < 10 ? '0' : '') + n; };
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+      }
+
       var usernameEl = document.getElementById('acc-username');
       var unameEdit = document.getElementById('uname-edit');
       var unameInput = document.getElementById('uname-input');
@@ -113,9 +121,9 @@
         document.getElementById('acc-email').textContent = user.email || '—';
         document.getElementById('acc-uid').textContent = user.id;
 
-        // 加载用户名
+        // 加载用户名（profile 行存在但 username 为 null 时也视为未设置）
         var profile = await User.getProfile();
-        if (profile.ok && profile.profile) {
+        if (profile.ok && profile.profile && profile.profile.username) {
           usernameEl.textContent = profile.profile.username;
           unameInput.value = profile.profile.username;
         } else {
@@ -124,6 +132,17 @@
         }
         usernameEl.innerHTML += ' <button type="button" class="link-btn" id="uname-edit-btn">修改</button>';
         document.getElementById('uname-edit-btn').addEventListener('click', showUnameEdit);
+
+        // 当前等级（三档：免费版 / Pro / Ultra；过期显示「已过期」）
+        var status = User.getPlanStatus(profile.ok ? profile.profile : null);
+        var PLAN_LABEL = { free: '免费版', pro: 'Pro', ultra: 'Ultra' };
+        var planText = PLAN_LABEL[status.plan] || '免费版';
+        if (status.plan === 'pro' || status.plan === 'ultra') {
+          planText += ' · 至 ' + fmtDate(status.proExpiresAt);
+        } else if (status.expired) {
+          planText = '免费版（' + (PLAN_LABEL[status.rawPlan] || '') + ' 已过期）';
+        }
+        document.getElementById('acc-plan').textContent = planText;
 
         // 保存用户名
         document.getElementById('uname-save').addEventListener('click', async function () {

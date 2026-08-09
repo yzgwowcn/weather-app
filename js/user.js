@@ -28,7 +28,7 @@
     if (!user) return { ok: false, message: '未登录' };
     var { data, error } = await client
       .from('profiles')
-      .select('username, created_at')
+      .select('username, created_at, plan, pro_started_at, pro_expires_at, ai_quota, ai_used')
       .eq('user_id', user.id)
       .maybeSingle();
     if (error) return { ok: false, message: error.message };
@@ -129,11 +129,83 @@
     return { ok: true };
   }
 
+  // ---- 等级 / 会员状态 ----
+  // 三档位：free / pro / ultra。pro 与 ultra 需在 pro_expires_at 有效期内才算生效，
+  // 过期自动按免费处理；rawPlan 保留原始档位、expired 标记过期状态，供页面展示「已过期」。
+  function getPlanStatus(profile) {
+    var plan = (profile && profile.plan) || 'free';
+    var rawPlan = plan;
+    var expired = false;
+    // 未知档位兜底为 free（rawPlan 保留原始值便于排查）
+    if (plan !== 'free' && plan !== 'pro' && plan !== 'ultra') plan = 'free';
+    var expiresAt = profile && profile.pro_expires_at ? new Date(profile.pro_expires_at) : null;
+    if ((plan === 'pro' || plan === 'ultra') && (!expiresAt || expiresAt.getTime() <= Date.now())) {
+      expired = true;
+      plan = 'free';
+    }
+    return {
+      plan: plan,
+      rawPlan: rawPlan,
+      expired: expired,
+      proExpiresAt: profile ? (profile.pro_expires_at || null) : null,
+    };
+  }
+
+  // ---- 用户偏好 ----
+  // 读取偏好（无记录返回 preferences: null）
+  async function getPreferences() {
+    var client = sb();
+    var user = currentUser();
+    if (!client) return { ok: false, message: '认证服务未配置' };
+    if (!user) return { ok: false, message: '未登录' };
+    var { data, error } = await client
+      .from('user_preferences')
+      .select('default_city, temp_unit, travel_prefs, updated_at')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (error) return { ok: false, message: error.message };
+    return { ok: true, preferences: data || null };
+  }
+
+  // 保存偏好（部分更新，upsert 自动建行；RLS 保证只能写自己的行）
+  async function savePreferences(prefs) {
+    var client = sb();
+    var user = currentUser();
+    if (!client) return { ok: false, message: '认证服务未配置' };
+    if (!user) return { ok: false, message: '未登录' };
+    if (!prefs || typeof prefs !== 'object') return { ok: false, message: '偏好数据无效' };
+    var patch = {};
+    if ('default_city' in prefs) {
+      patch.default_city = prefs.default_city == null ? null : String(prefs.default_city);
+    }
+    if ('temp_unit' in prefs) {
+      var tu = String(prefs.temp_unit);
+      if (tu !== 'celsius' && tu !== 'fahrenheit') return { ok: false, message: '温度单位无效' };
+      patch.temp_unit = tu;
+    }
+    if ('travel_prefs' in prefs) {
+      if (typeof prefs.travel_prefs !== 'object' || prefs.travel_prefs === null || Array.isArray(prefs.travel_prefs)) {
+        return { ok: false, message: '出行偏好数据无效' };
+      }
+      patch.travel_prefs = prefs.travel_prefs;
+    }
+    if (!Object.keys(patch).length) return { ok: true };
+    patch.updated_at = new Date().toISOString();
+    var { error } = await client
+      .from('user_preferences')
+      .upsert(Object.assign({ user_id: user.id }, patch), { onConflict: 'user_id' });
+    if (error) return { ok: false, message: error.message };
+    return { ok: true };
+  }
+
   window.User = {
     isValidUsername: isValidUsername,
     getProfile: getProfile,
     isUsernameTaken: isUsernameTaken,
     setUsername: setUsername,
+    getPlanStatus: getPlanStatus,
+    getPreferences: getPreferences,
+    savePreferences: savePreferences,
     listFavorites: listFavorites,
     addFavorite: addFavorite,
     removeFavorite: removeFavorite,
