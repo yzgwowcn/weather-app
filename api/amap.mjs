@@ -18,6 +18,8 @@ const ALLOWED_PATHS = new Set([
   'v3/place/around',          // 周边搜索
   'v3/geolocation',           // 定位（Geolocation）
   'v3/ip',                    // IP 定位兜底
+  'v3/log/init',              // SDK 初始化日志上报（JS API 2.0 经 serviceHost 发送，轻量无配额风险）
+  'v3/log/error',             // SDK 错误日志上报（同上）
 ]);
 // 未配置 ALLOWED_ORIGINS 时只警告一次，避免刷日志（部署后建议在 Vercel 配置该环境变量）
 let warnedOrigin = false;
