@@ -1,16 +1,32 @@
-// 地点服务层：地名搜索、逆地理编码、坐标工具与海南范围判断。
+// 地点服务层：地名搜索、逆地理编码、坐标工具与区域（海南/四川）范围判断。
 // 地名搜索：高德 inputtips（Vercel 部署时经 /_AMapService 代理）优先 + Photon 兜底；
 // 地图选点/逆地理/定位走高德 JS API（AMap.AutoComplete/Geocoder/Geolocation）。
-// 纯函数部分可在 Node 测试中直接加载（不依赖 DOM / AMap）。
+// 纯函数部分可在 Node 测试中直接加载（不依赖 DOM / AMap）；REGION_TEXTS / CURRENT_REGION
+// 仅在渲染函数体内引用（惰性求值），Node 测试不触碰这些路径。
 const Location = (() => {
   'use strict';
 
   const HAINAN_BOX = { latMin: 18.1, latMax: 20.1, lonMin: 108.6, lonMax: 111.0 };
+  // 四川省大致外接矩形（最南攀枝花 ~26.0°N，最北若尔盖 ~34.3°N，最西石渠 ~97.3°E，最东邻水 ~108.5°E）
+  const SICHUAN_BOX = { latMin: 26.0, latMax: 34.5, lonMin: 97.2, lonMax: 108.7 };
 
   function isInHainan(lat, lon) {
     return Number.isFinite(lat) && Number.isFinite(lon)
       && lat >= HAINAN_BOX.latMin && lat <= HAINAN_BOX.latMax
       && lon >= HAINAN_BOX.lonMin && lon <= HAINAN_BOX.lonMax;
+  }
+
+  function isInSichuan(lat, lon) {
+    return Number.isFinite(lat) && Number.isFinite(lon)
+      && lat >= SICHUAN_BOX.latMin && lat <= SICHUAN_BOX.latMax
+      && lon >= SICHUAN_BOX.lonMin && lon <= SICHUAN_BOX.lonMax;
+  }
+
+  // 坐标所属区域：'hainan' | 'sichuan' | null（两框不重叠，先后顺序无影响）
+  function regionOf(lat, lon) {
+    if (isInHainan(lat, lon)) return 'hainan';
+    if (isInSichuan(lat, lon)) return 'sichuan';
+    return null;
   }
 
   function formatCoordName(lat, lon) {
@@ -44,7 +60,7 @@ const Location = (() => {
               lat = wgsLat;
               lon = wgsLon;
             }
-            return { ...item, lat, lon, inHainan: isInHainan(lat, lon) };
+            return { ...item, lat, lon, inHainan: isInHainan(lat, lon), inRegion: regionOf(lat, lon) };
           }));
         } catch {
           resolve([]);
@@ -233,7 +249,7 @@ const Location = (() => {
         <span class="search-item-name">${escapeHtml(item.name)}</span>
         ${item.region ? `<span class="search-item-region">${escapeHtml(item.region)}</span>` : ''}
         <span class="search-item-coord">${coordLabel(item.lat, item.lon)}</span>
-        ${item.inHainan ? '' : '<span class="search-item-tag">⚠ 非海南</span>'}
+        ${item.inRegion === CURRENT_REGION ? '' : `<span class="search-item-tag">${REGION_TEXTS[CURRENT_REGION].regionTag}</span>`}
       </li>`).join('');
     resultsEl.classList.remove('hidden');
   }
@@ -309,6 +325,8 @@ const Location = (() => {
     searchPlaces,
     reverseGeocode,
     isInHainan,
+    isInSichuan,
+    regionOf,
     formatCoordName,
     coordLabel,
     gcj02ToWgs84,

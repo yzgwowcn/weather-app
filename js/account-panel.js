@@ -1,6 +1,6 @@
 // 账户面板：右上角汉堡入口 → 右侧抽屉（账户详情：邮箱/用户名/等级；设置：默认城市、温度单位；退出登录）
 // 桌面端与移动端统一入口与交互；未登录展开显示登录引导。
-// 依赖：js/auth.js（window.Auth）、js/user.js（window.User）、js/config.js（DESTINATIONS）
+// 依赖：js/auth.js（window.Auth）、js/user.js（window.User）、js/config.js（REGIONS/CURRENT_REGION）
 (function () {
   'use strict';
 
@@ -114,13 +114,22 @@
   // 登录/退出状态变化：收起面板（内容在下次展开时重新渲染）
   document.addEventListener('auth-change', closePanel);
 
-  // 默认城市下拉：填充预设目的地
-  if (typeof DESTINATIONS !== 'undefined' && DESTINATIONS.length) {
-    DESTINATIONS.forEach(function (d) {
+  // 默认城市下拉：填充当前区域预设目的地（区域切换后重建，保留原选中值）
+  function fillCityOptions() {
+    citySelect.innerHTML = '<option value="">未设置</option>';
+    var list = (typeof REGIONS !== 'undefined' && CURRENT_REGION && REGIONS[CURRENT_REGION]) ? REGIONS[CURRENT_REGION] : [];
+    list.forEach(function (d) {
       var opt = document.createElement('option');
       opt.value = d.id;
       opt.textContent = d.name;
       citySelect.appendChild(opt);
     });
   }
+  fillCityOptions();
+  // 顶栏区域切换（region-change 由 app.js 派发）：重建下拉；跨区域不存在时回落「未设置」
+  document.addEventListener('region-change', function () {
+    var prev = citySelect.value;
+    fillCityOptions();
+    citySelect.value = prev;
+  });
 })();

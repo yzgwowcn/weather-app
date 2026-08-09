@@ -235,7 +235,7 @@ function renderSkySection(cloudSeries, dates, skyView, skyIndex) {
       <div><p class="section-kicker">EC SKY PROFILE</p><h2>天空剖面</h2></div>
       <div class="sky-switch" role="group" aria-label="云图数据源切换">${buttons}</div>
     </div>
-    <p class="sky-note"><span class="legend low">低云</span><span class="legend mid">中云</span><span class="legend high">高云</span> · 海边天色重点看低云与中云，点击或悬停图表查看逐小时详情；高云仅供参考，不影响出行判断。浅色带为 08:00–18:00 白天时段。</p>
+    <p class="sky-note"><span class="legend low">低云</span><span class="legend mid">中云</span><span class="legend high">高云</span> · ${regionTexts().skyNote}</p>
     ${panes}
   </section>`;
 }
@@ -280,7 +280,7 @@ function renderEcHero(day, assessment, destination) {
       ${overturnNote ? `<p class="overturn-note">${overturnNote}</p>` : ''}
       ${thunder}
       ${gust}
-      <p class="sea-sky-tip">海边天色重点看低云与中云影响最大，高云仅供参考。</p>
+      <p class="sea-sky-tip">${regionTexts().seaTip}</p>
     </div>
     <div class="ec-probability">
       <div class="probability-orb ${assessment.probability == null ? 'unavailable' : ''}">
@@ -442,6 +442,15 @@ function renderMarineCards(marine, destination) {
 function escapeText(text) {
   return String(text).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
+// 当前区域文案：config.js 未加载（Node 冒烟测试等无 config 环境）时回落海南默认，保证输出稳定
+function regionTexts() {
+  if (typeof REGION_TEXTS !== 'undefined' && CURRENT_REGION && REGION_TEXTS[CURRENT_REGION]) return REGION_TEXTS[CURRENT_REGION];
+  return {
+    skyNote: '海边天色重点看低云与中云，点击或悬停图表查看逐小时详情；高云仅供参考，不影响出行判断。浅色带为 08:00–18:00 白天时段。',
+    seaTip: '海边天色重点看低云与中云影响最大，高云仅供参考。',
+    regionNotice: '该地点不在海南范围内，预报数据仅供参考，出行请以当地气象台通知为准。',
+  };
+}
 function renderWeatherApp(bundle, destination, requestedDays, selectedDate, ui = {}) {
   destination = { ...destination, name: escapeText(destination.name) };
   const forecast = bundle?.forecast;
@@ -456,6 +465,6 @@ function renderWeatherApp(bundle, destination, requestedDays, selectedDate, ui =
   const skyView = ui.skyView === 'forecast' ? 'forecast' : 'ec';
   const skyIndex = ui.skyIndex;
   const farNotice = requestedDays > 7 ? '<p class="notice">第 8 天及以后仅适合作趋势参考，临近出行请再次更新。</p>' : '';
-  const regionNotice = destination.outOfRegion ? '<p class="notice">该地点不在海南范围内，预报数据仅供参考，出行请以当地气象台通知为准。</p>' : '';
+  const regionNotice = destination.outOfRegion ? `<p class="notice">${regionTexts().regionNotice}</p>` : '';
   return `${regionNotice}${farNotice}${renderDayRail(days, currentDate)}${renderEcHero(selected, selected.assessment, destination)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderForecastCards(days, currentDate, cloudCurves)}${renderMarineCards(bundle.marine, destination)}`;
 }

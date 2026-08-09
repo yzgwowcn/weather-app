@@ -2,10 +2,12 @@
 // 并把渲染层输出的 weatherMood 应用到页面背景状态机。
 (() => {
   'use strict';
-  const state = { dest: DESTINATIONS[0], days: DEFAULT_DAYS, bundle: null, selectedDate: null, skyView: 'ec', skyIndex: null, cloudPick: null, customDest: null };
+  const state = { region: readRegion(), dest: null, days: DEFAULT_DAYS, bundle: null, selectedDate: null, skyView: 'ec', skyIndex: null, cloudPick: null, customDest: null };
+  state.dest = currentDestinations()[0];
   const destListEl = document.getElementById('dest-list');
   const daysGroupEl = document.getElementById('days-group');
   const queryBtnEl = document.getElementById('query-btn');
+  const regionToggleEl = document.getElementById('region-toggle');
   const resultEl = document.getElementById('result');
   const loadingEl = document.getElementById('loading');
   const searchInputEl = document.getElementById('location-search');
@@ -30,6 +32,56 @@
   let searchItems = [];
   let requestSeq = 0;
   let abortController = null;
+
+  // ---- 区域模式：海南（默认）/ 四川，localStorage 记忆，顶栏按钮切换 ----
+  const REGION_STORAGE_KEY = 'regionMode';
+  function readRegion() {
+    try {
+      return localStorage.getItem(REGION_STORAGE_KEY) === 'sichuan' ? 'sichuan' : 'hainan';
+    } catch (e) { return 'hainan'; } // 存储不可用：回落默认区域
+  }
+  function currentDestinations() { return REGIONS[state.region]; }
+
+  // 应用当前区域文案（标题/meta/eyebrow/首屏/顶栏/页脚/按钮），供初始化与切换共用
+  function applyRegionTexts() {
+    const t = REGION_TEXTS[state.region];
+    document.title = t.title;
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute('content', t.metaDescription);
+    const eyebrow = document.querySelector('.eyebrow');
+    if (eyebrow) eyebrow.innerHTML = `<span class="eyebrow-line" aria-hidden="true"></span>${t.eyebrow}<span class="eyebrow-line" aria-hidden="true"></span>`;
+    const introCopy = document.querySelector('.intro-copy');
+    if (introCopy) introCopy.textContent = t.introCopy;
+    const xhsBrand = document.querySelector('.xhs-brand');
+    if (xhsBrand) xhsBrand.textContent = t.xhsBrand;
+    const xhsLink = document.querySelector('.xhs-link');
+    if (xhsLink) xhsLink.setAttribute('aria-label', t.xhsAria);
+    const footers = document.querySelectorAll('.footer p');
+    if (footers.length >= 2) {
+      footers[0].textContent = t.footer[0];
+      footers[1].textContent = t.footer[1];
+    }
+    if (regionToggleEl) {
+      regionToggleEl.textContent = '切换到' + t.switchTo;
+      regionToggleEl.setAttribute('aria-label', '切换到' + t.switchTo);
+    }
+  }
+  function switchRegion(next) {
+    if (next === state.region || !REGIONS[next]) return;
+    state.region = next;
+    CURRENT_REGION = next;
+    // 切换即显式进入该区域默认状态：阻止在途 applyDefaultCity 异步回调覆盖目的地（竞态防护）
+    defaultCityApplied = true;
+    try { localStorage.setItem(REGION_STORAGE_KEY, next); } catch (e) { /* 存储不可用：仅本次会话生效 */ }
+    // 切换后进入该区域默认目的地（成都·市区 / 三亚·亚龙湾），清除自定义选点
+    state.dest = REGIONS[next][0];
+    state.customDest = null;
+    applyRegionTexts();
+    renderDestButtons();
+    // 通知账号面板刷新「默认城市」下拉选项
+    document.dispatchEvent(new CustomEvent('region-change', { detail: { region: next } }));
+    query();
+  }
 
   function toast(message) {
     let el = document.querySelector('.toast');
@@ -71,7 +123,7 @@
     if (!isLoggedIn()) return;
     window.User.getPreferences().then(function (r) {
       if (!r.ok || !r.preferences || !r.preferences.default_city) { defaultCityApplied = true; return; }
-      const dest = DESTINATIONS.find((d) => d.id === r.preferences.default_city);
+      const dest = currentDestinations().find((d) => d.id === r.preferences.default_city);
       defaultCityApplied = true;
       if (!dest) return;
       state.dest = dest;
@@ -93,12 +145,12 @@
       ? `<button type="button" class="dest-btn custom ${state.dest.id === 'custom' ? 'active' : ''}" data-id="custom" aria-pressed="${state.dest.id === 'custom'}">
           <span>${escapeHtml(state.customDest.name)}</span><span class="dest-tag">自定义</span>
         </button>` : '';
-    destListEl.innerHTML = DESTINATIONS.map((dest) => `
+    destListEl.innerHTML = currentDestinations().map((dest) => `
       <button type="button" class="dest-btn ${dest.id === state.dest.id ? 'active' : ''}" data-id="${dest.id}" aria-pressed="${dest.id === state.dest.id}">
         <span>${dest.name}</span>${dest.marine ? '<span class="dest-tag">近海</span>' : ''}
       </button>`).join('') + customBtn;
     destListEl.querySelectorAll('.dest-btn').forEach((button) => button.addEventListener('click', () => {
-      state.dest = button.dataset.id === 'custom' ? { ...state.customDest } : DESTINATIONS.find((dest) => dest.id === button.dataset.id);
+      state.dest = button.dataset.id === 'custom' ? { ...state.customDest } : currentDestinations().find((dest) => dest.id === button.dataset.id);
       renderDestButtons();
     }));
   }
@@ -125,15 +177,15 @@
         <span class="search-item-name">${escapeHtml(item.name)}</span>
         ${item.region ? `<span class="search-item-region">${escapeHtml(item.region)}</span>` : ''}
         <span class="search-item-coord">${Location.coordLabel(item.lat, item.lon)}</span>
-        ${item.inHainan ? '' : '<span class="search-item-tag">⚠ 非海南</span>'}
+        ${item.inRegion === state.region ? '' : `<span class="search-item-tag">${REGION_TEXTS[state.region].regionTag}</span>`}
       </li>`).join('');
     searchResultsEl.classList.remove('hidden');
   }
   function selectSearchItem(index) {
     const item = searchItems[index];
     if (!item) return;
-    if (!item.inHainan) toast('该地点不在海南范围内，预报数据仅供参考');
-    state.customDest = { id: 'custom', name: item.name, lat: item.lat, lon: item.lon, marine: false, outOfRegion: !item.inHainan };
+    if (item.inRegion !== state.region) toast(REGION_TEXTS[state.region].regionToast);
+    state.customDest = { id: 'custom', name: item.name, lat: item.lat, lon: item.lon, marine: false, outOfRegion: item.inRegion !== state.region };
     state.dest = state.customDest;
     searchInputEl.value = '';
     closeSearchResults();
@@ -144,9 +196,9 @@
   window.__getCurrentDest = function () {
     return { name: state.dest.name, lat: state.dest.lat, lon: state.dest.lon, is_gcj: false };
   };
-  // 收藏功能接入点：选中收藏项 → 设为当前目的地并立即查询
+  // 收藏功能接入点：选中收藏项 → 设为当前目的地并立即查询（收藏为主动保存，区域外同样给出提示）
   window.__WeatherSelectDest = function (name, lat, lon) {
-    state.customDest = { id: 'custom', name: name, lat: lat, lon: lon, marine: false };
+    state.customDest = { id: 'custom', name: name, lat: lat, lon: lon, marine: false, outOfRegion: Location.regionOf(lat, lon) !== state.region };
     state.dest = state.customDest;
     renderDestButtons();
     query();
@@ -327,8 +379,8 @@
     const pick = Location.getMapPick();
     if (!pick) { toast('请先在地图上放置选点标记'); return; }
     const name = pick.name ? `${pick.name}（地图选点）` : Location.formatCoordName(pick.lat_wgs, pick.lng_wgs);
-    const outOfRegion = !Location.isInHainan(pick.lat_wgs, pick.lng_wgs);
-    if (outOfRegion) toast('该地点不在海南范围内，预报数据仅供参考');
+    const outOfRegion = Location.regionOf(pick.lat_wgs, pick.lng_wgs) !== state.region;
+    if (outOfRegion) toast(REGION_TEXTS[state.region].regionToast);
     state.customDest = { id: 'custom', name, lat: pick.lat_wgs, lon: pick.lng_wgs, marine: false, outOfRegion, source: 'map' };
     state.dest = state.customDest;
     closeMapPanel();
@@ -368,6 +420,8 @@
     renderResult();
   }
   function init() {
+    CURRENT_REGION = state.region;
+    applyRegionTexts();
     renderDestButtons();
     applyDayAccess();
     applyDefaultCity();
@@ -380,7 +434,7 @@
     document.addEventListener('pref-saved', (e) => {
       const city = e.detail && e.detail.default_city;
       if (!city) return;
-      const dest = DESTINATIONS.find((d) => d.id === city);
+      const dest = currentDestinations().find((d) => d.id === city);
       if (!dest) return;
       state.dest = dest;
       renderDestButtons();
@@ -396,6 +450,8 @@
       daysGroupEl.querySelectorAll('.days-btn').forEach((item) => item.classList.toggle('active', item === button));
     }));
     queryBtnEl.addEventListener('click', query);
+    // 区域切换：海南 ⇄ 四川（按钮文案随模式互切）
+    if (regionToggleEl) regionToggleEl.addEventListener('click', () => switchRegion(state.region === 'hainan' ? 'sichuan' : 'hainan'));
 
     // 地点搜索：防抖由 Location.searchPlaces 内部管理（300ms），点击结果选中并立即查询
     searchInputEl.addEventListener('input', () => {
@@ -419,8 +475,8 @@
       }
       const [wgsLon, wgsLat] = coordGcjEl.checked ? Location.gcj02ToWgs84(lon, lat) : [lon, lat];
       const name = Location.formatCoordName(wgsLat, wgsLon);
-      const outOfRegion = !Location.isInHainan(wgsLat, wgsLon);
-      if (outOfRegion) toast('该坐标不在海南范围内，预报数据仅供参考');
+      const outOfRegion = Location.regionOf(wgsLat, wgsLon) !== state.region;
+      if (outOfRegion) toast(REGION_TEXTS[state.region].regionToast);
       state.customDest = { id: 'custom', name, lat: wgsLat, lon: wgsLon, marine: false, outOfRegion };
       state.dest = state.customDest;
       searchInputEl.value = '';

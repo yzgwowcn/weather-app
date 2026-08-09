@@ -23,6 +23,13 @@ if (Math.abs(gLng2 - 109.512) < 1e-4 && Math.abs(gLat2 - 18.224) < 1e-4) {
 // 3. 海南范围矩形判断
 if (!L.isInHainan(19.0, 110.0)) { console.error('HAINAN INSIDE FAIL'); process.exit(1); }
 if (L.isInHainan(30.0, 120.0) || L.isInHainan(18.0, 109.0) || L.isInHainan(19.0, 112.0)) { console.error('HAINAN OUTSIDE FAIL'); process.exit(1); }
+// 3b. 四川范围矩形判断（区域切换模式）
+if (!L.isInSichuan(30.657, 104.065)) { console.error('SICHUAN INSIDE FAIL'); process.exit(1); }
+if (L.isInSichuan(18.224, 109.512) || L.isInSichuan(25.9, 104.0) || L.isInSichuan(34.6, 104.0) || L.isInSichuan(30.0, 108.8) || L.isInSichuan(30.0, 97.0)) { console.error('SICHUAN OUTSIDE FAIL'); process.exit(1); }
+// 3c. regionOf：三亚→hainan、成都→sichuan、上海→null
+if (L.regionOf(18.224, 109.512) !== 'hainan') { console.error('REGIONOF HAINAN FAIL'); process.exit(1); }
+if (L.regionOf(30.657, 104.065) !== 'sichuan') { console.error('REGIONOF SICHUAN FAIL'); process.exit(1); }
+if (L.regionOf(31.23, 121.47) !== null) { console.error('REGIONOF NULL FAIL'); process.exit(1); }
 // 4. 兜底名称格式
 if (L.formatCoordName(18.5, 110.03) !== '自选点 (18.50°N, 110.03°E)') { console.error('NAME FAIL:', L.formatCoordName(18.5, 110.03)); process.exit(1); }
 if (L.formatCoordName(-18.5, -110.03) !== '自选点 (18.50°S, 110.03°W)') { console.error('NAME SW FAIL'); process.exit(1); }
