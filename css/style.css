@@ -147,6 +147,56 @@ body[data-mood="storm"]::after {
   opacity: .85;
 }
 
+/* ---- 区域示意地图背景（SVG：海南/四川风格化轮廓，DataV GeoAtlas 简化数据，非标准政区图） ---- */
+/* 层级：body 渐变底色 → ::before 日照层 → #region-map 地图 → ::after 天气氛围层 → #rain-layer → .page-shell；
+   天气氛围层（云影/雨滴/光带）自然覆盖在地图之上 */
+#region-map {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.region-map-svg {
+  position: absolute;
+  right: 3%;
+  top: 50%;
+  height: min(60vh, 540px);
+  width: auto;
+  max-width: 40vw;
+  transform: translateY(-50%) translateX(4%); /* 非当前区域：偏右隐藏，切换时从右侧滑入模拟「随定位移动」 */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 1.3s ease, transform 2.4s cubic-bezier(.22, .61, .36, 1), visibility 0s linear 1.3s;
+  filter: drop-shadow(0 6px 30px rgba(125, 180, 255, .14));
+}
+.region-map-svg.active {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+  transition: opacity 1.3s ease, transform 2.4s cubic-bezier(.22, .61, .36, 1);
+}
+.region-shape {
+  fill: rgba(125, 180, 255, .10);
+  stroke: rgba(195, 222, 255, .55);
+  stroke-width: .35;
+  stroke-linejoin: round;
+}
+/* 目的地光点：全部目的地小点，当前选中大点 + 呼吸 + 名称标签（由 js/region-map.js 生成） */
+.map-dot { fill: rgba(170, 212, 255, .85); transition: fill .3s ease; }
+.map-dot.current { fill: #ffd27a; animation: dot-breathe 2.4s ease-in-out infinite; }
+.map-dot-label { fill: rgba(255, 255, 255, .92); font-weight: 700; letter-spacing: .02em; paint-order: stroke; stroke: rgba(10, 20, 36, .55); stroke-width: .55; }
+@keyframes dot-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+@media (max-width: 760px) {
+  /* 移动端：地图退为弱背景水印，避免遮挡内容 */
+  .region-map-svg { right: -18%; height: 46vh; opacity: .5 !important; }
+  .region-map-svg.active { opacity: .5 !important; transform: translateY(-50%) translateX(0); }
+  .map-dot-label { display: none; }
+}
+
 /* ---- 减弱动态偏好：关闭动效，仅保留必要指示 ---- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -299,8 +349,8 @@ button { font: inherit; }
 .eyebrow-line:last-child { background: linear-gradient(90deg, rgba(125, 180, 255, .65), transparent); }
 .intro h1 { margin: 0; font-size: clamp(48px, 6.5vw, 96px); letter-spacing: -.085em; line-height: .94; font-weight: 800; }
 .intro h1 em { color: var(--blue); font-style: normal; text-shadow: 0 0 34px rgba(125, 180, 255, .35); }
-.intro-copy { margin: 0; color: rgba(226, 233, 240, .8); font-size: 16px; line-height: 1.75; }
-.intro-source { margin: 26px 0 0; color: var(--muted); font-size: 12.5px; letter-spacing: .05em; }
+.intro-copy { margin: 0; color: #fff; font-size: 16px; line-height: 1.75; }
+.intro-source { margin: 26px 0 0; color: #fff; font-size: 12.5px; letter-spacing: .05em; }
 .intro-source::before { content: ''; display: block; width: 56px; height: 1px; margin-bottom: 14px; background: linear-gradient(90deg, rgba(255, 255, 255, .25), transparent); }
 .source-line { margin: 0 0 6px; }
 .source-status { margin: 0; display: flex; align-items: center; gap: 7px; }
@@ -322,13 +372,13 @@ button { font: inherit; }
   padding: 5px 0; font-size: 12px; border-top: 1px dashed rgba(255, 255, 255, .12);
 }
 .model-row:first-child { border-top: 0; }
-.model-name { display: inline-flex; align-items: center; gap: 6px; color: rgba(226, 233, 240, .85); font-weight: 650; white-space: nowrap; }
+.model-name { display: inline-flex; align-items: center; gap: 6px; color: #fff; font-weight: 650; white-space: nowrap; }
 .model-name .status-dot { width: 6px; height: 6px; flex-shrink: 0; }
-.model-upto { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.model-ago { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.model-row.live .model-upto, .model-row.live .model-ago { color: rgba(226, 233, 240, .78); }
+.model-upto { color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.model-ago { color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.model-row.live .model-upto, .model-row.live .model-ago { color: #fff; }
 .model-row.dead .model-upto, .model-row.dead .model-ago { color: rgba(255, 143, 135, .8); }
-.model-row.placeholder { display: block; padding: 4px 0; border-top: 0; color: var(--muted); opacity: .7; font-size: 12px; }
+.model-row.placeholder { display: block; padding: 4px 0; border-top: 0; color: #fff; opacity: .7; font-size: 12px; }
 
 /* ---- 查询面板（亚克力：半透明 + backdrop-filter 模糊） ---- */
 /* z-index 10：backdrop-filter 会创建层叠上下文把内部元素困在 z-index 0，

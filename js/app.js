@@ -170,6 +170,8 @@
       state.dest = button.dataset.id === 'custom' ? { ...state.customDest } : currentDestinations().find((dest) => dest.id === button.dataset.id);
       renderDestButtons();
     }));
+    // 目的地变化通知（地图背景光点高亮等订阅方）；所有目的地变更路径都经 renderDestButtons 汇聚
+    document.dispatchEvent(new CustomEvent('dest-change'));
   }
   function closeSearchResults() {
     searchResultsEl.classList.add('hidden');
