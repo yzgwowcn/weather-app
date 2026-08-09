@@ -320,8 +320,11 @@ button { font: inherit; }
 .model-row.placeholder { display: block; padding: 4px 0; border-top: 0; color: var(--muted); opacity: .7; font-size: 12px; }
 
 /* ---- 查询面板（亚克力：半透明 + backdrop-filter 模糊） ---- */
+/* z-index 10：backdrop-filter 会创建层叠上下文把内部元素困在 z-index 0，
+   提升本层级使搜索下拉可浮于收藏框（.fav-section）与时间轴（.result）之上 */
 .workspace {
   display: grid; grid-template-columns: 1fr auto; gap: 14px 0;
+  position: relative; z-index: 10;
   padding: 16px; border: 1px solid transparent; border-radius: var(--r-lg);
   background: var(--glass-border);
   backdrop-filter: blur(16px) saturate(1.5);
@@ -353,7 +356,9 @@ button { font: inherit; }
 .dest-btn.custom.active { background: rgba(111, 216, 180, .94); color: #0d1a16; }
 
 /* ---- 地点搜索 ---- */
-.location-search { position: relative; margin-top: 8px; }
+/* z-index 30：创建独立层叠上下文，下拉浮于收藏框/时间轴之上
+   （.workspace 的 backdrop-filter 会限制子元素 .search-results 的 z-index，必须在 .location-search 本级提升） */
+.location-search { position: relative; z-index: 30; margin-top: 8px; }
 .location-search-input {
   width: min(420px, 100%); min-height: 34px; padding: 6px 12px 6px 34px;
   border: 1px solid var(--line); border-radius: var(--r-sm);
@@ -919,12 +924,18 @@ button { font: inherit; }
   color: rgba(222, 230, 238, .85); font-size: 14px; cursor: pointer;
 }
 .map-close:hover { background: rgba(255, 255, 255, .16); }
+.map-search-wrap { position: relative; margin-bottom: 10px; }
 .map-search {
-  width: 100%; min-height: 34px; margin-bottom: 10px; padding: 6px 12px;
+  width: 100%; min-height: 34px; padding: 6px 12px;
   border: 1px solid var(--line); border-radius: var(--r-sm);
   background: rgba(255, 255, 255, .06); color: rgba(222, 230, 238, .92); font-size: 13px;
 }
 .map-search:focus-visible { border-color: rgba(125, 180, 255, .55); outline: none; }
+/* 地图搜索自绘下拉：z-index 高于高德地图内部控件（amap-container 内最高约 100+） */
+.map-search-results {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 200;
+  width: 100%; max-height: 240px; overflow-y: auto;
+}
 .map-container { width: 100%; height: 340px; border-radius: 12px; overflow: hidden; background: #0e1a2c; }
 .map-container .amap-container { border-radius: 12px; }
 .map-container-wrap { position: relative; }

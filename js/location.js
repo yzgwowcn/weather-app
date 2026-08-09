@@ -149,7 +149,8 @@ const Location = (() => {
   let mapPick = null;
   let mapReverseTimer = null;
   let mapCallbacks = null;
-  let mapSearchAuto = null;
+  let mapSearchBound = false;
+  let mapSearchItems = [];
   let satelliteLayer = null;
   let roadNetLayer = null;
 
@@ -215,16 +216,67 @@ const Location = (() => {
     setMapPick(gcjLng, gcjLat);
   }
 
-  // 地图内搜索：AMap.AutoComplete 联想（内部完成认证，无额外签名；全国范围，选中后地图自动定位）
-  function bindMapSearch(inputEl) {
+  // 地图内搜索：自绘下拉（复用 searchPlaces 双通道：高德 REST 优先 + Photon 兜底），
+  // 不依赖 AMap.AutoComplete——其联想请求必须走 /_AMapService 代理，任何环境异常都会静默无反应。
+  // 选中结果后坐标转回 GCJ-02 供地图定位（searchPlaces 返回 WGS84）。
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+  function renderMapSearchResults(resultsEl, items) {
+    if (!items.length) {
+      resultsEl.innerHTML = '<li class="search-empty">未找到相关地点，换个关键词试试</li>';
+      resultsEl.classList.remove('hidden');
+      return;
+    }
+    resultsEl.innerHTML = items.map((item, index) => `
+      <li role="option" class="search-item" data-index="${index}">
+        <span class="search-item-name">${escapeHtml(item.name)}</span>
+        ${item.region ? `<span class="search-item-region">${escapeHtml(item.region)}</span>` : ''}
+        <span class="search-item-coord">${coordLabel(item.lat, item.lon)}</span>
+        ${item.inHainan ? '' : '<span class="search-item-tag">⚠ 非海南</span>'}
+      </li>`).join('');
+    resultsEl.classList.remove('hidden');
+  }
+  function bindMapSearch(inputEl, resultsEl) {
     if (!isAMapReady()) return null;
-    if (mapSearchAuto) return mapSearchAuto;
-    mapSearchAuto = new AMap.AutoComplete({ input: inputEl }); // 不带 city 即全国搜索
-    mapSearchAuto.on('select', (e) => {
-      const loc = e.poi?.location;
-      if (loc) focusMapPick(loc.lng, loc.lat);
+    if (mapSearchBound) return true;
+    mapSearchBound = true;
+    const closeResults = () => { resultsEl.classList.add('hidden'); resultsEl.innerHTML = ''; };
+    const pickItem = (item) => {
+      if (!item) return;
+      const [gcjLng, gcjLat] = wgs84ToGcj02(item.lon, item.lat);
+      focusMapPick(gcjLng, gcjLat);
+      inputEl.value = '';
+      closeResults();
+    };
+    inputEl.addEventListener('input', async () => {
+      const q = inputEl.value.trim();
+      if (!q) { closeResults(); return; }
+      resultsEl.innerHTML = '<li class="search-empty">搜索中…</li>';
+      resultsEl.classList.remove('hidden');
+      const items = await searchPlaces(q); // 防抖 + 双通道 + GCJ→WGS 换算
+      if (inputEl.value.trim() !== q) return; // 过期响应不再覆盖新输入
+      mapSearchItems = items;
+      renderMapSearchResults(resultsEl, items);
     });
-    return mapSearchAuto;
+    inputEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') { inputEl.value = ''; closeResults(); }
+      if (event.key === 'Enter' && mapSearchItems.length) { event.preventDefault(); pickItem(mapSearchItems[0]); }
+    });
+    resultsEl.addEventListener('click', (event) => {
+      const itemEl = event.target.closest('.search-item');
+      if (itemEl) pickItem(mapSearchItems[Number(itemEl.dataset.index)]);
+    });
+    document.addEventListener('pointerdown', (event) => {
+      if (!event.target.closest('.map-search-wrap')) closeResults();
+    });
+    return true;
+  }
+  // 面板关闭时清空地图搜索状态（由 app.js 调用）
+  function clearMapSearch(inputEl, resultsEl) {
+    mapSearchItems = [];
+    if (inputEl) inputEl.value = '';
+    if (resultsEl) { resultsEl.classList.add('hidden'); resultsEl.innerHTML = ''; }
   }
 
   // 当前定位：AMap.Geolocation（返回 GCJ-02 展示坐标 + WGS84 请求坐标）
@@ -268,6 +320,7 @@ const Location = (() => {
     getMapPick,
     focusMapPick,
     bindMapSearch,
+    clearMapSearch,
     getCurrentPosition,
     destroyMap,
   };

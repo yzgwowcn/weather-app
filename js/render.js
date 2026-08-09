@@ -200,7 +200,7 @@ function renderSkyChart(series, dates, skyIndex) {
     if (!day) return;
     day.points.forEach((p, hi) => {
       const i = di * 24 + hi;
-      parts.push(`<line class="sky-hit" data-index="${i}" data-x="${x(i)}" data-time="${p.time}" data-hour="${p.hour}"
+      parts.push(`<line class="sky-hit" data-index="${i}" data-x="${x(i)}" data-time="${escapeText(p.time)}" data-hour="${p.hour}"
         data-low="${p.low ?? ''}" data-mid="${p.mid ?? ''}" data-high="${p.high ?? ''}"
         data-mask="${p.mask == null ? '' : p.mask.toFixed(1)}"
         data-precip="${p.precipitation == null ? '' : p.precipitation.toFixed(1)}"
@@ -401,7 +401,7 @@ function renderCloudCurve(points) {
   });
   // 不可见命中区：每小时一条透明竖条，事件委托读取 dataset（与天空剖面一致）
   points.forEach((p, i) => {
-    parts.push(`<line class="cloud-hit" data-index="${i}" data-x="${xc(p.hour)}" data-time="${p.time}" data-hour="${p.hour}"
+    parts.push(`<line class="cloud-hit" data-index="${i}" data-x="${xc(p.hour)}" data-time="${escapeText(p.time)}" data-hour="${p.hour}"
       data-low="${p.low ?? ''}" data-mid="${p.mid ?? ''}" data-precip="${p.precipitation == null ? '' : p.precipitation.toFixed(1)}"
       x1="${xc(p.hour)}" y1="${PAD.top}" x2="${xc(p.hour)}" y2="${PAD.top + plotH}" />`);
   });

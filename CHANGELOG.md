@@ -1,5 +1,13 @@
 # 更新日志
 
+## v1.18（2026-08-09）
+
+### 变更
+- **地图选点搜索改为自绘下拉**：`#map-search` 不再依赖 `AMap.AutoComplete`（其联想请求必须经 `/_AMapService` 代理，任何环境异常都会静默无反应），改为复用 `Location.searchPlaces` 双通道（高德 REST 优先 + Photon 兜底）自绘结果列表，点击/Enter 选中后坐标换算回 GCJ-02 并地图定位；下拉 `z-index: 200` 高于高德地图控件
+- **主搜索下拉层级修复**：`.workspace` 的 `backdrop-filter` 创建层叠上下文把内部 `z-index` 困在 0 层，收藏框/时间轴 DOM 靠后而覆盖搜索下拉；`.workspace` 提升 `z-index: 10`、`.location-search` 提升 `z-index: 30` 后下拉正常浮于其上
+- **安全加固**：天空剖面/云量曲线的 `data-time` 属性与 tooltip 中的时间字段统一经 `escapeText`/`escapeHtml` 转义（防御纵深，外部 API 数据不直接拼接 HTML）
+- 新增 `tests/map-search.check.js`：AMap stub 下端到端验证地图搜索全流程（金牛区→下拉→定位）与主搜索下拉不被遮挡
+
 ## v1.17（2026-08-09）
 
 ### 变更

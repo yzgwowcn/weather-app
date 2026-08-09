@@ -21,6 +21,7 @@
   const mapCloseEl = document.getElementById('map-close');
   const mapContainerEl = document.getElementById('map-container');
   const mapSearchEl = document.getElementById('map-search');
+  const mapSearchResultsEl = document.getElementById('map-search-results');
   const mapPickNameEl = document.getElementById('map-pick-name');
   const mapCoordsEl = document.getElementById('map-coords');
   const mapLocateEl = document.getElementById('map-locate');
@@ -255,7 +256,7 @@
     crosshair.classList.add('visible');
     const fmt = (value, unit) => (value === '' ? '—' : `${value}${unit}`);
     tooltip.innerHTML = `
-      <strong>${d.time}</strong>
+      <strong>${escapeHtml(d.time)}</strong>
       <span>低云 <b>${fmt(d.low, '%')}</b></span>
       <span>中云 <b>${fmt(d.mid, '%')}</b></span>
       <span>高云 <b>${fmt(d.high, '%')}</b></span>
@@ -283,7 +284,7 @@
     crosshair.classList.add('visible');
     const fmt = (value, unit) => (value === '' ? '—' : `${value}${unit}`);
     tooltip.innerHTML = `
-      <strong>${d.time}</strong>
+      <strong>${escapeHtml(d.time)}</strong>
       <span>低云 <b>${fmt(d.low, '%')}</b></span>
       <span>中云 <b>${fmt(d.mid, '%')}</b></span>
       <span>降雨 <b>${fmt(d.precip, ' mm')}</b></span>`;
@@ -314,12 +315,13 @@
         mapConfirmEl.disabled = !pick;
       },
     });
-    Location.bindMapSearch(mapSearchEl);
+    Location.bindMapSearch(mapSearchEl, mapSearchResultsEl);
   }
   function closeMapPanel() {
     mapPanelEl.classList.remove('open');
     mapPanelEl.setAttribute('aria-hidden', 'true');
     mapBtnEl.disabled = !Location.isAMapReady();
+    Location.clearMapSearch(mapSearchEl, mapSearchResultsEl);
   }
   function confirmMapPick() {
     const pick = Location.getMapPick();
