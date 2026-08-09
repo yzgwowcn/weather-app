@@ -45,6 +45,7 @@
     <main class="auth-page">
       <div class="auth-card">
         <div id="cb-status" class="auth-msg" role="status">正在处理确认链接…</div>
+        <p id="cb-back" class="auth-back hidden"><a href="../auth.html">← 返回登录页</a></p>
         <!-- 找回密码第二步：设置新密码 -->
         <form id="reset-form" class="hidden" novalidate>
           <div class="auth-field">
@@ -76,13 +77,19 @@
         statusEl.className = 'auth-msg' + (isError ? ' error' : text ? ' ok' : '');
       }
 
+      function showBack() {
+        document.getElementById('cb-back').classList.remove('hidden');
+      }
+
       (async function main() {
-        if (!Auth.isReady()) { setMsg('认证服务未配置（构建时未注入 SUPABASE 环境变量），请联系管理员。', true); return; }
+        if (!Auth.isReady()) { setMsg('认证服务未配置（构建时未注入 SUPABASE 环境变量），请联系管理员。', true); showBack(); return; }
         var r = await Auth.handleCallback(window.location);
-        if (!r.ok) { setMsg(r.message, true); return; }
+        if (!r.ok) { setMsg(r.message, true); showBack(); return; }
         if (r.type === 'confirm') {
-          setMsg('邮箱确认成功，正在跳转…');
-          setTimeout(function () { window.location.href = '../index.html'; }, 800);
+          // OAuth 登录（google/github）→ 账户页；邮箱确认 → 首页
+          var dest = (r.provider === 'google' || r.provider === 'github') ? '../account.html' : '../index.html';
+          setMsg('登录成功，正在跳转…');
+          setTimeout(function () { window.location.href = dest; }, 800);
           return;
         }
         if (r.type === 'recovery') {
@@ -91,6 +98,7 @@
           return;
         }
         setMsg('未知的回调类型', true);
+        showBack();
       })();
 
       // 找回密码第二步：保存新密码

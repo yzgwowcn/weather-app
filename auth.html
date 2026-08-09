@@ -53,6 +53,18 @@
     .auth-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
     .auth-back { display: inline-block; margin-top: 16px; font-size: 13px; opacity: 0.85; }
     .auth-back a { color: inherit; }
+    /* 第三方登录（仅登录 tab 显示） */
+    .auth-divider { display: flex; align-items: center; gap: 10px; margin: 18px 0 14px; font-size: 12px; opacity: 0.6; }
+    .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.15); }
+    .auth-oauth-btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; padding: 10px 0; margin-bottom: 10px; cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 8px;
+      background: rgba(255,255,255,0.06); color: inherit; font-size: 14px; font-family: inherit;
+    }
+    .auth-oauth-btn:hover { background: rgba(255,255,255,0.12); }
+    .auth-oauth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .auth-oauth-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
   </style>
 </head>
 <body data-mood="neutral">
@@ -80,6 +92,19 @@
           </div>
           <button type="submit" class="auth-submit" id="login-submit">登录</button>
         </form>
+
+        <!-- 第三方登录（仅登录 tab 显示；OAuth 由 Supabase 托管，走 auth/callback.html 回跳） -->
+        <div id="oauth-panel" class="auth-oauth hidden">
+          <div class="auth-divider"><span>或</span></div>
+          <button type="button" class="auth-oauth-btn" id="oauth-google">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+            使用 Google 登录
+          </button>
+          <button type="button" class="auth-oauth-btn" id="oauth-github">
+            <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+            使用 GitHub 登录
+          </button>
+        </div>
 
         <!-- 注册（含 Turnstile 人机验证；两步：资料 → 邮箱验证码） -->
         <form id="signup-form" class="auth-form hidden" novalidate>
@@ -160,7 +185,7 @@
       // 未注入 Supabase 配置时整体禁用
       if (!Auth.isReady()) {
         setMsg('认证服务未配置（构建时未注入 SUPABASE 环境变量），请联系管理员。', true);
-        ['login-submit', 'signup-submit', 'forgot-submit'].forEach(function (id) { $(id).disabled = true; });
+        ['login-submit', 'signup-submit', 'forgot-submit', 'oauth-google', 'oauth-github'].forEach(function (id) { $(id).disabled = true; });
       }
 
       // Turnstile 显式渲染（仅注册 tab 需要）
@@ -230,6 +255,7 @@
           $('login-form').classList.toggle('hidden', currentMode !== 'login');
           $('signup-form').classList.toggle('hidden', currentMode !== 'signup');
           $('forgot-form').classList.toggle('hidden', currentMode !== 'forgot');
+          $('oauth-panel').classList.toggle('hidden', currentMode !== 'login');
           setMsg('');
           hint.classList.toggle('hidden', currentMode !== 'signup');
           if (currentMode === 'signup') renderTurnstile();
@@ -248,6 +274,23 @@
         setMsg('登录成功，正在跳转…');
         setTimeout(function () { window.location.href = 'account.html'; }, 600);
       });
+
+      // 第三方登录（Google / GitHub）：supabase-js 成功后自动跳转授权页，此处处理失败提示与兜底跳转
+      function startOAuth(provider) {
+        setMsg('');
+        var btn = provider === 'google' ? $('oauth-google') : $('oauth-github');
+        btn.disabled = true;
+        Auth.signInWithOAuth(provider).then(function (r) {
+          btn.disabled = false;
+          if (!r.ok) { setMsg(r.message, true); return; }
+          if (r.url) window.location.href = r.url; // 个别环境 supabase-js 未自动跳转时兜底
+        }).catch(function () {
+          btn.disabled = false;
+          setMsg('网络异常，请重试', true);
+        });
+      }
+      $('oauth-google').addEventListener('click', function () { startOAuth('google'); });
+      $('oauth-github').addEventListener('click', function () { startOAuth('github'); });
 
       // ---- 注册第二步：邮箱验证码 ----
       var signupEmail = '';
