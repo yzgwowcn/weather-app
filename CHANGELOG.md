@@ -7,9 +7,6 @@
 - **纵深防御**：新增 `_admin.guard_profile_entitlements` 更新触发器，即使后续误恢复宽泛表权限，anon/authenticated 篡改权益字段仍会以 `42501` 拒绝；service_role 与注册建档触发器不受影响
 - 新增 `tests/profile-permissions.test.js`，锁定 profiles 最小列权限、权益字段触发器和 service_role 管理权限，防止后续 migration 回退安全边界
 
-### 文档
-- 新增 `DEEPSEEK_REMEDIATION_PLAN.md`，记录 CAPTCHA、密码策略、函数权限、RLS 性能、最小授权、移动端界面与自动化测试的后续落地步骤
-
 ## v1.23（2026-08-09）
 
 ### 修复
