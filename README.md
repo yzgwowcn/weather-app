@@ -118,6 +118,7 @@ Vercel Dashboard → 项目 → Settings → Environment Variables，新增：
 |---|---|
 | `AMAP_KEY` | 高德 JS API Key（32 位，构建时注入前端 `js/config.js`） |
 | `AMAP_SECRET` | 高德安全密钥 jscode（仅服务端 `api/amap.mjs` 通过 `process.env` 读取） |
+| `ALLOWED_ORIGINS` | 可选。逗号分隔的站点 host 列表（如 `your-app.vercel.app,www.your-domain.com`），配置后 `/_AMapService` 与 `/api/verify-turnstile` 仅受理来自这些站点的请求；**未配置时放行但输出警告日志**，生产环境建议配置 |
 
 Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `package.json` 的 build 脚本会自动执行）。
 
@@ -128,6 +129,7 @@ Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `packa
 - 地图交互：点击地图放置 Marker（可拖动微调），拖动停止后自动逆地理编码显示地名；支持地图内 POI 搜索与「使用当前位置」。
 - 高德坐标（GCJ-02）会自动转换为 WGS84 后再请求 Open-Meteo 天气（`js/location.js` 内置迭代逆转换，精度 <1 米）。
 - 安全模式采用高德官方推荐的 **serviceHost 服务端代理**：前端 `window._AMapSecurityConfig = { serviceHost: window.location.origin + '/_AMapService' }`，JS API 的 Geocoder / AutoComplete / Geolocation 等 REST 请求经 `vercel.json` rewrite 转发到 `api/amap.mjs`（Vercel Function），由服务端注入 `jscode` 后代理到 `https://restapi.amap.com/`；安全密钥不再以明文出现在任何静态文件中。
+- 代理防护：仅接受 GET/HEAD；path 白名单仅放行前端实际用到的轻量接口（`v3/geocode/*`、`v3/assistant/inputtips`、`v3/place/*`、`v3/geolocation`、`v3/ip`），其余路径 400；配置 `ALLOWED_ORIGINS` 后按 Origin/Referer 校验来源，非白名单来源 403（防止代理被第三方当免费高德通道消耗配额/费用）。
 - 高德 JS API 通过 `webapi.amap.com` CDN 条件加载，仅在注入真实 Key 后引入；免费配额有限，生产使用请关注控制台用量。
 
 ## 账户系统（Supabase Auth + Resend + Cloudflare Turnstile）
@@ -159,6 +161,7 @@ Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `packa
 - 注册表单带 Turnstile：前端拿到 token → `POST /api/verify-turnstile`（Vercel Function 用服务端 Secret Key 调 Cloudflare siteverify）→ 通过后才执行 `supabase.auth.signUp()`；Secret Key 不出现在任何静态文件或日志。
 - 未配置环境变量时（本地开发），认证入口按钮保留但表单禁用并提示"认证服务未配置"，不影响天气查询等既有功能。
 - 数据安全：所有用户表开启 **RLS** 并按 `user_id = auth.uid()` 配置策略，anon key 才可安全暴露于前端。
+- 管理端聚合视图 `user_favorites_view` 已迁至非 API 暴露的 `_admin` schema 并以 `security_invoker` 语义重建，**仅 `service_role` 可查**（SQL Editor 可直接 `SELECT * FROM _admin.user_favorites_view;`）；历史问题：public 下的旧视图曾因被误授 anon/authenticated 权限而可绕过 RLS 泄露全部用户邮箱/收藏，修复详见 `supabase/migrations/004_fix_user_favorites_view_security.sql`（003 已废弃，勿再执行）。
 
 ### ④ 用户数据表（profiles / favorites，已在 Supabase 建好）
 
