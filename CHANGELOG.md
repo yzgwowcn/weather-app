@@ -1,5 +1,10 @@
 # 更新日志
 
+## v1.20.1（2026-08-09）
+
+### 修复
+- **线上修复：`default_region` 列缺失导致登录后无法选择默认城市/区域**。`supabase/migrations/005_user_preferences_default_region.sql` 设计为 Dashboard 手动执行但从未在生产执行，PostgREST 报 `Could not find the 'default_region' column of 'user_preferences' in the schema cache`，`getPreferences` 整个 select 失败 → 账户面板读不出/存不进默认城市与默认区域。已通过 Management API 在生产数据库执行 005 迁移（`ADD COLUMN IF NOT EXISTS` + CHECK 白名单，幂等）+ `NOTIFY pgrst, 'reload schema'` 刷新 schema cache，并实测 PostgREST 端点恢复正常（HTTP 200）。前端代码零改动。
+
 ## v1.20（2026-08-09）
 
 ### 变更
