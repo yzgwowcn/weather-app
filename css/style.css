@@ -163,12 +163,19 @@ button { font: inherit; }
   min-height: 76px;
   display: flex;
   align-items: center;
-  gap: 14px;
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  /* 顶栏底色提亮：与内容区拉开层次（半透明深蓝玻璃） */
-  background: rgba(34, 48, 76, .78);
+  /* 顶栏底色明显提亮（比内容区亮两级，深蓝玻璃） */
+  background: rgba(58, 80, 120, .85);
+}
+/* 顶栏内容容器：全宽 header 内居中限宽，任意窗口宽度自适应 */
+.site-header-inner {
+  width: min(100% - 24px, 1180px);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 .brand { order: 0; color: var(--ink); text-decoration: none; font-size: 19px; font-weight: 800; letter-spacing: -.06em; }
 .brand-mark {
@@ -845,11 +852,12 @@ button { font: inherit; }
 }
 @media (max-width: 560px) {
   .page-shell { width: min(100% - 24px, 1180px); }
-  .site-header { min-height: 62px; gap: 10px; }
+  .site-header { min-height: 62px; }
+  .site-header-inner { gap: 10px; }
   /* 移动端布局对齐参考站：左 logo + 小红书，右汉堡；中间胶囊隐藏 */
   .xhs-link { order: 1; padding: 5px 10px 5px 6px; }
-  /* 移动端移除小红书 logo 图，保留「海南旅行天气判断」与「我的小红书」文字 */
-  .xhs-logo { display: none; }
+  /* 移动端保留小红书 logo（18px）与「海南旅行天气判断」「我的小红书」文字 */
+  .xhs-logo { display: block; height: 18px; }
   .header-center { display: none; }
   .hamburger-btn { display: inline-flex; margin-left: auto; }
   /* 右侧滑出抽屉（覆盖桌面 fixed 居中定位） */

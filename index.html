@@ -11,8 +11,8 @@
 </head>
 <body data-mood="neutral">
   <canvas id="rain-layer" aria-hidden="true"></canvas>
-  <div class="page-shell">
-    <header class="site-header">
+  <header class="site-header">
+    <div class="site-header-inner">
       <a class="brand" href="#top" aria-label="晴海首页"><span class="brand-mark">◐</span>晴海</a>
       <a class="xhs-link" href="https://xhslink.cn/m/4BS8N8iCK3F" target="_blank" rel="noopener" aria-label="我的小红书主页 · 海南旅行天气判断">
         <img class="xhs-logo" src="assets/xhs-logo.png" alt="" width="205" height="96" aria-hidden="true">
@@ -33,7 +33,9 @@
       <button type="button" class="hamburger-btn" id="account-hamburger" aria-label="账户菜单" aria-haspopup="true" aria-expanded="false">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
       </button>
-    </header>
+    </div><!-- /site-header-inner -->
+  </header>
+  <div class="page-shell">
     <!-- 账户面板（body 层：避免被移动端 header 隐藏子树影响） + 遮罩 -->
     <div id="account-panel" class="account-panel hidden" role="dialog" aria-label="账户与设置">
       <div class="panel-head">
