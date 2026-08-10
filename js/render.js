@@ -278,6 +278,7 @@ function renderEcHero(day, assessment, destination, aiAnalysis, aiAnimate, aiSta
     glassSea: aiAnalysis.glassSea ? escapeText(aiAnalysis.glassSea) : '',
   } : null;
   const pendingAi = ['loading', 'settling', 'generating', 'retrying'].includes(aiStatus);
+  const unavailableAi = ['unavailable', 'version_mismatch', 'retryable'].includes(aiStatus);
   const loadingCopy = aiStatus === 'settling'
     ? '最新一轮气象数据正在同步，稍后开始分析'
     : aiStatus === 'generating'
@@ -304,7 +305,15 @@ function renderEcHero(day, assessment, destination, aiAnalysis, aiAnimate, aiSta
             <p class="ai-loading-copy">${loadingCopy}<span class="ai-loading-dots" aria-hidden="true"><i></i><i></i><i></i></span></p>
           </div>
         </div>`
-      : (advice.note ? `<p class="advice-note">${advice.note}</p>` : '');
+      : unavailableAi
+        ? `<div class="ai-analysis ai-unavailable" role="status" aria-live="polite" aria-label="DeepSeek 分析暂未完成">
+            <span class="ai-avatar" aria-hidden="true">DS</span>
+            <div class="ai-bubble">
+              <span class="ai-analysis-label">DEEPSEEK 天气分析</span>
+              <p class="ai-unavailable-copy">${aiStatus === 'version_mismatch' ? '气象数据刚刚更新，请再次点击“更新判断”获取对应版本分析。' : '本次 AI 分析暂未完成，当前出行结论仍由气象规则正常提供。'}</p>
+            </div>
+          </div>`
+        : (advice.note ? `<p class="advice-note">${advice.note}</p>` : '');
   return `
   <section class="ec-hero" data-mood="${assessment.weatherMood.mood}" data-cloud="${day.cloud < 30 ? 'clear' : day.cloud < 60 ? 'partly' : 'cloudy'}" data-thunder-intensity="${Metrics.thunderIntensity(day, main)}">
     <div class="ec-verdict">

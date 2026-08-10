@@ -102,6 +102,10 @@ for (const c of ['ai-analysis ai-loading', 'DeepSeek 正在分析', '正在结�
 const htmlAiRetrying = renderWeatherApp(bundle, dest, 3, null, { aiStatus: 'retrying' });
 if (!htmlAiRetrying.includes('正在进行一次安全重试')) { console.error('AI RETRY COPY MISSING'); process.exit(1); }
 if (htmlAi.includes('ai-loading')) { console.error('AI READY STILL LOADING'); process.exit(1); }
+const htmlAiUnavailable = renderWeatherApp(bundle, dest, 3, null, { aiStatus: 'unavailable' });
+for (const c of ['ai-analysis ai-unavailable', 'DeepSeek 分析暂未完成', '当前出行结论仍由气象规则正常提供']) {
+  if (!htmlAiUnavailable.includes(c)) { console.error('AI UNAVAILABLE MISSING:', c); process.exit(1); }
+}
 // 概率环形图：SVG 环（pathLength=100，dasharray 即百分比；全成员晴好 → 100 100）
 for (const c of ['prob-ring', 'prob-arc', 'prob-track', 'stroke-dasharray="100 100"', 'rotate(-90 60 60)']) {
   if (!html.includes(c)) { console.error('PROB-RING MISSING:', c); process.exit(1); }

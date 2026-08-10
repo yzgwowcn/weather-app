@@ -710,6 +710,8 @@ html, body { overflow-x: hidden; }
 .ai-loading-dots i:nth-child(3) { animation-delay: .28s; }
 @keyframes ai-loading-dot { 0%, 60%, 100% { opacity: .35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
 @keyframes ai-loading-sheen { 55%, 100% { transform: translateX(100%); } }
+.ai-unavailable .ai-bubble { min-height: 64px; }
+.ai-unavailable-copy { margin: 0; color: rgba(226, 233, 240, .82); font-size: 13px; line-height: 1.55; }
 .ai-uncertainty { padding: 7px 10px; border: 1px solid rgba(125, 180, 255, .18); border-radius: 10px; background: rgba(68, 120, 190, .1); }
 @media (prefers-reduced-motion: reduce) {
   .ai-analysis.typing .ai-bubble::after { animation: none; opacity: 0; }
@@ -792,6 +794,10 @@ html, body { overflow-x: hidden; }
 .sky-view-pane:not([hidden]) { animation: paneIn .28s ease; }
 .sky-view-btn.active { animation: btnPop .2s ease; }
 .date-rail, .ec-hero, .forecast-section { animation: fadeRise .3s ease both; }
+/* AI 状态更新会重建结果 DOM；禁用整卡入场动画，确保 loading → 打字机视觉连续。 */
+.result.stable-update .date-rail,
+.result.stable-update .ec-hero,
+.result.stable-update .forecast-section { animation: none; }
 .sky-scroll {
   overflow-x: auto; padding-bottom: 8px;
   border: 1px solid var(--line); border-radius: var(--r-md);
