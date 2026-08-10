@@ -2,7 +2,7 @@
 // 并把渲染层输出的 weatherMood 应用到页面背景状态机。
 (() => {
   'use strict';
-  const state = { region: readRegion(), dest: null, days: DEFAULT_DAYS, bundle: null, selectedDate: null, skyView: 'ec', skyIndex: null, cloudPick: null, customDest: null, aiAnalyses: {}, aiStatus: 'idle' };
+  const state = { region: readRegion(), dest: null, days: DEFAULT_DAYS, bundle: null, selectedDate: null, skyView: 'ec', skyIndex: null, cloudPick: null, customDest: null, aiAnalyses: {}, aiStatus: 'idle', aiSeenDates: new Set() };
   state.dest = currentDestinations()[0];
   const destListEl = document.getElementById('dest-list');
   const daysGroupEl = document.getElementById('days-group');
@@ -32,6 +32,7 @@
   let searchItems = [];
   let requestSeq = 0;
   let abortController = null;
+  let typingTimer = null;
 
   // ---- 区域模式：海南（默认）/ 四川，localStorage 记忆，顶栏按钮切换 ----
   const REGION_STORAGE_KEY = 'regionMode';
@@ -290,8 +291,10 @@
     const scrollLeft = oldScroll ? oldScroll.scrollLeft : 0;
     const oldRail = resultEl.querySelector('.date-rail');
     const railLeft = oldRail ? oldRail.scrollLeft : 0;
+    if (typingTimer) { clearTimeout(typingTimer); typingTimer = null; }
     resultEl.innerHTML = renderWeatherApp(state.bundle, state.dest, state.days, state.selectedDate, {
-      skyView: state.skyView, skyIndex: state.skyIndex, aiAnalyses: state.aiAnalyses, aiStatus: state.aiStatus,
+      skyView: state.skyView, skyIndex: state.skyIndex, aiAnalyses: state.aiAnalyses,
+      aiStatus: state.aiStatus, aiSeenDates: state.aiSeenDates,
     });
     updateDataStatus();
     const mood = resultEl.querySelector('[data-mood]')?.dataset.mood || 'neutral';
@@ -333,6 +336,38 @@
       const cloudHit = cloudChart?.querySelector(`.cloud-hit[data-index="${state.cloudPick.index}"]`);
       if (cloudHit) updateCloudCursor(cloudChart, cloudHit);
     }
+    startAiTyping();
+  }
+
+  // DeepSeek 气泡仅在某日期本次查询中首次展示时逐字出现；重渲染、切换图表不重复播放。
+  function startAiTyping() {
+    const bubble = resultEl.querySelector('[data-ai-typing="true"]');
+    if (!bubble) return;
+    const date = bubble.dataset.aiDate;
+    if (date) state.aiSeenDates.add(date);
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      bubble.classList.remove('typing');
+      return;
+    }
+    const nodes = Array.from(bubble.querySelectorAll('[data-ai-text]'));
+    const texts = nodes.map((node) => node.textContent);
+    nodes.forEach((node) => { node.textContent = ''; });
+    let nodeIndex = 0;
+    let charIndex = 0;
+    const tick = () => {
+      const node = nodes[nodeIndex];
+      const chars = Array.from(texts[nodeIndex] || '');
+      if (!node) { bubble.classList.remove('typing'); typingTimer = null; return; }
+      if (charIndex < chars.length) {
+        node.textContent += chars[charIndex++];
+        typingTimer = setTimeout(tick, 12);
+        return;
+      }
+      nodeIndex += 1;
+      charIndex = 0;
+      typingTimer = setTimeout(tick, 70);
+    };
+    tick();
   }
   // 悬停/触控提示：更新图表准星与数值卡，不触发整页重渲染
   function updateSkyCursor(chart, hit) {
@@ -453,6 +488,7 @@
     state.cloudPick = null;
     state.aiAnalyses = {};
     state.aiStatus = AIAnalysis.isPreset(state.dest) ? 'loading' : 'disabled';
+    state.aiSeenDates = new Set();
     loadingEl.classList.add('hidden');
     queryBtnEl.disabled = false;
     resultEl.removeAttribute('aria-busy');

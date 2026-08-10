@@ -26,7 +26,7 @@ const AIAnalysis = (() => {
       const analyses = Object.fromEntries(data.analyses
         .filter((item) => item && typeof item.date === 'string')
         .map((item) => [item.date, item]));
-      return { status: 'ready', analyses, modelVersion: data.modelVersion, generatedAt: data.generatedAt };
+      return { status: 'ready', analyses, modelVersion: data.modelVersion, generatedAt: data.generatedAt, cached: data.cached === true };
     } catch (error) {
       if (error && error.name === 'AbortError') throw error;
       return { status: 'unavailable', analyses: {} };
