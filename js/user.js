@@ -4,6 +4,7 @@
 // 未注入 Supabase 配置或未登录时各方法返回 { ok: false, message }
 (function () {
   'use strict';
+  var MAX_FAVORITES = 20;
 
   function sb() {
     if (!window.Auth || !window.Auth.isReady()) return null;
@@ -97,6 +98,9 @@
     if (typeof item.lat !== 'number' || typeof item.lon !== 'number') return { ok: false, message: '收藏数据无效' };
     var list = await listFavorites();
     if (list.ok) {
+      if (list.favorites.length >= MAX_FAVORITES) {
+        return { ok: false, message: '每位用户最多收藏 20 个地点，请先删除不需要的收藏' };
+      }
       var dup = list.favorites.some(function (f) {
         return f.name === name && Math.abs(f.lat - item.lat) < 0.001 && Math.abs(f.lon - item.lon) < 0.001;
       });
@@ -107,6 +111,9 @@
       .insert({ user_id: user.id, name: name, lat: item.lat, lon: item.lon, is_gcj: !!item.is_gcj })
       .select('id, name, lat, lon, is_gcj, created_at');
     if (error) {
+      if (error.message && error.message.indexOf('FAVORITES_LIMIT_REACHED') !== -1) {
+        return { ok: false, message: '每位用户最多收藏 20 个地点，请先删除不需要的收藏' };
+      }
       if (error.code === '23514') return { ok: false, message: '收藏名称不能超过 15 字' }; // 数据库 CHECK 兜底
       return { ok: false, message: error.message };
     }

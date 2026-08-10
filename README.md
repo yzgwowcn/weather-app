@@ -189,8 +189,9 @@ Build Command 设为 `npm run build`（或保持默认，Vercel 检测到 `packa
 
 ### ④ 用户数据表（profiles / favorites，已在 Supabase 建好）
 
-- `profiles`：用户名（注册时可选填，账户页可修改）；`favorites`：收藏位置（名称 + 坐标 + 是否高德坐标）。
+- `profiles`：用户名（注册时可选填，账户页可修改）；`favorites`：收藏位置（名称 + 坐标 + 是否高德坐标），每位用户最多 20 个。
 - 两张表均开启 RLS，按 `user_id = auth.uid()` 隔离；`profiles` 的登录用户写权限仅限 `username`，不能自行修改会员等级、有效期或额度；`username_taken` RPC 做用户名占用检查。
+- 收藏上限由 `supabase/migrations/008_limit_user_favorites.sql` 的数据库触发器强制执行，并用事务级 advisory lock 防止多标签页或直接调用 API 并发越限；前端计数仅用于提前给出友好提示。该迁移已于 2026-08-10 部署至生产 Supabase。
 - 读写封装在 `js/user.js`（`window.User`）：`getProfile / setUsername / listFavorites / addFavorite / removeFavorite`；收藏项点击即设为当前目的地并查询。
 
 ### ⑤ 验证码注册 · Supabase 控制台配置清单（一次性）
