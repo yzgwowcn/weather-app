@@ -1,4 +1,4 @@
-// 账户面板：右上角汉堡入口 → 右侧抽屉（账户详情：邮箱/用户名/等级；设置：默认城市、温度单位；退出登录）
+// 账户面板：右上角汉堡入口 → 右侧抽屉（账户详情：邮箱/昵称/等级；设置：默认城市、温度单位；退出登录）
 // 桌面端与移动端统一入口与交互；未登录展开显示登录引导。
 // 依赖：js/auth.js（window.Auth）、js/user.js（window.User）、js/config.js（REGIONS/CURRENT_REGION）
 (function () {
@@ -14,9 +14,14 @@
   var regionSelect = document.getElementById('panel-region');
   var tempSelect = document.getElementById('panel-temp');
   var hint = document.getElementById('panel-hint');
+  var editUsernameLink = document.getElementById('panel-edit-username');
+  var nicknamePrompt = document.getElementById('nickname-prompt');
+  var nicknamePromptClose = document.getElementById('nickname-prompt-close');
   if (!hamburger || !panel) return;
 
   var PLAN_LABEL = { free: '免费版', pro: 'Pro', ultra: 'Ultra' };
+  var nicknameCheckedUserId = '';
+  var nicknameDismissedUserId = '';
 
   function isLoggedIn() {
     return !!(window.Auth && window.Auth.isReady && window.Auth.isReady() && window.Auth.getUser());
@@ -39,6 +44,27 @@
     return t;
   }
 
+  function hideNicknamePrompt() {
+    if (nicknamePrompt) nicknamePrompt.classList.add('hidden');
+  }
+
+  // 每次重新进入页面或重新登录后检查一次。关闭只对本次页面会话生效，
+  // 下次进入仍会提醒；资料请求失败时不把“未知”误判为“未设置”。
+  function checkNicknamePrompt(user) {
+    if (!user || !window.User || nicknameCheckedUserId === user.id) return;
+    nicknameCheckedUserId = user.id;
+    window.User.getProfile().then(function (r) {
+      var current = isLoggedIn() ? window.Auth.getUser() : null;
+      if (!current || current.id !== user.id || !r.ok) return;
+      var missing = !(r.profile && r.profile.username);
+      if (missing && nicknameDismissedUserId !== user.id && nicknamePrompt) {
+        nicknamePrompt.classList.remove('hidden');
+      } else {
+        hideNicknamePrompt();
+      }
+    });
+  }
+
   // 渲染面板内容：未登录显示登录引导，已登录显示详情 + 设置
   function renderPanel() {
     var loggedIn = isLoggedIn();
@@ -53,6 +79,7 @@
       var profile = r.ok ? r.profile : null;
       if (!isLoggedIn()) return;
       document.getElementById('panel-username').textContent = (profile && profile.username) ? profile.username : '未设置';
+      if (editUsernameLink) editUsernameLink.textContent = (profile && profile.username) ? '修改昵称' : '设置昵称';
       document.getElementById('panel-plan').textContent = planText(window.User.getPlanStatus(profile));
     });
     window.User.getPreferences().then(function (r) {
@@ -110,6 +137,11 @@
     if (panel.classList.contains('hidden')) openPanel(); else closePanel();
   });
   if (panelClose) panelClose.addEventListener('click', closePanel);
+  if (nicknamePromptClose) nicknamePromptClose.addEventListener('click', function () {
+    var user = isLoggedIn() ? window.Auth.getUser() : null;
+    nicknameDismissedUserId = user ? user.id : '';
+    hideNicknamePrompt();
+  });
   // 点击面板外关闭（排除面板本体与汉堡）
   document.addEventListener('click', function (e) {
     if (panel.classList.contains('hidden')) return;
@@ -128,8 +160,18 @@
   document.getElementById('panel-logout').addEventListener('click', function () {
     window.Auth.signOut().then(closePanel);
   });
-  // 登录/退出状态变化：收起面板（内容在下次展开时重新渲染）
-  document.addEventListener('auth-change', closePanel);
+  // 登录/退出状态变化：收起面板，并在资料确认缺少昵称时提醒。
+  document.addEventListener('auth-change', function (e) {
+    closePanel();
+    var user = e.detail && e.detail.user ? e.detail.user : null;
+    if (!user) {
+      nicknameCheckedUserId = '';
+      nicknameDismissedUserId = '';
+      hideNicknamePrompt();
+      return;
+    }
+    checkNicknamePrompt(user);
+  });
 
   // 默认城市下拉：填充指定区域（缺省用当前会话区域）的预设目的地；区域切换后重建，保留原选中值
   function fillCityOptions(region) {

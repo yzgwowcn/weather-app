@@ -97,8 +97,9 @@
       <div id="panel-user">
         <div class="panel-section">
           <div class="panel-row"><span class="k">邮箱</span><span class="v" id="panel-email">—</span></div>
-          <div class="panel-row"><span class="k">用户名</span><span class="v" id="panel-username">—</span></div>
+          <div class="panel-row"><span class="k">昵称</span><span class="v" id="panel-username">—</span></div>
           <div class="panel-row"><span class="k">等级</span><span class="v" id="panel-plan">—</span></div>
+          <a class="panel-btn panel-link-btn" id="panel-edit-username" href="account.html?edit=username">修改昵称</a>
         </div>
         <div class="panel-section">
           <div class="panel-row panel-col">
@@ -128,6 +129,13 @@
       </div>
     </div>
     <div id="panel-mask" class="panel-mask hidden" aria-hidden="true"></div>
+
+    <aside id="nickname-prompt" class="nickname-prompt hidden" role="status" aria-live="polite" aria-labelledby="nickname-prompt-title">
+      <button type="button" id="nickname-prompt-close" class="nickname-prompt-close" aria-label="关闭昵称提醒">✕</button>
+      <strong id="nickname-prompt-title">设置一个昵称</strong>
+      <p>你的账户还没有昵称，设置后更方便识别。</p>
+      <a href="account.html?edit=username" class="nickname-prompt-action">去设置昵称</a>
+    </aside>
 
     <main id="top">
       <section class="intro">
