@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import handler from '../api/weather-analysis.mjs';
 import {
-  ANALYSIS_VERSION, PRESETS, deepSeekRequest, shanghaiDateRange,
+  ANALYSIS_VERSION, PRESETS, addGlassSeaForecast, deepSeekRequest, marineUrl, shanghaiDateRange,
   summarizeWeather, validateAnalyses, weatherUrls,
 } from '../api/_weather-analysis-core.mjs';
 import { completeAnalysis, getAnalysis } from '../api/_weather-analysis-store.mjs';
@@ -59,6 +59,24 @@ test('上海日期范围和天气 URL 不接受客户端坐标', () => {
   const urls = weatherUrls(PRESETS.sanya, range.start, range.end);
   assert.match(urls.main, /latitude=18\.224/);
   assert.match(urls.ensemble, /models=ecmwf_ifs025/);
+  assert.match(marineUrl(PRESETS.sanya, range.start, range.end), /cell_selection=sea/);
+  assert.match(marineUrl(PRESETS.sanya, range.start, range.end), /wind_wave_height/);
+});
+
+test('服务端为海南分析注入与前端同口径的玻璃海候选窗口', () => {
+  const dates = ['2026-08-10'];
+  const main = hourly(dates, { wind_speed_10m: Array(24).fill(10) });
+  const days = [{ date: dates[0] }];
+  const marine = {
+    hourly: {
+      time: [...main.time], wave_height: Array(24).fill(0.4),
+      wind_wave_height: Array(24).fill(0.1), swell_wave_height: Array(24).fill(0.4),
+    },
+  };
+  const result = addGlassSeaForecast(days, { hourly: main }, marine);
+  assert.equal(result[0].glassSea.level, 'excellent');
+  assert.equal(result[0].glassSea.windows[0].time, '08:00–17:00');
+  assert.equal(addGlassSeaForecast(days, { hourly: main }, null)[0].glassSea.level, 'unavailable');
 });
 
 test('DeepSeek 请求按海南云层口径解释并严格校验 JSON', () => {
@@ -71,12 +89,16 @@ test('DeepSeek 请求按海南云层口径解释并严格校验 JSON', () => {
   assert.match(request.messages[0].content, /阴晴观感以低云和中云/);
   assert.match(request.messages[0].content, /覆盖率而非光学厚度/);
   assert.match(request.messages[0].content, /不得笼统写“云量少”/);
-  assert.match(request.messages[0].content, /禁止仅凭高云或 windKmh 承诺\/否定玻璃海/);
+  assert.match(request.messages[0].content, /海南每项必须额外输出 glassSea/);
+  assert.match(request.messages[0].content, /高云不单独否决候选/);
   assert.doesNotMatch(deepSeekRequest(PRESETS.chengdu, 123, days).messages[0].content, /玻璃海/);
   const payload = { analyses: [{ date: '2026-08-10', summary: '晴好', reason: '云量低', uncertainty: '集合一致', advice: '注意防晒' }] };
   assert.deepEqual(validateAnalyses(payload, ['2026-08-10']), payload.analyses);
+  assert.throws(() => validateAnalyses(payload, ['2026-08-10'], { requireGlassSea: true }), /AI_INVALID_OUTPUT/);
+  const hainanPayload = { analyses: [{ ...payload.analyses[0], glassSea: '08:00–10:00较佳候选，仍需看现场水质。' }] };
+  assert.deepEqual(validateAnalyses(hainanPayload, ['2026-08-10'], { requireGlassSea: true }), hainanPayload.analyses);
   assert.throws(() => validateAnalyses({ analyses: [] }, ['2026-08-10']), /AI_INVALID_OUTPUT/);
-  assert.equal(ANALYSIS_VERSION, 'weather-v3');
+  assert.equal(ANALYSIS_VERSION, 'weather-v4');
 });
 
 function responseRecorder() {
@@ -128,12 +150,12 @@ test('分析完成后自动删除同一预设点的旧模型和旧提示词版�
     return new Response(null, { status: 204 });
   };
   try {
-    await completeAnalysis('sanya', 456, 'weather-v3', [], {}, {
+    await completeAnalysis('sanya', 456, 'weather-v4', [], {}, {
       SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SECRET_KEY: 'sb_secret_example',
     });
     assert.deepEqual(calls.map((call) => call.method), ['PATCH', 'DELETE', 'DELETE']);
     assert.match(calls[1].url, /model_version=lt\.456/);
-    assert.match(calls[2].url, /analysis_version=neq\.weather-v3/);
+    assert.match(calls[2].url, /analysis_version=neq\.weather-v4/);
   } finally {
     globalThis.fetch = originalFetch;
   }

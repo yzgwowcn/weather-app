@@ -2,7 +2,7 @@
 import { checkOrigin } from './_origin-check.mjs';
 import {
   ANALYSIS_VERSION, DEEPSEEK_MODEL_DEFAULT, MODEL_META_URL, PRESETS,
-  deepSeekRequest, shanghaiDateRange, summarizeWeather, validateAnalyses, weatherUrls,
+  addGlassSeaForecast, deepSeekRequest, marineUrl, shanghaiDateRange, summarizeWeather, validateAnalyses, weatherUrls,
 } from './_weather-analysis-core.mjs';
 import { claimAnalysis, completeAnalysis, failAnalysis, getAnalysis } from './_weather-analysis-store.mjs';
 
@@ -91,8 +91,12 @@ export default async function handler(req, res) {
   try {
     const { start, end } = shanghaiDateRange();
     const urls = weatherUrls(preset, start, end);
-    const [main, ensemble] = await Promise.all([getJson(urls.main), getJson(urls.ensemble)]);
-    const days = summarizeWeather(main, ensemble);
+    const [main, ensemble, marine] = await Promise.all([
+      getJson(urls.main), getJson(urls.ensemble),
+      preset.region === 'hainan' ? getJson(marineUrl(preset, start, end)).catch(() => null) : Promise.resolve(null),
+    ]);
+    let days = summarizeWeather(main, ensemble);
+    if (preset.region === 'hainan') days = addGlassSeaForecast(days, main, marine);
     if (days.length < 3) throw new Error('EC_DATA_INCOMPLETE');
 
     const model = process.env.DEEPSEEK_MODEL || DEEPSEEK_MODEL_DEFAULT;
@@ -103,7 +107,7 @@ export default async function handler(req, res) {
     });
     const content = completion?.choices?.[0]?.message?.content;
     const parsed = JSON.parse(content);
-    const analyses = validateAnalyses(parsed, days.map((day) => day.date));
+    const analyses = validateAnalyses(parsed, days.map((day) => day.date), { requireGlassSea: preset.region === 'hainan' });
     await completeAnalysis(presetId, modelVersion, ANALYSIS_VERSION, analyses, completion.usage);
     return send(res, 200, {
       ok: true, status: 'ready', cached: false, modelVersion,

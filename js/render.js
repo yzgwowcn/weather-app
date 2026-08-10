@@ -275,6 +275,7 @@ function renderEcHero(day, assessment, destination, aiAnalysis, aiAnimate) {
     reason: escapeText(aiAnalysis.reason),
     uncertainty: escapeText(aiAnalysis.uncertainty),
     advice: escapeText(aiAnalysis.advice),
+    glassSea: aiAnalysis.glassSea ? escapeText(aiAnalysis.glassSea) : '',
   } : null;
   const narrative = ai
     ? `<div class="ai-analysis ${aiAnimate ? 'typing' : ''}" aria-label="DeepSeek 智能分析" ${aiAnimate ? `data-ai-typing="true" data-ai-date="${day.date}"` : ''}>
@@ -283,6 +284,7 @@ function renderEcHero(day, assessment, destination, aiAnalysis, aiAnimate) {
           <span class="ai-analysis-label">DEEPSEEK 天气分析</span>
           <p class="ai-summary" data-ai-text>${ai.summary}</p>
           <p class="ai-reason" data-ai-text>${ai.reason}</p>
+          ${ai.glassSea ? `<p class="ai-glass-sea" data-ai-text>${ai.glassSea}</p>` : ''}
           <p class="ai-advice" data-ai-text>${ai.advice}</p>
         </div>
       </div>`
@@ -425,6 +427,23 @@ function renderCloudCurve(points) {
   return `<svg class="cloud-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="当天逐小时低云、中云与降雨量曲线（1 小时间隔，共 ${points.length} 点）">${parts.join('')}</svg>`;
 }
 
+function renderGlassSeaDetail(glassSea) {
+  if (!glassSea) return '';
+  const labels = { excellent: '较佳候选', possible: '可以关注', none: '暂无明显窗口', unavailable: '海况数据待补充' };
+  if (!glassSea.windows?.length) {
+    const note = glassSea.level === 'unavailable'
+      ? 'Marine 模式当前没有覆盖到该日，不能据此判断。'
+      : '当天风、浪、低中云或降水条件没有同时达到候选阈值，不影响一般海边出行判断。';
+    return `<div class="glass-sea-detail ${glassSea.level}"><div class="glass-sea-head"><span>玻璃海候选</span><strong>${labels[glassSea.level]}</strong></div><p>${note}</p></div>`;
+  }
+  const windows = glassSea.windows.map((window) => `
+    <div class="glass-sea-window ${window.level}">
+      <strong>${GlassSea.hourLabel(window)}</strong><span>${labels[window.level]}</span>
+      <small>有效浪高≤${window.maxWaveM.toFixed(1)} m · 风浪≤${window.maxWindWaveM.toFixed(1)} m · 涌浪≤${window.maxSwellM.toFixed(1)} m · 风≤${window.maxWindKmh} km/h</small>
+    </div>`).join('');
+  return `<div class="glass-sea-detail ${glassSea.level}"><div class="glass-sea-head"><span>玻璃海候选</span><strong>${labels[glassSea.level]}</strong></div><div class="glass-sea-windows">${windows}</div><p>高云不单独否决候选；近海网格无法判断现场水质、岸边浪花与瞬时涌浪，请结合临近海况和景区实况。</p></div>`;
+}
+
 function renderForecastCards(days, selectedDate, cloudCurves = {}) {
   return `<section class="forecast-section"><div class="section-heading"><p class="section-kicker">OUTLOOK</p><h2>逐日判断</h2></div>
     <div class="forecast-list">${days.map((day, index) => {
@@ -438,7 +457,7 @@ function renderForecastCards(days, selectedDate, cloudCurves = {}) {
           <div class="forecast-condition"><strong>${probabilityWord(day.assessment.probability)}</strong><span>${condition} · ${Math.round(day.low)}°–${Math.round(day.high)}°</span></div>
           <div class="forecast-probability"><b>${Metrics.formatPercent(day.assessment.probability)}</b><small>${consistency.text}</small></div>
         </button>
-        ${active ? `<div class="forecast-detail">${cloudCurves[day.date] ? `<div class="cloud-curve-wrap"><div class="cloud-curve-head"><span>当天逐小时低云 · 中云 · 降雨量</span><small>1 小时间隔 · ${cloudCurves[day.date].length} 点 · 综合预报</small></div><div class="cloud-scroll"><div class="cloud-chart" data-cloud-chart data-date="${day.date}" tabindex="0" role="application" aria-label="当天逐小时低云、中云与降雨量图，左右方向键移动准星">${renderCloudCurve(cloudCurves[day.date])}<div class="cloud-crosshair" aria-hidden="true"></div><div class="cloud-tooltip" role="status"></div></div></div><p class="cloud-note">低云与中云按百分比（左轴），降雨量为柱状（高度按当天最大值归一化），悬停或点击查看精确数值；横向滚动查看全部时段。</p><div class="cloud-curve-legend"><span class="legend-low">低云</span><span class="legend-mid">中云</span><span class="legend-precip">降雨量</span></div></div>` : '<p class="cloud-curve-empty">当天逐小时云量数据暂缺。</p>'}</div>` : ''}
+        ${active ? `<div class="forecast-detail">${renderGlassSeaDetail(day.glassSea)}${cloudCurves[day.date] ? `<div class="cloud-curve-wrap"><div class="cloud-curve-head"><span>当天逐小时低云 · 中云 · 降雨量</span><small>1 小时间隔 · ${cloudCurves[day.date].length} 点 · 综合预报</small></div><div class="cloud-scroll"><div class="cloud-chart" data-cloud-chart data-date="${day.date}" tabindex="0" role="application" aria-label="当天逐小时低云、中云与降雨量图，左右方向键移动准星">${renderCloudCurve(cloudCurves[day.date])}<div class="cloud-crosshair" aria-hidden="true"></div><div class="cloud-tooltip" role="status"></div></div></div><p class="cloud-note">低云与中云按百分比（左轴），降雨量为柱状（高度按当天最大值归一化），悬停或点击查看精确数值；横向滚动查看全部时段。</p><div class="cloud-curve-legend"><span class="legend-low">低云</span><span class="legend-mid">中云</span><span class="legend-precip">降雨量</span></div></div>` : '<p class="cloud-curve-empty">当天逐小时云量数据暂缺。</p>'}</div>` : ''}
       </article>`;
     }).join('')}</div></section>`;
 }
@@ -475,7 +494,8 @@ function renderWeatherApp(bundle, destination, requestedDays, selectedDate, ui =
   const dates = forecast.daily.time;
   const assessments = Metrics.buildAssessment(bundle.ensembles, bundle.deterministic, dates);
   const cloudSeries = Metrics.buildCloudSeries(bundle.deterministic['ECMWF IFS'], forecast, dates);
-  const days = dates.map((date, index) => ({ ...dailyData(forecast, index), assessment: assessments[date], iconCodes: hourlyCodesFor(forecast, date) }));
+  const glassSeaDays = destination.marine ? Metrics.buildGlassSeaForecast(bundle.deterministic['ECMWF IFS'], bundle.marine, dates) : {};
+  const days = dates.map((date, index) => ({ ...dailyData(forecast, index), assessment: assessments[date], iconCodes: hourlyCodesFor(forecast, date), glassSea: glassSeaDays[date] }));
   const cloudCurves = Object.fromEntries(dates.map((date) => [date, cloudCurve(forecast, date)]));
   const currentDate = days.some((day) => day.date === selectedDate) ? selectedDate : days[0].date;
   const selected = days.find((day) => day.date === currentDate);

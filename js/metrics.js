@@ -259,6 +259,10 @@ const Metrics = (() => {
       forecast: cloudSeriesFor(forecastResponse, dates),
     };
   }
+  function buildGlassSeaForecast(forecastResponse, marineResponse, dates) {
+    if (typeof GlassSea === 'undefined') return Object.fromEntries(dates.map((date) => [date, { level: 'unavailable', windows: [], availableHours: 0 }]));
+    return GlassSea.build(forecastResponse?.hourly, marineResponse?.hourly, dates);
+  }
   function formatPercent(value) { return value == null ? '—' : `${Math.round(value)}%`; }
   // 雷暴强度 0–1：决定闪电频率与质感（晴天短时雷雨低、阴雨长雷暴高）。
   // 由雷雨窗口覆盖小时数、遮蔽云量、累计降水与天气码加权合成。
@@ -301,5 +305,5 @@ const Metrics = (() => {
     if (near) return { level: 'avoid', text: '不建议出行', note: p == null ? '主运行不适合且集合数据暂缺，不建议按当前预报出行。' : `主运行不适合，集合多数成员也不看好（晴好率仅 ${pct}）。` };
     return { level: 'watch', text: '关注后续预报', note: p == null ? '主运行不适合且集合数据暂缺，远期变化大，建议关注后续起报。' : `主运行与集合多数成员都不看好（晴好率仅 ${pct}），远期仍可关注临近更新。` };
   }
-  return { THRESHOLDS, buildAssessment, buildCloudSeries, formatPercent, thunderIntensity, travelAdvice };
+  return { THRESHOLDS, buildAssessment, buildCloudSeries, buildGlassSeaForecast, formatPercent, thunderIntensity, travelAdvice };
 })();

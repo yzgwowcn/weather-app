@@ -17,6 +17,8 @@ const server = http.createServer((req, res) => {
   const browser = await pw.chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const failures = [];
+  const marineRequests = [];
+  page.on('request', (request) => { if (request.url().startsWith('https://marine-api.open-meteo.com/')) marineRequests.push(request.url()); });
   const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ' — ' + detail : ''}`); if (!ok) failures.push(name); };
   page.on('pageerror', (err) => failures.push(`pageerror: ${err.message}`));
   await page.goto('http://127.0.0.1:8124/', { waitUntil: 'networkidle', timeout: 60000 });
@@ -70,6 +72,7 @@ const server = http.createServer((req, res) => {
   await page.locator('#coord-confirm').click();
   await page.waitForFunction(() => /自选点/.test(document.querySelector('.section-kicker')?.textContent || ''), null, { timeout: 60000 }).catch(() => {});
   check('坐标查询生成自定义按钮', /自选点 \(18\.50°N, 110\.03°E\)/.test(await page.locator('.dest-btn.custom').textContent()), await page.locator('.dest-btn.custom').textContent());
+  check('海南自选点请求近海数据', marineRequests.some((url) => /latitude=18\.5(?:0|&)/.test(url) && /cell_selection=sea/.test(url)), `marineRequests=${marineRequests.length}`);
   const coordLoading = await page.locator('#loading').evaluate((el) => !el.classList.contains('hidden'));
   check('坐标查询完成后 loading 隐藏', !coordLoading);
   // 高德 GCJ-02 坐标勾选换算：输入高德拾取坐标，确认后名称应显示换算后的 WGS84 坐标

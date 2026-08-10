@@ -688,6 +688,8 @@ html, body { overflow-x: hidden; }
 }
 .ai-summary { margin: 0; color: #fff; font-size: 14px; font-weight: 750; line-height: 1.55; }
 .ai-reason { margin: 5px 0 0; color: rgba(226, 233, 240, .9); font-size: 13px; line-height: 1.62; }
+.ai-glass-sea { margin: 8px 0 0; padding: 7px 9px; border-radius: 9px; background: rgba(79, 216, 196, .1); color: #baf4e9; font-size: 13px; line-height: 1.58; }
+.ai-glass-sea::before { content: '玻璃海 · '; color: #69dfcc; font-weight: 800; }
 .ai-advice { margin: 8px 0 0; padding-top: 7px; border-top: 1px solid rgba(125, 180, 255, .18); color: #cfe4ff; font-size: 13px; line-height: 1.58; }
 .ai-advice::before { content: '建议 · '; color: #8fc0ff; font-weight: 800; }
 .ai-analysis.typing .ai-bubble::after {
@@ -896,6 +898,19 @@ html, body { overflow-x: hidden; }
 }
 .forecast-detail p { margin: 0; color: rgba(226, 233, 240, .88); font-size: 13px; }
 
+.glass-sea-detail { margin-top: 10px; padding: 11px 12px; border: 1px solid rgba(79, 216, 196, .24); border-radius: 12px; background: rgba(35, 115, 115, .1); }
+.glass-sea-detail.none, .glass-sea-detail.unavailable { border-color: rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .035); }
+.glass-sea-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.glass-sea-head span { color: #baf4e9; font-size: 12px; font-weight: 850; letter-spacing: .08em; }
+.glass-sea-head strong { color: #69dfcc; font-size: 13px; }
+.glass-sea-detail.none .glass-sea-head strong, .glass-sea-detail.unavailable .glass-sea-head strong { color: var(--muted); }
+.glass-sea-windows { display: grid; gap: 6px; margin-top: 8px; }
+.glass-sea-window { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 9px; background: rgba(8, 28, 38, .28); }
+.glass-sea-window strong { color: #fff; font-size: 13px; }
+.glass-sea-window span { padding: 2px 7px; border-radius: 999px; background: rgba(79, 216, 196, .14); color: #94eadc; font-size: 12px; font-weight: 750; }
+.glass-sea-window small { color: rgba(226, 233, 240, .76); font-size: 12px; text-align: right; }
+.glass-sea-detail > p { margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+
 /* 选中卡片展开区：当天逐小时低云/中云/降雨量曲线（横向滚动，交互同天空剖面） */
 .cloud-curve-wrap { margin-top: 10px; padding: 10px 0 0; border-top: 1px solid rgba(255, 255, 255, .08); }
 .cloud-curve-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
@@ -1039,6 +1054,8 @@ html, body { overflow-x: hidden; }
   .forecast-summary .icon-period { font-size: 12px; }
   .forecast-detail { padding: 0 10px 15px; }
   .forecast-detail p { font-size: 12px; }
+  .glass-sea-window { grid-template-columns: 1fr auto; }
+  .glass-sea-window small { grid-column: 1 / -1; text-align: left; }
   .section-heading h2 { font-size: 26px; }
 }
 
