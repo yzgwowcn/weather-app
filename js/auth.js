@@ -133,6 +133,18 @@
     return { ok: true };
   }
 
+  // 找回密码验证码：Recovery 邮件模板展示 {{ .Token }}，验证成功后建立短期受信会话。
+  async function verifyRecoveryOtp(email, token) {
+    if (!client) return { ok: false, message: '认证未配置' };
+    var { data, error } = await client.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: String(token).trim(),
+      type: 'recovery',
+    });
+    if (error) return { ok: false, message: error.message };
+    return { ok: true, user: (data && data.user) || null };
+  }
+
   // 第三方 OAuth 登录（google / github）：跳转 Supabase 托管授权页，成功后回跳 auth/callback.html
   // 与 resetPasswordForEmail 的回调约定一致；supabase-js 成功时会自动跳转授权页（data.url）
   async function signInWithOAuth(provider) {
@@ -308,6 +320,7 @@
     resendSignupCode: resendSignupCode,
     signInWithOAuth: signInWithOAuth,
     resetPasswordForEmail: resetPasswordForEmail,
+    verifyRecoveryOtp: verifyRecoveryOtp,
     handleCallback: handleCallback,
     updatePassword: updatePassword,
     refreshUser: refreshUser,

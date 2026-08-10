@@ -26,6 +26,16 @@
       border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);
       background: rgba(0,0,0,0.25); color: inherit; font-size: 15px;
     }
+    .password-wrap { position: relative; }
+    .password-wrap input { padding-right: 48px; }
+    .password-toggle {
+      position: absolute; top: 50%; right: 7px; display: grid; place-items: center; width: 36px; height: 36px;
+      transform: translateY(-50%); border: 0; border-radius: 9px; background: transparent; color: rgba(221,233,247,.7); cursor: pointer;
+    }
+    .password-toggle:hover, .password-toggle:focus-visible { color: #fff; background: rgba(125,180,255,.12); outline: none; }
+    .eye-icon { position: relative; width: 18px; height: 12px; border: 1.5px solid currentColor; border-radius: 70% 30% 70% 30%; transform: rotate(45deg); }
+    .eye-icon::after { content: ''; position: absolute; top: 50%; left: 50%; width: 5px; height: 5px; border-radius: 50%; background: currentColor; transform: translate(-50%, -50%); }
+    .password-toggle[aria-pressed="true"] .eye-icon::before { content: ''; position: absolute; z-index: 1; top: 50%; left: -3px; width: 24px; height: 1.5px; background: currentColor; box-shadow: 0 0 0 2px rgba(24,38,58,.9); transform: rotate(-45deg); }
     .auth-submit {
       width: 100%; padding: 11px 0; margin-top: 6px; cursor: pointer;
       border: none; border-radius: 8px; font-size: 15px;
@@ -50,11 +60,11 @@
         <form id="reset-form" class="hidden" novalidate>
           <div class="auth-field">
             <label for="new-password">新密码（至少 6 位）</label>
-            <input type="password" id="new-password" minlength="6" autocomplete="new-password" required>
+            <div class="password-wrap"><input type="password" id="new-password" minlength="6" autocomplete="new-password" required><button type="button" class="password-toggle" data-password-toggle="new-password" aria-label="显示密码" aria-pressed="false"><span class="eye-icon" aria-hidden="true"></span></button></div>
           </div>
           <div class="auth-field">
             <label for="new-password2">确认新密码</label>
-            <input type="password" id="new-password2" minlength="6" autocomplete="new-password" required>
+            <div class="password-wrap"><input type="password" id="new-password2" minlength="6" autocomplete="new-password" required><button type="button" class="password-toggle" data-password-toggle="new-password2" aria-label="显示密码" aria-pressed="false"><span class="eye-icon" aria-hidden="true"></span></button></div>
           </div>
           <button type="submit" class="auth-submit" id="reset-submit">保存新密码</button>
         </form>
@@ -71,6 +81,18 @@
       'use strict';
       var statusEl = document.getElementById('cb-status');
       var resetForm = document.getElementById('reset-form');
+
+      document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var input = document.getElementById(button.dataset.passwordToggle);
+          var show = input && input.type === 'password';
+          if (!input) return;
+          input.type = show ? 'text' : 'password';
+          button.setAttribute('aria-pressed', String(show));
+          button.setAttribute('aria-label', show ? '隐藏密码' : '显示密码');
+          try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); }
+        });
+      });
 
       function setMsg(text, isError) {
         statusEl.textContent = text || '';

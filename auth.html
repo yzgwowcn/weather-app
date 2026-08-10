@@ -3,52 +3,71 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>登录 / 注册 · 晴海</title>
+  <title>账户登录与注册 · 晴海</title>
   <link rel="stylesheet" href="css/style.css">
   <style>
     /* 认证页：复用站点毛玻璃视觉语言，独立样式不改动 style.css */
-    .auth-page { max-width: 420px; margin: 40px auto; padding: 0 16px; }
+    .auth-page { width: min(100%, 468px); margin: 44px auto; padding: 0 16px; }
     .auth-card {
-      background: rgba(255,255,255,0.08);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+      position: relative; overflow: hidden;
+      background: linear-gradient(145deg, rgba(38,56,82,.78), rgba(17,29,48,.9));
+      backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+      border: 1px solid rgba(160,197,244,.2); border-radius: 22px; padding: 28px;
+      box-shadow: 0 22px 60px rgba(3,10,22,.34), inset 0 1px 0 rgba(255,255,255,.08);
     }
-    .auth-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+    .auth-card::before {
+      content: ''; position: absolute; width: 220px; height: 220px; top: -145px; right: -90px;
+      border-radius: 50%; background: radial-gradient(circle, rgba(106,169,250,.2), transparent 68%); pointer-events: none;
+    }
+    .auth-heading { position: relative; margin: 0; color: #f7fbff; font-size: 25px; line-height: 1.25; letter-spacing: -.02em; }
+    .auth-subtitle { position: relative; min-height: 42px; margin: 8px 0 20px; color: rgba(222,233,246,.72); font-size: 13px; line-height: 1.6; }
+    .auth-tabs { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 24px; padding: 4px; border-radius: 13px; background: rgba(5,14,27,.32); }
     .auth-tab {
-      flex: 1; padding: 8px 0; text-align: center; cursor: pointer;
-      border: 1px solid rgba(255,255,255,0.14); border-radius: 8px;
-      background: transparent; color: inherit; font-size: 14px;
+      min-height: 38px; padding: 8px 5px; text-align: center; cursor: pointer;
+      border: 1px solid transparent; border-radius: 10px;
+      background: transparent; color: rgba(222,233,246,.72); font-size: 13px; font-weight: 700;
     }
-    .auth-tab.active { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.35); }
-    .auth-field { margin-bottom: 14px; }
-    .auth-field label { display: block; font-size: 13px; margin-bottom: 6px; opacity: 0.85; }
+    .auth-tab:hover { color: #fff; background: rgba(255,255,255,.05); }
+    .auth-tab.active { color: #fff; background: rgba(103,158,231,.2); border-color: rgba(145,190,247,.28); box-shadow: 0 4px 14px rgba(5,16,32,.15); }
+    .auth-field { margin-bottom: 16px; }
+    .auth-field label { display: flex; justify-content: space-between; gap: 8px; color: rgba(230,239,249,.88); font-size: 13px; font-weight: 650; margin-bottom: 7px; }
     .auth-field input {
-      width: 100%; box-sizing: border-box; padding: 10px 12px;
-      border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);
-      background: rgba(0,0,0,0.25); color: inherit; font-size: 15px;
+      width: 100%; min-height: 46px; box-sizing: border-box; padding: 11px 13px;
+      border-radius: 11px; border: 1px solid rgba(164,195,233,.2);
+      background: rgba(4,12,24,.36); color: #f7fbff; font-size: 15px; transition: border-color .2s, box-shadow .2s, background .2s;
     }
-    .auth-field input:focus { outline: none; border-color: rgba(255,255,255,0.5); }
+    .auth-field input::placeholder { color: rgba(211,225,241,.42); }
+    .auth-field input:focus { outline: none; border-color: rgba(127,180,247,.72); background: rgba(4,12,24,.5); box-shadow: 0 0 0 3px rgba(86,145,221,.13); }
+    .password-wrap { position: relative; }
+    .password-wrap input { padding-right: 48px; }
+    .password-toggle {
+      position: absolute; top: 50%; right: 7px; display: grid; place-items: center; width: 36px; height: 36px;
+      transform: translateY(-50%); border: 0; border-radius: 9px; background: transparent; color: rgba(221,233,247,.7); cursor: pointer;
+    }
+    .password-toggle:hover, .password-toggle:focus-visible { color: #fff; background: rgba(125,180,255,.12); outline: none; }
+    .eye-icon { position: relative; width: 18px; height: 12px; border: 1.5px solid currentColor; border-radius: 70% 30% 70% 30%; transform: rotate(45deg); }
+    .eye-icon::after { content: ''; position: absolute; top: 50%; left: 50%; width: 5px; height: 5px; border-radius: 50%; background: currentColor; transform: translate(-50%, -50%); }
+    .password-toggle[aria-pressed="true"] .eye-icon::before { content: ''; position: absolute; z-index: 1; top: 50%; left: -3px; width: 24px; height: 1.5px; background: currentColor; box-shadow: 0 0 0 2px rgba(24,38,58,.9); transform: rotate(-45deg); }
     .auth-submit {
-      width: 100%; padding: 11px 0; margin-top: 6px; cursor: pointer;
-      border: none; border-radius: 8px; font-size: 15px;
-      background: linear-gradient(135deg, #f0b45a, #e08a3c); color: #1a1a1a; font-weight: 600;
+      width: 100%; min-height: 46px; padding: 11px 16px; margin-top: 6px; cursor: pointer;
+      border: 1px solid rgba(255,220,158,.3); border-radius: 11px; font-size: 15px;
+      background: linear-gradient(135deg, #f4c36e, #e89a4b); color: #18202b; font-weight: 800; box-shadow: 0 8px 22px rgba(210,128,49,.18);
     }
+    .auth-submit:hover { filter: brightness(1.05); transform: translateY(-1px); }
     .auth-submit:disabled { opacity: 0.5; cursor: not-allowed; }
-    .auth-msg { margin-top: 14px; font-size: 13px; min-height: 18px; line-height: 1.5; }
-    .auth-msg.error { color: #ff8f8f; }
-    .auth-msg.ok { color: #8fd6a0; }
-    .auth-hint { margin-top: 14px; font-size: 12px; opacity: 0.7; line-height: 1.6; }
+    .auth-msg { margin-top: 16px; padding: 0; border-radius: 10px; font-size: 13px; min-height: 19px; line-height: 1.55; }
+    .auth-msg.error, .auth-msg.ok { padding: 9px 11px; border: 1px solid; }
+    .auth-msg.error { color: #ffc0c0; background: rgba(208,70,70,.1); border-color: rgba(255,143,143,.22); }
+    .auth-msg.ok { color: #bceac6; background: rgba(70,170,100,.1); border-color: rgba(143,214,160,.2); }
+    .auth-hint { margin: 15px 0 0; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.08); color: rgba(218,231,246,.62); font-size: 12px; line-height: 1.6; }
     .cf-turnstile { margin-top: 4px; }
-    .auth-code-hint { margin: 0 0 14px; font-size: 13px; line-height: 1.6; opacity: 0.9; word-break: break-all; }
+    .auth-code-hint { margin: 0 0 16px; padding: 11px 12px; border: 1px solid rgba(125,180,255,.16); border-radius: 10px; background: rgba(75,130,198,.09); color: rgba(229,239,251,.88); font-size: 13px; line-height: 1.6; word-break: break-all; }
+    .auth-code-input { text-align: center; letter-spacing: .28em; font-size: 18px !important; font-variant-numeric: tabular-nums; }
     .auth-resend-row { display: flex; gap: 8px; margin-top: 10px; }
     .auth-secondary {
       flex: 1; padding: 9px 0; cursor: pointer;
-      border: 1px solid rgba(255,255,255,0.2); border-radius: 8px;
-      background: rgba(255,255,255,0.06); color: inherit; font-size: 14px;
+      min-height: 42px; border: 1px solid rgba(164,195,233,.18); border-radius: 10px;
+      background: rgba(255,255,255,.05); color: rgba(235,242,251,.88); font-size: 13px;
     }
     .auth-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
     .auth-back { display: inline-block; margin-top: 16px; font-size: 13px; opacity: 0.85; }
@@ -65,6 +84,14 @@
     .auth-oauth-btn:hover { background: rgba(255,255,255,0.12); }
     .auth-oauth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .auth-oauth-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .auth-step-label { margin: -4px 0 14px; color: #9dc8ff; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+    @media (max-width: 520px) {
+      .auth-page { margin: 22px auto; padding: 0 12px; }
+      .auth-card { padding: 22px 18px; border-radius: 18px; }
+      .auth-heading { font-size: 23px; }
+      .auth-tabs { margin-bottom: 20px; }
+    }
+    @media (prefers-reduced-motion: reduce) { .auth-submit, .auth-field input { transition: none; } }
   </style>
 </head>
 <body data-mood="neutral">
@@ -76,10 +103,12 @@
   <div class="page-shell">
     <main class="auth-page">
       <div class="auth-card">
+        <h1 class="auth-heading" id="auth-heading">欢迎回来</h1>
+        <p class="auth-subtitle" id="auth-subtitle">登录后同步收藏地点与旅行偏好。</p>
         <div class="auth-tabs" role="tablist">
-          <button type="button" class="auth-tab active" data-mode="login" role="tab">登录</button>
-          <button type="button" class="auth-tab" data-mode="signup" role="tab">注册</button>
-          <button type="button" class="auth-tab" data-mode="forgot" role="tab">找回密码</button>
+          <button type="button" class="auth-tab active" data-mode="login" role="tab" aria-selected="true">登录</button>
+          <button type="button" class="auth-tab" data-mode="signup" role="tab" aria-selected="false">注册</button>
+          <button type="button" class="auth-tab" data-mode="forgot" role="tab" aria-selected="false">找回密码</button>
         </div>
 
         <!-- 登录 -->
@@ -90,7 +119,7 @@
           </div>
           <div class="auth-field">
             <label for="login-password">密码</label>
-            <input type="password" id="login-password" autocomplete="current-password" required>
+            <div class="password-wrap"><input type="password" id="login-password" autocomplete="current-password" required><button type="button" class="password-toggle" data-password-toggle="login-password" aria-label="显示密码" aria-pressed="false"><span class="eye-icon" aria-hidden="true"></span></button></div>
           </div>
           <button type="submit" class="auth-submit" id="login-submit">登录</button>
         </form>
@@ -122,11 +151,11 @@
             </div>
             <div class="auth-field">
               <label for="signup-password">密码（至少 6 位）</label>
-              <input type="password" id="signup-password" minlength="6" autocomplete="new-password" required>
+              <div class="password-wrap"><input type="password" id="signup-password" minlength="6" autocomplete="new-password" required><button type="button" class="password-toggle" data-password-toggle="signup-password" aria-label="显示密码" aria-pressed="false"><span class="eye-icon" aria-hidden="true"></span></button></div>
             </div>
             <div class="auth-field">
               <label for="signup-password2">确认密码</label>
-              <input type="password" id="signup-password2" minlength="6" autocomplete="new-password" required>
+              <div class="password-wrap"><input type="password" id="signup-password2" minlength="6" autocomplete="new-password" required><button type="button" class="password-toggle" data-password-toggle="signup-password2" aria-label="显示密码" aria-pressed="false"><span class="eye-icon" aria-hidden="true"></span></button></div>
             </div>
             <div id="turnstile-widget" class="cf-turnstile"></div>
             <button type="submit" class="auth-submit" id="signup-submit">注册</button>
@@ -135,7 +164,7 @@
             <p class="auth-code-hint">验证码已发送至 <strong id="signup-code-email"></strong>,请查收邮件（含垃圾箱）。</p>
             <div class="auth-field">
               <label for="signup-code">邮箱验证码</label>
-              <input type="text" id="signup-code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="请输入邮件中的数字验证码" required>
+              <input type="text" class="auth-code-input" id="signup-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{8}" placeholder="8 位数字验证码" required>
             </div>
             <button type="button" class="auth-submit" id="signup-code-submit">验证并完成注册</button>
             <div class="auth-resend-row">
@@ -145,17 +174,41 @@
           </div>
         </form>
 
-        <!-- 找回密码 -->
+        <!-- 找回密码：填写新密码 → 收取 Recovery OTP → 验证后更新 -->
         <form id="forgot-form" class="auth-form hidden" novalidate>
-          <div class="auth-field">
-            <label for="forgot-email">邮箱</label>
-            <input type="email" id="forgot-email" autocomplete="email" required>
+          <div id="forgot-step1">
+            <p class="auth-step-label">第 1 步 · 设置新密码</p>
+            <div class="auth-field">
+              <label for="forgot-email">账户邮箱</label>
+              <input type="email" id="forgot-email" autocomplete="email" placeholder="name@example.com" required>
+            </div>
+            <div class="auth-field">
+              <label for="forgot-password">新密码（至少 6 位）</label>
+              <div class="password-wrap"><input type="password" id="forgot-password" minlength="6" autocomplete="new-password" required><button type="button" class="password-toggle" data-password-toggle="forgot-password" aria-label="显示密码" aria-pressed="false"><span class="eye-icon" aria-hidden="true"></span></button></div>
+            </div>
+            <div class="auth-field">
+              <label for="forgot-password2">确认新密码</label>
+              <div class="password-wrap"><input type="password" id="forgot-password2" minlength="6" autocomplete="new-password" required><button type="button" class="password-toggle" data-password-toggle="forgot-password2" aria-label="显示密码" aria-pressed="false"><span class="eye-icon" aria-hidden="true"></span></button></div>
+            </div>
+            <button type="submit" class="auth-submit" id="forgot-submit">发送邮箱验证码</button>
           </div>
-          <button type="submit" class="auth-submit" id="forgot-submit">发送重置邮件</button>
+          <div id="forgot-step2" class="hidden">
+            <p class="auth-step-label">第 2 步 · 验证身份</p>
+            <p class="auth-code-hint">8 位验证码已发送至 <strong id="forgot-code-email"></strong>，验证通过后立即更新密码。</p>
+            <div class="auth-field">
+              <label for="forgot-code">邮箱验证码</label>
+              <input type="text" class="auth-code-input" id="forgot-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{8}" placeholder="8 位数字验证码" required>
+            </div>
+            <button type="button" class="auth-submit" id="forgot-code-submit">验证并修改密码</button>
+            <div class="auth-resend-row">
+              <button type="button" class="auth-secondary" id="forgot-resend">重新发送验证码</button>
+              <button type="button" class="auth-secondary" id="forgot-back">返回修改</button>
+            </div>
+          </div>
         </form>
 
         <div id="auth-msg" class="auth-msg" role="status"></div>
-        <p class="auth-hint" id="auth-hint">您的账户 ID 用于关联收藏与偏好。</p>
+        <p class="auth-hint hidden" id="auth-hint">您的账户 ID 用于关联收藏与偏好。</p>
       </div>
       <p class="auth-back"><a href="index.html">← 返回首页</a></p>
     </main>
@@ -173,6 +226,24 @@
       var msg = $('auth-msg');
       var hint = $('auth-hint');
       var currentMode = 'login';
+      var modeCopy = {
+        login: ['欢迎回来', '登录后同步收藏地点与旅行偏好。'],
+        signup: ['创建晴海账户', '保存常用地点，让每次天气判断更省心。'],
+        forgot: ['重新设置密码', '先设定新密码，再用邮件中的 8 位验证码确认身份。'],
+      };
+
+      // 密码显隐：按钮不参与表单提交，状态通过 aria-pressed/aria-label 同步给辅助技术。
+      document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var input = $(button.dataset.passwordToggle);
+          if (!input) return;
+          var show = input.type === 'password';
+          input.type = show ? 'text' : 'password';
+          button.setAttribute('aria-pressed', String(show));
+          button.setAttribute('aria-label', show ? '隐藏密码' : '显示密码');
+          try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); }
+        });
+      });
 
       // Turnstile API 加载完成回调（onload 参数触发；兜底处理 API 晚于用户切 tab 的情况）
       window.onTurnstileLoad = function () {
@@ -187,7 +258,7 @@
       // 未注入 Supabase 配置时整体禁用
       if (!Auth.isReady()) {
         setMsg('认证服务未配置（构建时未注入 SUPABASE 环境变量），请联系管理员。', true);
-        ['login-submit', 'signup-submit', 'forgot-submit', 'oauth-google', 'oauth-github'].forEach(function (id) { $(id).disabled = true; });
+        ['login-submit', 'signup-submit', 'signup-code-submit', 'forgot-submit', 'forgot-code-submit', 'oauth-google', 'oauth-github'].forEach(function (id) { $(id).disabled = true; });
       }
 
       // Turnstile 显式渲染（仅注册 tab 需要）
@@ -253,7 +324,13 @@
       document.querySelectorAll('.auth-tab').forEach(function (tab) {
         tab.addEventListener('click', function () {
           currentMode = tab.dataset.mode;
-          document.querySelectorAll('.auth-tab').forEach(function (t) { t.classList.toggle('active', t === tab); });
+          document.querySelectorAll('.auth-tab').forEach(function (t) {
+            var active = t === tab;
+            t.classList.toggle('active', active);
+            t.setAttribute('aria-selected', String(active));
+          });
+          $('auth-heading').textContent = modeCopy[currentMode][0];
+          $('auth-subtitle').textContent = modeCopy[currentMode][1];
           $('login-form').classList.toggle('hidden', currentMode !== 'login');
           $('signup-form').classList.toggle('hidden', currentMode !== 'signup');
           $('forgot-form').classList.toggle('hidden', currentMode !== 'forgot');
@@ -403,8 +480,7 @@
       $('signup-code-submit').addEventListener('click', async function () {
         setMsg('');
         var code = $('signup-code').value.trim();
-        // 位数由 Supabase 项目决定（6/8 位均可），这里只做宽松校验
-        if (!/^\d{4,10}$/.test(code)) { setMsg('请输入邮件中的数字验证码', true); return; }
+        if (!/^\d{8}$/.test(code)) { setMsg('请输入邮件中的 8 位数字验证码', true); return; }
         var btn = $('signup-code-submit');
         btn.disabled = true;
         try {
@@ -446,16 +522,118 @@
         if (turnstileRendered) turnstile.reset(turnstileWidgetEl);
       });
 
-      // 找回密码
+      // ---- 找回密码：新密码只保留在当前页面内存，OTP 验证成功后才提交给 Supabase ----
+      var forgotEmail = '';
+      var forgotNewPassword = '';
+      var forgotResendTimer = null;
+
+      function startForgotResendCountdown() {
+        var btn = $('forgot-resend');
+        var remain = 60;
+        btn.disabled = true;
+        btn.textContent = '重新发送（' + remain + 's）';
+        clearInterval(forgotResendTimer);
+        forgotResendTimer = setInterval(function () {
+          remain -= 1;
+          if (remain <= 0) {
+            clearInterval(forgotResendTimer);
+            btn.disabled = false;
+            btn.textContent = '重新发送验证码';
+          } else {
+            btn.textContent = '重新发送（' + remain + 's）';
+          }
+        }, 1000);
+      }
+
+      function showForgotStep2(email, password) {
+        forgotEmail = email.trim().toLowerCase();
+        forgotNewPassword = password;
+        $('forgot-step1').classList.add('hidden');
+        $('forgot-step2').classList.remove('hidden');
+        $('forgot-code-email').textContent = forgotEmail;
+        $('forgot-code').value = '';
+        $('forgot-code').focus();
+        startForgotResendCountdown();
+      }
+
       $('forgot-form').addEventListener('submit', async function (e) {
         e.preventDefault();
         setMsg('');
+        if (!$('forgot-step2').classList.contains('hidden')) {
+          $('forgot-code-submit').click();
+          return;
+        }
+        var email = $('forgot-email').value;
+        var p1 = $('forgot-password').value;
+        var p2 = $('forgot-password2').value;
+        if (!/^\S+@\S+\.\S+$/.test(email.trim())) { setMsg('请输入有效的邮箱地址', true); return; }
+        if (p1.length < 6) { setMsg('新密码至少需要 6 位', true); return; }
+        if (p1 !== p2) { setMsg('两次输入的新密码不一致', true); return; }
         var btn = $('forgot-submit');
         btn.disabled = true;
-        var r = await Auth.resetPasswordForEmail($('forgot-email').value);
-        btn.disabled = false;
-        if (!r.ok) { setMsg(r.message, true); return; }
-        setMsg('重置邮件已发送，请查收（含垃圾箱）');
+        try {
+          var r = await Auth.resetPasswordForEmail(email);
+          if (!r.ok) { setMsg(r.message, true); return; }
+          showForgotStep2(email, p1);
+          setMsg('验证码已发送，请查收邮件（含垃圾箱）');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      $('forgot-code-submit').addEventListener('click', async function () {
+        setMsg('');
+        var code = $('forgot-code').value.trim();
+        if (!/^\d{8}$/.test(code)) { setMsg('请输入邮件中的 8 位数字验证码', true); return; }
+        if (!forgotEmail || !forgotNewPassword) { setMsg('找回信息已失效，请返回重新填写', true); return; }
+        var btn = $('forgot-code-submit');
+        btn.disabled = true;
+        try {
+          var verified = await Auth.verifyRecoveryOtp(forgotEmail, code);
+          if (!verified.ok) { setMsg(verified.message, true); return; }
+          var updated = await Auth.updatePassword(forgotNewPassword);
+          if (!updated.ok) { setMsg(updated.message, true); return; }
+          forgotNewPassword = '';
+          $('forgot-password').value = '';
+          $('forgot-password2').value = '';
+          $('forgot-code').value = '';
+          await Auth.signOut();
+          $('login-email').value = forgotEmail;
+          $('forgot-step2').classList.add('hidden');
+          $('forgot-step1').classList.remove('hidden');
+          clearInterval(forgotResendTimer);
+          document.querySelector('.auth-tab[data-mode="login"]').click();
+          setMsg('密码修改成功，请使用新密码登录');
+          $('login-password').focus();
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      $('forgot-code').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          $('forgot-code-submit').click();
+        }
+      });
+
+      $('forgot-resend').addEventListener('click', async function () {
+        setMsg('');
+        var btn = $('forgot-resend');
+        btn.disabled = true;
+        var r = await Auth.resetPasswordForEmail(forgotEmail).catch(function () { return { ok: false, message: '网络异常，请重试' }; });
+        if (!r.ok) { setMsg(r.message, true); btn.disabled = false; return; }
+        setMsg('验证码已重新发送，请查收');
+        startForgotResendCountdown();
+      });
+
+      $('forgot-back').addEventListener('click', function () {
+        $('forgot-step2').classList.add('hidden');
+        $('forgot-step1').classList.remove('hidden');
+        $('forgot-code').value = '';
+        forgotNewPassword = '';
+        clearInterval(forgotResendTimer);
+        setMsg('');
       });
 
       // URL 带 mode 参数时直接切 tab（如从回调页跳回）
