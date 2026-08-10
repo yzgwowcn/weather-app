@@ -2,7 +2,7 @@
 // 并把渲染层输出的 weatherMood 应用到页面背景状态机。
 (() => {
   'use strict';
-  const state = { region: readRegion(), dest: null, days: DEFAULT_DAYS, bundle: null, selectedDate: null, skyView: 'ec', skyIndex: null, cloudPick: null, customDest: null };
+  const state = { region: readRegion(), dest: null, days: DEFAULT_DAYS, bundle: null, selectedDate: null, skyView: 'ec', skyIndex: null, cloudPick: null, customDest: null, aiAnalyses: {}, aiStatus: 'idle' };
   state.dest = currentDestinations()[0];
   const destListEl = document.getElementById('dest-list');
   const daysGroupEl = document.getElementById('days-group');
@@ -290,7 +290,9 @@
     const scrollLeft = oldScroll ? oldScroll.scrollLeft : 0;
     const oldRail = resultEl.querySelector('.date-rail');
     const railLeft = oldRail ? oldRail.scrollLeft : 0;
-    resultEl.innerHTML = renderWeatherApp(state.bundle, state.dest, state.days, state.selectedDate, { skyView: state.skyView, skyIndex: state.skyIndex });
+    resultEl.innerHTML = renderWeatherApp(state.bundle, state.dest, state.days, state.selectedDate, {
+      skyView: state.skyView, skyIndex: state.skyIndex, aiAnalyses: state.aiAnalyses, aiStatus: state.aiStatus,
+    });
     updateDataStatus();
     const mood = resultEl.querySelector('[data-mood]')?.dataset.mood || 'neutral';
     document.body.dataset.mood = mood;
@@ -449,10 +451,38 @@
     state.selectedDate = null;
     state.skyIndex = null;
     state.cloudPick = null;
+    state.aiAnalyses = {};
+    state.aiStatus = AIAnalysis.isPreset(state.dest) ? 'loading' : 'disabled';
     loadingEl.classList.add('hidden');
     queryBtnEl.disabled = false;
     resultEl.removeAttribute('aria-busy');
     renderResult();
+    // AI 仅补充预设点的解释文案；天气主结果先展示，接口异常不阻断页面。
+    if (AIAnalysis.isPreset(state.dest) && !bundle.partialFallback &&
+        !bundle.deterministic?.['ECMWF IFS']?.error && !bundle.ensembles?.['ECMWF IFS 集合']?.error) {
+      loadAiAnalysis(seq, 0);
+    }
+  }
+
+  async function loadAiAnalysis(seq, attempt) {
+    const result = await AIAnalysis.fetchForPreset(state.dest, state.bundle.weatherVersion, abortController.signal).catch((error) => {
+      if (error && error.name === 'AbortError') return null;
+      return { status: 'unavailable', analyses: {} };
+    });
+    if (!result || seq !== requestSeq) return;
+    state.aiStatus = result.status;
+    if (result.status === 'ready') {
+      state.aiAnalyses = result.analyses;
+      renderResult();
+      return;
+    }
+    // 新模型正在跨节点同步或已有请求取得生成租约时，当前页面最多自动复查一次。
+    if ((result.status === 'settling' || result.status === 'generating') && attempt < 1) {
+      const delay = Math.min(60000, Math.max(3000, Number(result.retryAfterSeconds || 8) * 1000));
+      setTimeout(() => {
+        if (seq === requestSeq && !abortController.signal.aborted) loadAiAnalysis(seq, attempt + 1);
+      }, delay);
+    }
   }
   // 首屏渲染完成：淡出并移除 boot splash（覆盖 JS 就绪前的空白期）。
   // 兜底链：init() 同步渲染后主动调用 → window load 事件 → index.html 内联脚本 10s 强制 .done

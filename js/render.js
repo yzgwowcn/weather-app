@@ -252,7 +252,7 @@ const ADVICE_META = {
   none: { cls: 'none' },
 };
 
-function renderEcHero(day, assessment, destination) {
+function renderEcHero(day, assessment, destination, aiAnalysis) {
   const main = assessment.ec.main;
   const finalSuitable = assessment.finalSuitable === true;
   const ensembleOverturn = finalSuitable && main && !main.suitable;
@@ -270,17 +270,26 @@ function renderEcHero(day, assessment, destination) {
   const gust = main && main.gustWindows && main.gustWindows.length
     ? `<p class="gust-window">⚠ ${formatWindows(main.gustWindows)} 有短时大阵风（峰值 ${Math.round(main.gustMax)} km/h），注意防风</p>` : '';
   const consistency = assessment.ec.memberConsistency;
+  const ai = aiAnalysis ? {
+    summary: escapeText(aiAnalysis.summary),
+    reason: escapeText(aiAnalysis.reason),
+    uncertainty: escapeText(aiAnalysis.uncertainty),
+    advice: escapeText(aiAnalysis.advice),
+  } : null;
+  const narrative = ai
+    ? `<div class="ai-analysis" aria-label="DeepSeek 智能分析"><span class="ai-analysis-label">DEEPSEEK 分析</span><p class="advice-note">${ai.summary}</p><p class="ai-reason">${ai.reason}</p></div>`
+    : (advice.note ? `<p class="advice-note">${advice.note}</p>` : '');
   return `
   <section class="ec-hero" data-mood="${assessment.weatherMood.mood}" data-cloud="${day.cloud < 30 ? 'clear' : day.cloud < 60 ? 'partly' : 'cloudy'}" data-thunder-intensity="${Metrics.thunderIntensity(day, main)}">
     <div class="ec-verdict">
       <p class="section-kicker">ECMWF 主运行 · 08:00–18:00 · ${destination.name}</p>
       <div class="verdict-row">${lottieMarkup(day.iconCodes ?? [[], [], []], 'weather-symbol', finalSuitable, day.code)}<h2>${verdict.text}</h2><span class="verdict-badge ${verdict.cls}">${verdict.text}</span></div>
       <p class="verdict-basis">${basis}。${condition}，${cloudWord(day.cloud)}。</p>
-      ${advice.note ? `<p class="advice-note">${advice.note}</p>` : ''}
+      ${narrative}
       ${overturnNote ? `<p class="overturn-note">${overturnNote}</p>` : ''}
       ${thunder}
       ${gust}
-      <p class="sea-sky-tip">${regionTexts().seaTip}</p>
+      <p class="sea-sky-tip">${ai ? ai.advice : regionTexts().seaTip}</p>
     </div>
     <div class="ec-probability">
       <div class="probability-orb ${assessment.probability == null ? 'unavailable' : ''}">
@@ -292,7 +301,7 @@ function renderEcHero(day, assessment, destination) {
         <small>${assessment.ec.ensemble ? `${assessment.ec.ensemble.suitable}/${assessment.ec.ensemble.total} 成员满足` : '成员数据暂缺'}</small>
       </div>
       <span class="confidence-pill ${consistency.level}">${consistency.text}</span>
-      <p class="consistency-desc">${consistency.description}</p>
+      <p class="consistency-desc">${ai ? ai.uncertainty : consistency.description}</p>
     </div>
   </section>`;
 }
@@ -466,5 +475,6 @@ function renderWeatherApp(bundle, destination, requestedDays, selectedDate, ui =
   const skyIndex = ui.skyIndex;
   const farNotice = requestedDays > 7 ? '<p class="notice">第 8 天及以后仅适合作趋势参考，临近出行请再次更新。</p>' : '';
   const regionNotice = destination.outOfRegion ? `<p class="notice">${regionTexts().regionNotice}</p>` : '';
-  return `${regionNotice}${farNotice}${renderDayRail(days, currentDate)}${renderEcHero(selected, selected.assessment, destination)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderForecastCards(days, currentDate, cloudCurves)}${renderMarineCards(bundle.marine, destination)}`;
+  const aiAnalysis = ui.aiAnalyses && ui.aiAnalyses[currentDate];
+  return `${regionNotice}${farNotice}${renderDayRail(days, currentDate)}${renderEcHero(selected, selected.assessment, destination, aiAnalysis)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderForecastCards(days, currentDate, cloudCurves)}${renderMarineCards(bundle.marine, destination)}`;
 }

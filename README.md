@@ -8,6 +8,7 @@
 - **海边天色看低中云**：遮蔽云量 = 低云均值×60% + 中云均值×40%，低云与中云对海边天色影响最大；高云单独绘制与提示、不参与晴好率扣分。
 - **EC 天空剖面**：原生 SVG 小时精度图表，低/中/高三条平滑曲线、白天时段浅色带、日界线与选中准星；悬停/触控/键盘查看逐小时三层云、加权遮蔽云量、降水与风速；14 天保持小时精度并可横向滚动；支持 EC / 综合预报视图切换。
 - **两层一致性**：`EC 成员一致性`（集合晴好率是否集中于高/低区间 + 主运行方向是否一致）与 `外部模型验证`（GFS/JMA/CMA 支持数、反对数与缺失来源，明确为模型分歧提示）。
+- **DeepSeek 解释（预设点）**：仅 12 个内置目的地在 ECMWF 数据版本更新后生成一次共享分析；数值与出行等级仍由规则引擎决定，DeepSeek 只解释原因、不确定性和行动建议。搜索、地图与坐标自选点继续使用原规则文案，不调用 AI。
 - **晴雨结合氛围界面**：页面底色恒为暖金阳光基调（晴天阳光偏多），按选中日 EC 数据叠加氛围层——cloudy 云影、windy 气流光带、storm 气流+雨、thunder 雨+闪电；雨滴为**本地 Canvas 特效**（`js/rain.js`，零依赖，参考雨特效 demo 的视觉语言：斜向雨滴 + 头部亮点 + 落地涟漪），雷阵雨闪电 2.8–6s 随机双闪；多层毛玻璃面板、细白描边、低饱和主题色；全部动效遵守 `prefers-reduced-motion`。
 - **区域示意地图背景**：海南/四川两省风格化轮廓 SVG（`index.html` 内嵌，取自阿里 DataV GeoAtlas 公开简化数据）随区域模式切换，目的地光点高亮当前选中（呼吸动画 + 名称标签）；**两级 LOD**——选择预设目的地后背景平滑放大过渡到其所在市/县精细轮廓（8 个市/县级区划，光点重新定位），点击地图空白或切换区域恢复省全景；自定义选点（搜索/地图选点/坐标）在省全景上显示定位光点；地图层位于日照层与天气氛围层之间，云影/雨滴/光带自然覆盖其上；切换时平移滑入模拟「随定位移动」；移动端退为弱背景水印。**合规注记：风格化示意轮廓，非标准政区图，不涉审图号与九段线**（海南仅展示主岛）。
 - **亚克力面板**：五个玻璃面板（查询区/EC 主结论/指标/交叉验证/日期条）为半透明亚克力质感（`backdrop-filter` 模糊 + 渐变描边 + 内高光），`body[data-mood]` 天气背景（阳光/云影/气流/雨+闪电）透出；无 WebGL/流体折射依赖。
@@ -56,6 +57,20 @@ NODE_PATH="$(npm root -g)" node tests/e2e.check.js   # 端到端（真实 API + 
 3. **Settings → Domains** 挂载自定义域名，按提示在域名服务商处配置 DNS，Vercel 自动签发 HTTPS 证书。
 4. 之后每次本地 `git push`，Vercel 自动重新部署。
 
+### DeepSeek 天气解释配置
+
+先在 Supabase SQL Editor 执行 `supabase/migrations/007_weather_ai_analyses.sql`，再在 Vercel 配置以下仅服务端环境变量：
+
+| Name | 用途 |
+|---|---|
+| `DEEPSEEK_API_KEY` | DeepSeek API Key；仅由 `api/weather-analysis.mjs` 读取 |
+| `DEEPSEEK_MODEL` | 可选，默认 `deepseek-v4-flash` |
+| `SUPABASE_SECRET_KEY` | 推荐：Supabase `sb_secret_...` 服务端密钥；共享分析缓存读写，严禁注入前端 |
+| `SUPABASE_SERVICE_ROLE_KEY` | 兼容旧项目的 legacy service-role JWT；配置了新 secret key 时无需设置 |
+| `ALLOWED_ORIGINS` | 生产站点 host 白名单，建议必配 |
+
+`SUPABASE_URL` 已用于现有账户构建配置，同时也会由服务端函数读取。缺少任一服务端密钥时，AI 接口返回不可用，页面自动保留原规则分析。管理访问令牌（`sbp_...`）只用于 CLI/Management API，不可替代 `SUPABASE_SERVICE_ROLE_KEY`。
+
 ## 目录结构
 
 ```
@@ -67,6 +82,7 @@ weather-app/
 │   └── callback.html   # 邮箱确认与找回密码回调（PKCE code → 会话；recovery → 设置新密码）
 ├── api/
 │   ├── amap.mjs        # 高德 REST API 服务端代理（Vercel Function，serviceHost 代理，服务端注入 jscode）
+│   ├── weather-analysis.mjs  # 预设点 DeepSeek 分析（EC 数据版本触发 + Supabase 共享缓存）
 │   └── verify-turnstile.mjs  # Cloudflare Turnstile 服务端验证（Vercel Function，secret 仅服务端）
 ├── css/
 │   └── style.css       # 毛玻璃视觉系统 + 天气状态机 + reduced-motion + 响应式
@@ -74,6 +90,7 @@ weather-app/
 │   ├── config.js       # 预设目的地坐标 + 默认参数 + AMAP/SUPABASE/TURNSTILE 构建注入配置
 │   ├── auth.js         # Supabase Auth 封装（注册/登录/退出/找回密码/会话监听，window.Auth）
 │   ├── api.js          # 综合预报、多模型（含三层云）、集合预报与海况请求
+│   ├── ai-analysis.js  # 预设点 AI 结果请求；自选点禁用并回退规则文案
 │   ├── metrics.js      # EC 主结论、加权遮蔽、成员一致性、外部验证、云图序列、天气状态机
 │   ├── render.js       # 首屏区块 + SVG 天空剖面 + 视图切换（只消费结构化日级结果）
 │   ├── rain.js         # Canvas 雨滴特效（雨滴/涟漪/闪电，零依赖）

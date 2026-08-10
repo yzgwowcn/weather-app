@@ -74,6 +74,14 @@ const checks = ['ec-hero', 'verdict-badge good', 'EC 集合晴好率', '100%', '
 for (const c of checks) {
   if (!html.includes(c)) { console.error('MISSING:', c); process.exit(1); }
 }
+// 预设点 AI 文案只替换解释层，核心 EC 数值与结论仍由规则引擎输出；外部文本必须转义。
+const htmlAi = renderWeatherApp(bundle, dest, 3, null, { aiAnalyses: {
+  [DAYS[0]]: { summary: '晴好窗口稳定', reason: '低中云较少', uncertainty: '集合一致', advice: '<注意防晒>' },
+} });
+for (const c of ['DEEPSEEK 分析', '晴好窗口稳定', '低中云较少', '集合一致', '&lt;注意防晒&gt;', '100%', '51 成员满足']) {
+  if (!htmlAi.includes(c)) { console.error('AI RENDER MISSING:', c); process.exit(1); }
+}
+if (htmlAi.includes('<注意防晒>')) { console.error('AI RENDER XSS'); process.exit(1); }
 // 概率环形图：SVG 环（pathLength=100，dasharray 即百分比；全成员晴好 → 100 100）
 for (const c of ['prob-ring', 'prob-arc', 'prob-track', 'stroke-dasharray="100 100"', 'rotate(-90 60 60)']) {
   if (!html.includes(c)) { console.error('PROB-RING MISSING:', c); process.exit(1); }
