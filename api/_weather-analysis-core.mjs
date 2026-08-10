@@ -1,7 +1,8 @@
 // DeepSeek 天气分析的纯函数核心：预设点白名单、ECMWF 数据聚合、规则结论与输出校验。
 // 服务端只接收 presetId；坐标和判断口径均以本文件为准，避免客户端伪造数据污染共享缓存。
+import GlassSea from '../js/glass-sea.js';
 
-export const ANALYSIS_VERSION = 'weather-v2';
+export const ANALYSIS_VERSION = 'weather-v4';
 export const DEEPSEEK_MODEL_DEFAULT = 'deepseek-v4-flash';
 export const MODEL_META_URL = 'https://api.open-meteo.com/data/ecmwf_ifs025/static/meta.json';
 
@@ -25,6 +26,7 @@ const DAY_END = 18;
 const BLOCKING_CODES = new Set([61, 63, 65, 80, 81, 82]);
 const THUNDER_CODES = new Set([95, 96, 99]);
 const HOURLY = 'weather_code,cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation,wind_speed_10m';
+const MARINE_HOURLY = 'wave_height,wind_wave_height,swell_wave_height,wave_period,swell_wave_period';
 
 function finite(value) {
   const n = value == null ? NaN : Number(value);
@@ -158,6 +160,12 @@ export function summarizeWeather(mainResponse, ensembleResponse) {
   return days;
 }
 
+export function addGlassSeaForecast(days, mainResponse, marineResponse) {
+  const dates = days.map((day) => day.date);
+  const glassSeaDays = GlassSea.build(mainResponse?.hourly, marineResponse?.hourly, dates);
+  return days.map((day) => ({ ...day, glassSea: GlassSea.compact(glassSeaDays[day.date]) }));
+}
+
 export function shanghaiDateRange(now = new Date(), days = 14) {
   const start = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -176,13 +184,23 @@ export function weatherUrls(preset, start, end) {
   return { main: main.toString(), ensemble: ensemble.toString() };
 }
 
+export function marineUrl(preset, start, end) {
+  const url = new URL('https://marine-api.open-meteo.com/v1/marine');
+  const params = {
+    latitude: preset.lat, longitude: preset.lon, start_date: start, end_date: end,
+    timezone: 'Asia/Shanghai', cell_selection: 'sea', hourly: MARINE_HOURLY,
+  };
+  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, String(value)));
+  return url.toString();
+}
+
 function cleanText(value, max) {
   if (typeof value !== 'string') return null;
   const text = value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
   return text && text.length <= max ? text : null;
 }
 
-export function validateAnalyses(payload, expectedDates) {
+export function validateAnalyses(payload, expectedDates, { requireGlassSea = false } = {}) {
   const source = payload && Array.isArray(payload.analyses) ? payload.analyses : null;
   if (!source) throw new Error('AI_INVALID_OUTPUT');
   const expected = new Set(expectedDates);
@@ -194,32 +212,38 @@ export function validateAnalyses(payload, expectedDates) {
     const reason = cleanText(item?.reason, 180);
     const uncertainty = cleanText(item?.uncertainty, 140);
     const advice = cleanText(item?.advice, 140);
-    if (!expected.has(date) || seen.has(date) || !summary || !reason || !uncertainty || !advice) continue;
+    const glassSea = cleanText(item?.glassSea, 120);
+    if (!expected.has(date) || seen.has(date) || !summary || !reason || !uncertainty || !advice || (requireGlassSea && !glassSea)) continue;
     seen.add(date);
-    analyses.push({ date, summary, reason, uncertainty, advice });
+    analyses.push({ date, summary, reason, uncertainty, advice, ...(glassSea ? { glassSea } : {}) });
   }
   if (analyses.length !== expected.size) throw new Error('AI_INVALID_OUTPUT');
   return analyses.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export function deepSeekRequest(preset, modelVersion, days, model = DEEPSEEK_MODEL_DEFAULT) {
-  const system = [
+  const systemRules = [
     '你是旅行天气解释器，只解释程序已经计算出的结论，不得改变 verdict、数值或安全口径。',
     '使用简洁自然的中文，面向普通游客。雷阵雨只是避雨提醒，不自动否定出行；中雨及以上、遮蔽云量和平均风速按输入结论解释。不要机械复述所有数字。',
     '按需控制详略：仅当 verdictLevel 为 caution/watch/avoid，或输入含 ecDisagreement 时展开；其余 recommended/suitable 保持精炼。展开时明确真正拖累出行的因素及数值、风险意味着什么，并给出可执行的改期/室内安排/临近复核建议。',
     'ecDisagreement=main_opposed 表示主运行与高度集中的集合方向相反；ecDisagreement=members_split 表示成员晴好率处于 25%–75% 分歧区。必须结合 mainSuitable、ensembleProbability 和最终 verdict 解释双方各自表达什么、程序为何给出当前结论，以及应按保守方案还是临近复核；不得把集合概率说成降雨概率或历史准确率。',
     '若不理想日期提供 nextBetterDate，只可把该日期作为备选并注明仍需临近更新；没有该字段时不得编造更好日期。除 thunderWindows 外，输入没有逐小时时段，不得编造降雨开始或结束时间。',
     '不得声称这是官方预警或历史准确率，不得编造输入中没有的天气、景区开放或交通信息。',
-    '必须输出 json，格式为 {"analyses":[{"date":"YYYY-MM-DD","summary":"...","reason":"...","uncertainty":"...","advice":"..."}]}。',
+    '必须输出 json，基础格式为 {"analyses":[{"date":"YYYY-MM-DD","summary":"...","reason":"...","uncertainty":"...","advice":"..."}]}。',
     '每个输入日期必须恰好输出一项。无 ecDisagreement 的 recommended/suitable：summary≤35字、reason≤50字、uncertainty≤35字、advice≤35字；caution/watch/avoid 或含 ecDisagreement：summary≤55字、reason≤120字、uncertainty≤80字、advice≤90字。',
-  ].join('\n');
-  const user = JSON.stringify({ destination: preset.name, modelVersion, timezone: 'Asia/Shanghai', days });
+  ];
+  if (preset.region === 'hainan') systemRules.splice(2, 0,
+    '海南海边的阴晴观感以低云和中云形成的 maskMean 为主，高云 highCloudMean 只辅助描述日照通透感、天空乳白感、海水显色与摄影反差。highCloudMean 是覆盖率而非光学厚度：低中云少、无阻断降水且风满足规则时，即使高云多，也不得写成阴天、无太阳或不适合出行，也不得笼统写“云量少”或保证“阳光充足”；应明确写“低中云少，仍有日照机会，高云可能让阳光偏柔、蓝天与海水色彩反差略弱”。语气客观但不要放大不影响安全的小瑕疵。',
+    '海南每项必须额外输出 glassSea≤80字。只能解释输入 glassSea：excellent 写“较佳候选”，possible 写“可以关注”，none 写“暂无明显候选窗口”但不得据此否定一般海边出行，unavailable 写“海况数据待补充”。候选时段和浪、风数值必须照输入，不得扩展时段或提高把握。',
+    '“玻璃海候选”只表示低中云、降水、近地风、有效浪高（wave_height）、风浪和涌浪的模式条件较配合，不是现场保证。高云不单独否决候选；海洋网格无法判断水体清澈度、岸边浪花、潮流细节和太阳角度，glassSea 必须用积极但克制的语气提醒结合临近海况与景区实况。海南输出格式在基础字段后增加 "glassSea":"..."。');
+  const system = systemRules.join('\n');
+  const user = JSON.stringify({ destination: preset.name, region: preset.region, modelVersion, timezone: 'Asia/Shanghai', days });
   return {
     model,
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
     thinking: { type: 'disabled' },
     temperature: 0.2,
-    max_tokens: 3800,
+    max_tokens: 4300,
     response_format: { type: 'json_object' },
     stream: false,
   };

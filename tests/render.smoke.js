@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 const ctx = {};
 vm.runInNewContext(
-  `${fs.readFileSync('js/metrics.js', 'utf8')}\n${fs.readFileSync('js/render.js', 'utf8')}\nglobalThis.__out = { renderWeatherApp };`,
+  `${fs.readFileSync('js/glass-sea.js', 'utf8')}\n${fs.readFileSync('js/metrics.js', 'utf8')}\n${fs.readFileSync('js/render.js', 'utf8')}\nglobalThis.__out = { renderWeatherApp };`,
   ctx,
 );
 const { renderWeatherApp } = ctx.__out;
@@ -30,9 +30,9 @@ function ens(members) {
   });
   return h;
 }
-function allDay(d, codes = 0) {
+function allDay(d, codes = 0, wind = 20) {
   const time = Array.from({ length: 24 }, (_, i) => `${d}T${String(i).padStart(2, '0')}:00`);
-  return { time, cloud_cover_low: Array(24).fill(20), cloud_cover_mid: Array(24).fill(20), cloud_cover_high: Array(24).fill(90), precipitation: Array(24).fill(0), wind_speed_10m: Array(24).fill(20), weather_code: Array.isArray(codes) ? [...codes] : Array(24).fill(codes) };
+  return { time, cloud_cover_low: Array(24).fill(20), cloud_cover_mid: Array(24).fill(20), cloud_cover_high: Array(24).fill(90), precipitation: Array(24).fill(0), wind_speed_10m: Array(24).fill(wind), weather_code: Array.isArray(codes) ? [...codes] : Array(24).fill(codes) };
 }
 
 const members = Array.from({ length: 51 }, () => ({ low: 20, mid: 20, high: 90, precip: 0, wind: 20 }));
@@ -56,7 +56,7 @@ const bundle = {
     },
   },
   deterministic: {
-    'ECMWF IFS': { hourly: allDay(DAYS[0]) },
+    'ECMWF IFS': { hourly: allDay(DAYS[0], 0, 10) },
     'NOAA GFS': { hourly: allDay(DAYS[1]) },
     'JMA GSM': { hourly: allDay(DAYS[2], 95, 95) },
     'CMA GRAPES': { error: 'x' },
@@ -65,9 +65,18 @@ const bundle = {
     'ECMWF IFS 集合': { hourly: ens(members) },
     'GFS 集合': { hourly: ens(members.slice(0, 3)) },
   },
-  marine: null,
+  marine: {
+    latitude: 18.208, longitude: 109.542,
+    hourly: {
+      time: DAYS.flatMap((d) => allDay(d).time),
+      wave_height: DAYS.flatMap(() => Array(24).fill(0.4)),
+      wind_wave_height: DAYS.flatMap(() => Array(24).fill(0.1)),
+      swell_wave_height: DAYS.flatMap(() => Array(24).fill(0.4)),
+    },
+    daily: { time: DAYS, wave_height_max: [0.4, 0.4, 0.4] },
+  },
 };
-const dest = { name: '三亚·亚龙湾', id: 'sanya', lat: 18.224, lon: 109.512, marine: false };
+const dest = { name: '三亚·亚龙湾', id: 'sanya', lat: 18.224, lon: 109.512, marine: true };
 
 const html = renderWeatherApp(bundle, dest, 3, null, {});
 const checks = ['ec-hero', 'verdict-badge good', 'EC 集合晴好率', '100%', '51 成员满足', 'sky-section', 'sky-svg', 'sky-hit', 'sky-view-btn', 'cross-section', 'cross-stat support', 'cross-stat oppose', 'cross-stat missing', 'date-rail', 'forecast-section', 'ECMWF 主运行'];
@@ -76,12 +85,12 @@ for (const c of checks) {
 }
 // 预设点 AI 文案只替换解释层，核心 EC 数值与结论仍由规则引擎输出；外部文本必须转义。
 const htmlAi = renderWeatherApp(bundle, dest, 3, null, { aiAnalyses: {
-  [DAYS[0]]: { summary: '晴好窗口稳定', reason: '低中云较少', uncertainty: '集合一致', advice: '<注意防晒>' },
+  [DAYS[0]]: { summary: '晴好窗口稳定', reason: '低中云较少', uncertainty: '集合一致', glassSea: '<08:00–10:00较佳候选>', advice: '<注意防晒>' },
 } });
-for (const c of ['DEEPSEEK 天气分析', 'ai-avatar', 'ai-bubble', 'data-ai-typing="true"', '晴好窗口稳定', '低中云较少', '集合一致', '&lt;注意防晒&gt;', '100%', '51 成员满足']) {
+for (const c of ['DEEPSEEK 天气分析', 'ai-avatar', 'ai-bubble', 'ai-glass-sea', 'data-ai-typing="true"', '晴好窗口稳定', '低中云较少', '集合一致', '&lt;08:00–10:00较佳候选&gt;', '&lt;注意防晒&gt;', '玻璃海候选', '有效浪高≤0.4 m', '100%', '51 成员满足']) {
   if (!htmlAi.includes(c)) { console.error('AI RENDER MISSING:', c); process.exit(1); }
 }
-if (htmlAi.includes('<注意防晒>')) { console.error('AI RENDER XSS'); process.exit(1); }
+if (htmlAi.includes('<注意防晒>') || htmlAi.includes('<08:00–10:00较佳候选>')) { console.error('AI RENDER XSS'); process.exit(1); }
 const htmlAiSeen = renderWeatherApp(bundle, dest, 3, null, { aiAnalyses: {
   [DAYS[0]]: { summary: '晴好窗口稳定', reason: '低中云较少', uncertainty: '集合一致', advice: '注意防晒' },
 }, aiSeenDates: new Set([DAYS[0]]) });
@@ -104,6 +113,8 @@ if ((htmlC.match(/class="cloud-line/g) || []).length !== 2) { console.error('CLO
 if ((htmlC.match(/class="cloud-hit"/g) || []).length !== 24) { console.error('CLOUD HIT COUNT FAIL（应为 24 条）'); process.exit(1); }
 if ((htmlC.match(/class="cloud-bar"/g) || []).length !== 7) { console.error('CLOUD BAR COUNT FAIL（应为 7 根降雨柱）'); process.exit(1); }
 if ((htmlC.match(/cloud-curve-wrap/g) || []).length !== 1) { console.error('CLOUD CURVE WRAP COUNT FAIL（应仅选中卡片展开）'); process.exit(1); }
+const inlandHtml = renderWeatherApp(bundle, { ...dest, id: 'custom', lat: 19.05, lon: 109.78 }, 3, null, {});
+if (inlandHtml.includes('glass-sea-detail') || inlandHtml.includes('marine-section')) { console.error('INLAND MARINE SHOULD BE HIDDEN'); process.exit(1); }
 const iRail = html.indexOf('date-rail');
 const iHero = html.indexOf('ec-hero');
 const iSky = html.indexOf('sky-section');

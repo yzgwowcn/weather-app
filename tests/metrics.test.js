@@ -6,8 +6,9 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const context = {};
-vm.runInNewContext(`${fs.readFileSync('js/metrics.js', 'utf8')}\nglobalThis.metricsUnderTest = Metrics;`, context);
+vm.runInNewContext(`${fs.readFileSync('js/glass-sea.js', 'utf8')}\n${fs.readFileSync('js/metrics.js', 'utf8')}\nglobalThis.metricsUnderTest = Metrics; globalThis.glassSeaUnderTest = GlassSea;`, context);
 const Metrics = context.metricsUnderTest;
+const GlassSea = context.glassSeaUnderTest;
 
 const DAY = '2026-08-08';
 
@@ -263,6 +264,26 @@ function ecMain(hourly = hourlyFixture()) { return { 'ECMWF IFS': { hourly } }; 
   assert.equal(result.advice.level, 'recommended', 'buildAssessment 注入 advice');
   assert.equal(result.advice.text, '推荐出行');
   assert.equal(result.finalSuitable, true, 'finalSuitable 公式不受 advice 影响');
+}
+
+// 17. 玻璃海候选：高云不否决；逐小时同时约束低中云、降水、风、有效浪高、风浪和涌浪
+{
+  const weather = hourlyFixture({ low: 10, mid: 10, high: 100, precip: 0, wind: 10 });
+  const marine = {
+    time: [...weather.time],
+    wave_height: [0.4, 0.4, 0.7, 0.7, 1, 1, 1, 1, 1, 1],
+    wind_wave_height: [0.1, 0.1, 0.25, 0.25, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4],
+    swell_wave_height: [0.4, 0.4, 0.6, 0.6, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8],
+  };
+  const result = Metrics.buildGlassSeaForecast({ hourly: weather }, { hourly: marine }, [DAY])[DAY];
+  assert.equal(result.level, 'excellent', '存在较佳窗口时日级标记为较佳候选');
+  assert.equal(result.windows.length, 2, '不同等级的连续候选窗口分开');
+  assert.deepEqual([result.windows[0].startHour, result.windows[0].endHour], [8, 9]);
+  assert.equal(result.windows[0].highCloudMean, 100, '高云 100% 不否决候选');
+  assert.equal(result.windows[1].level, 'possible');
+  assert.equal(Metrics.buildGlassSeaForecast({ hourly: weather }, null, [DAY])[DAY].level, 'unavailable');
+  assert.equal(GlassSea.isNearSeaGrid(18.224, 109.512, { latitude: 18.208, longitude: 109.542 }), true, '沿海点距海格近');
+  assert.equal(GlassSea.isNearSeaGrid(19.05, 109.78, { latitude: 18.8, longitude: 109.7 }), false, '内陆点距海格超过20km');
 }
 
 console.log('metrics fixture tests passed');

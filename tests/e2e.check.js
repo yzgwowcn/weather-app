@@ -118,6 +118,9 @@ const server = http.createServer((req, res) => {
   check('展开区云量曲线两条线', curveLines === 2, `lines=${curveLines}`);
   const curveHead = await page.locator('.forecast-card.selected .cloud-curve-head').textContent();
   check('云量曲线标注 1 小时间隔', /1 小时间隔 · 24 点/.test(curveHead.replace(/\s+/g, ' ')), curveHead.replace(/\s+/g, ' '));
+  check('每日详情包含玻璃海候选', await page.locator('.forecast-card.selected .glass-sea-detail').count() === 1);
+  const glassText = await page.locator('.forecast-card.selected .glass-sea-detail').textContent();
+  check('玻璃海候选状态明确', /较佳候选|可以关注|暂无明显窗口|海况数据待补充/.test(glassText), glassText.trim().replace(/\s+/g, ' '));
 
   // 云量曲线悬浮详情（同天空剖面交互）：移入命中条 → tooltip 显示低云/中云/降雨
   const cloudChart = page.locator('.forecast-card.selected [data-cloud-chart]');

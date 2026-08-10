@@ -205,7 +205,7 @@
     const item = searchItems[index];
     if (!item) return;
     if (item.inRegion !== state.region) toast(REGION_TEXTS[state.region].regionToast);
-    state.customDest = { id: 'custom', name: item.name, lat: item.lat, lon: item.lon, marine: false, outOfRegion: item.inRegion !== state.region };
+    state.customDest = { id: 'custom', name: item.name, lat: item.lat, lon: item.lon, marine: Location.regionOf(item.lat, item.lon) === 'hainan', outOfRegion: item.inRegion !== state.region };
     state.dest = state.customDest;
     searchInputEl.value = '';
     closeSearchResults();
@@ -218,7 +218,7 @@
   };
   // 收藏功能接入点：选中收藏项 → 设为当前目的地并立即查询（收藏为主动保存，区域外同样给出提示）
   window.__WeatherSelectDest = function (name, lat, lon) {
-    state.customDest = { id: 'custom', name: name, lat: lat, lon: lon, marine: false, outOfRegion: Location.regionOf(lat, lon) !== state.region };
+    state.customDest = { id: 'custom', name: name, lat: lat, lon: lon, marine: Location.regionOf(lat, lon) === 'hainan', outOfRegion: Location.regionOf(lat, lon) !== state.region };
     state.dest = state.customDest;
     renderDestButtons();
     query();
@@ -453,7 +453,7 @@
     const name = pick.name ? `${pick.name}（地图选点）` : Location.formatCoordName(pick.lat_wgs, pick.lng_wgs);
     const outOfRegion = Location.regionOf(pick.lat_wgs, pick.lng_wgs) !== state.region;
     if (outOfRegion) toast(REGION_TEXTS[state.region].regionToast);
-    state.customDest = { id: 'custom', name, lat: pick.lat_wgs, lon: pick.lng_wgs, marine: false, outOfRegion, source: 'map' };
+    state.customDest = { id: 'custom', name, lat: pick.lat_wgs, lon: pick.lng_wgs, marine: Location.regionOf(pick.lat_wgs, pick.lng_wgs) === 'hainan', outOfRegion, source: 'map' };
     state.dest = state.customDest;
     closeMapPanel();
     renderDestButtons();
@@ -600,7 +600,7 @@
       const name = Location.formatCoordName(wgsLat, wgsLon);
       const outOfRegion = Location.regionOf(wgsLat, wgsLon) !== state.region;
       if (outOfRegion) toast(REGION_TEXTS[state.region].regionToast);
-      state.customDest = { id: 'custom', name, lat: wgsLat, lon: wgsLon, marine: false, outOfRegion };
+      state.customDest = { id: 'custom', name, lat: wgsLat, lon: wgsLon, marine: Location.regionOf(wgsLat, wgsLon) === 'hainan', outOfRegion };
       state.dest = state.customDest;
       searchInputEl.value = '';
       closeSearchResults();
