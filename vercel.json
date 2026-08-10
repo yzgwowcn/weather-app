@@ -3,6 +3,11 @@
   "outputDirectory": ".",
   "installCommand": "",
   "framework": null,
+  "functions": {
+    "api/weather-analysis.mjs": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     {
       "source": "/_AMapService/:path*",

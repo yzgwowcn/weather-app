@@ -196,10 +196,10 @@ const API = (() => {
       const avail = meta && !meta.error ? Number(meta.last_run_availability_time) : NaN;
       if (Number.isFinite(avail) && avail > 0) {
         if (avail === cached.metaAvail) {
-          return { ...cached.bundle, fromCache: true }; // 模型未更新 → 读缓存
+          return { ...cached.bundle, weatherVersion: cached.metaAvail, fromCache: true }; // 模型未更新 → 读缓存
         }
       } else if (Date.now() - cached.ts < CACHE_STALE_LIMIT_MS) {
-        return { ...cached.bundle, fromCache: true }; // meta 查询失败：缓存 6 小时内直接使用
+        return { ...cached.bundle, weatherVersion: cached.metaAvail, fromCache: true }; // meta 查询失败：缓存 6 小时内直接使用
       }
       // meta 显示模型已更新，或缓存超过 6 小时 → 重新请求
     }
@@ -217,13 +217,14 @@ const API = (() => {
           if (m && m.error && c && !c.error) merged[group][name] = c;
         });
       });
-      return { ...merged, fromCache: true, partialFallback: true };
+      return { ...merged, weatherVersion: cached.metaAvail, fromCache: true, partialFallback: true };
     }
     // 写入缓存：以 EC 集合所属模型的 last_run_availability_time 作为"数据版本"快照
     const metaEcmwf = bundle.modelMeta && bundle.modelMeta['ECMWF IFS'];
     const avail = metaEcmwf && !metaEcmwf.error ? Number(metaEcmwf.last_run_availability_time) : NaN;
-    cacheSet(key, bundle, Number.isFinite(avail) && avail > 0 ? avail : 0);
-    return bundle;
+    const weatherVersion = Number.isFinite(avail) && avail > 0 ? avail : 0;
+    cacheSet(key, bundle, weatherVersion);
+    return { ...bundle, weatherVersion };
   }
   return { fetchBundle, searchLocation };
 })();
