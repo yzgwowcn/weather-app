@@ -4,6 +4,10 @@
 const fs = require('node:fs');
 const css = fs.readFileSync('css/style.css', 'utf8');
 
+for (const key of ['.ai-avatar', '.ai-bubble', '.ai-analysis.typing', '@keyframes ai-caret']) {
+  if (!css.includes(key)) { console.error('AI bubble style MISSING:', key); process.exit(1); }
+}
+
 // rain/thunder 无独立 CSS（雨滴与闪电由 Canvas 接管）；其余状态有叠加层
 const moods = ['sunny', 'cloudy', 'windy', 'storm'];
 for (const m of moods) {

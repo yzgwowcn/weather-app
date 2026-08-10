@@ -1,7 +1,7 @@
 // DeepSeek 天气分析的纯函数核心：预设点白名单、ECMWF 数据聚合、规则结论与输出校验。
 // 服务端只接收 presetId；坐标和判断口径均以本文件为准，避免客户端伪造数据污染共享缓存。
 
-export const ANALYSIS_VERSION = 'weather-v1';
+export const ANALYSIS_VERSION = 'weather-v2';
 export const DEEPSEEK_MODEL_DEFAULT = 'deepseek-v4-flash';
 export const MODEL_META_URL = 'https://api.open-meteo.com/data/ecmwf_ifs025/static/meta.json';
 
@@ -116,13 +116,16 @@ export function summarizeWeather(mainResponse, ensembleResponse) {
   const ensembleGroups = dayGroups(ensembleResponse.hourly);
   const suffixes = memberSuffixes(ensembleResponse.hourly);
   if (suffixes.length < 2) throw new Error('EC_ENSEMBLE_INCOMPLETE');
-  return Object.keys(mainGroups).sort().map((date, horizon) => {
+  const days = Object.keys(mainGroups).sort().map((date, horizon) => {
     const main = evaluate(mainResponse.hourly, mainGroups[date]);
     const memberIndexes = ensembleGroups[date];
     const members = memberIndexes ? suffixes.map((suffix) => evaluate(ensembleResponse.hourly, memberIndexes, suffix)).filter(Boolean) : [];
     const suitableMembers = members.filter((member) => member.suitable).length;
     const probability = members.length ? suitableMembers / members.length * 100 : null;
     const advice = adviceFor(main, probability, horizon);
+    const mainOpposed = main && probability != null &&
+      ((probability >= 75 && !main.suitable) || (probability <= 25 && main.suitable));
+    const membersSplit = probability != null && probability > 25 && probability < 75;
     return {
       date,
       horizon,
@@ -140,8 +143,19 @@ export function summarizeWeather(mainResponse, ensembleResponse) {
       ensembleSuitable: suitableMembers,
       ensembleTotal: members.length,
       mainEnsembleConflict: main && probability != null ? main.suitable !== (probability >= 50) : null,
+      // 只在确有冲突时携带短标记，避免一致日期增加提示词 token。
+      ecDisagreement: mainOpposed ? 'main_opposed' : membersSplit ? 'members_split' : undefined,
     };
   }).filter((day) => day.mainSuitable != null && day.ensembleTotal > 0);
+  // 不理想日期预先标出最近一个规则结论更好的备选日，模型无需自行扫描和复述整段数据。
+  days.forEach((day, index) => {
+    const poor = ['caution', 'watch', 'avoid'].includes(day.verdictLevel);
+    const better = poor ? days.slice(index + 1).find((candidate) =>
+      ['recommended', 'suitable'].includes(candidate.verdictLevel)) : null;
+    day.nextBetterDate = better?.date || null;
+    day.nextBetterVerdict = better?.verdict || null;
+  });
+  return days;
 }
 
 export function shanghaiDateRange(now = new Date(), days = 14) {
@@ -177,9 +191,9 @@ export function validateAnalyses(payload, expectedDates) {
   for (const item of source) {
     const date = typeof item?.date === 'string' ? item.date : '';
     const summary = cleanText(item?.summary, 80);
-    const reason = cleanText(item?.reason, 120);
-    const uncertainty = cleanText(item?.uncertainty, 100);
-    const advice = cleanText(item?.advice, 80);
+    const reason = cleanText(item?.reason, 180);
+    const uncertainty = cleanText(item?.uncertainty, 140);
+    const advice = cleanText(item?.advice, 140);
     if (!expected.has(date) || seen.has(date) || !summary || !reason || !uncertainty || !advice) continue;
     seen.add(date);
     analyses.push({ date, summary, reason, uncertainty, advice });
@@ -191,10 +205,13 @@ export function validateAnalyses(payload, expectedDates) {
 export function deepSeekRequest(preset, modelVersion, days, model = DEEPSEEK_MODEL_DEFAULT) {
   const system = [
     '你是旅行天气解释器，只解释程序已经计算出的结论，不得改变 verdict、数值或安全口径。',
-    '使用简洁自然的中文，面向普通游客。雷阵雨只是避雨提醒，不自动否定出行；中雨及以上、遮蔽云量和平均风速按输入结论解释。',
+    '使用简洁自然的中文，面向普通游客。雷阵雨只是避雨提醒，不自动否定出行；中雨及以上、遮蔽云量和平均风速按输入结论解释。不要机械复述所有数字。',
+    '按需控制详略：仅当 verdictLevel 为 caution/watch/avoid，或输入含 ecDisagreement 时展开；其余 recommended/suitable 保持精炼。展开时明确真正拖累出行的因素及数值、风险意味着什么，并给出可执行的改期/室内安排/临近复核建议。',
+    'ecDisagreement=main_opposed 表示主运行与高度集中的集合方向相反；ecDisagreement=members_split 表示成员晴好率处于 25%–75% 分歧区。必须结合 mainSuitable、ensembleProbability 和最终 verdict 解释双方各自表达什么、程序为何给出当前结论，以及应按保守方案还是临近复核；不得把集合概率说成降雨概率或历史准确率。',
+    '若不理想日期提供 nextBetterDate，只可把该日期作为备选并注明仍需临近更新；没有该字段时不得编造更好日期。除 thunderWindows 外，输入没有逐小时时段，不得编造降雨开始或结束时间。',
     '不得声称这是官方预警或历史准确率，不得编造输入中没有的天气、景区开放或交通信息。',
     '必须输出 json，格式为 {"analyses":[{"date":"YYYY-MM-DD","summary":"...","reason":"...","uncertainty":"...","advice":"..."}]}。',
-    '每个输入日期必须恰好输出一项；summary≤45字，reason≤70字，uncertainty≤55字，advice≤45字。',
+    '每个输入日期必须恰好输出一项。无 ecDisagreement 的 recommended/suitable：summary≤35字、reason≤50字、uncertainty≤35字、advice≤35字；caution/watch/avoid 或含 ecDisagreement：summary≤55字、reason≤120字、uncertainty≤80字、advice≤90字。',
   ].join('\n');
   const user = JSON.stringify({ destination: preset.name, modelVersion, timezone: 'Asia/Shanghai', days });
   return {
@@ -202,7 +219,7 @@ export function deepSeekRequest(preset, modelVersion, days, model = DEEPSEEK_MOD
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
     thinking: { type: 'disabled' },
     temperature: 0.2,
-    max_tokens: 3500,
+    max_tokens: 3800,
     response_format: { type: 'json_object' },
     stream: false,
   };

@@ -60,6 +60,27 @@ export async function completeAnalysis(presetId, modelVersion, analysisVersion, 
       completion_tokens: Number(usage?.completion_tokens) || 0,
     }),
   }, env);
+  // 当前版本已安全落库后，删除同一预设点的旧模型/旧提示词版本。
+  // 每个预设点最终只保留当前一行；从未再次访问的点也最多残留一行，不会随时间无限增长。
+  try {
+    await pruneAnalyses(presetId, modelVersion, analysisVersion, env);
+  } catch {
+    console.error('weather-analysis: old cache prune failed');
+  }
+}
+
+export async function pruneAnalyses(presetId, modelVersion, analysisVersion, env = process.env) {
+  const olderModels = new URLSearchParams({
+    preset_id: `eq.${presetId}`,
+    model_version: `lt.${modelVersion}`,
+  });
+  const olderSchemas = new URLSearchParams({
+    preset_id: `eq.${presetId}`,
+    model_version: `eq.${modelVersion}`,
+    analysis_version: `neq.${analysisVersion}`,
+  });
+  await request(`weather_ai_analyses?${olderModels}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, env);
+  await request(`weather_ai_analyses?${olderSchemas}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, env);
 }
 
 export async function failAnalysis(presetId, modelVersion, analysisVersion, errorCode, env = process.env) {

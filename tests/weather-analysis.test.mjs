@@ -5,7 +5,7 @@ import {
   ANALYSIS_VERSION, PRESETS, deepSeekRequest, shanghaiDateRange,
   summarizeWeather, validateAnalyses, weatherUrls,
 } from '../api/_weather-analysis-core.mjs';
-import { getAnalysis } from '../api/_weather-analysis-store.mjs';
+import { completeAnalysis, getAnalysis } from '../api/_weather-analysis-store.mjs';
 
 function hourly(days, overrides = {}) {
   const time = days.flatMap((date) => Array.from({ length: 24 }, (_, hour) => `${date}T${String(hour).padStart(2, '0')}:00`));
@@ -37,12 +37,20 @@ test('预设白名单固定为 12 个坐标且不含 custom', () => {
 
 test('服务端聚合 EC 主运行与集合并保持规则结论', () => {
   const days = ['2026-08-10', '2026-08-11', '2026-08-12'];
-  const result = summarizeWeather({ hourly: hourly(days) }, { hourly: ensemble(days) });
+  const main = hourly(days);
+  main.cloud_cover_low = main.cloud_cover_low.map((value, index) => index >= 24 && index < 48 ? 90 : value);
+  main.cloud_cover_mid = main.cloud_cover_mid.map((value, index) => index >= 24 && index < 48 ? 90 : value);
+  const result = summarizeWeather({ hourly: main }, { hourly: ensemble(days) });
   assert.equal(result.length, 3);
   assert.equal(result[0].verdict, '推荐出行');
   assert.equal(result[0].ensembleProbability, 100);
   assert.equal(result[1].ensembleProbability, 50);
   assert.equal(result[1].ensembleTotal, 2);
+  assert.equal(result[1].verdict, '审慎出行');
+  assert.equal(result[1].ecDisagreement, 'members_split');
+  assert.equal(result[0].ecDisagreement, undefined);
+  assert.equal(result[1].nextBetterDate, '2026-08-12');
+  assert.equal(result[0].nextBetterDate, null);
 });
 
 test('上海日期范围和天气 URL 不接受客户端坐标', () => {
@@ -58,10 +66,12 @@ test('DeepSeek 请求关闭思考并要求 JSON，输出严格按日期校验', 
   const request = deepSeekRequest(PRESETS.sanya, 123, days);
   assert.equal(request.thinking.type, 'disabled');
   assert.equal(request.response_format.type, 'json_object');
+  assert.match(request.messages[0].content, /ecDisagreement=main_opposed/);
+  assert.match(request.messages[0].content, /ecDisagreement=members_split/);
   const payload = { analyses: [{ date: '2026-08-10', summary: '晴好', reason: '云量低', uncertainty: '集合一致', advice: '注意防晒' }] };
   assert.deepEqual(validateAnalyses(payload, ['2026-08-10']), payload.analyses);
   assert.throws(() => validateAnalyses({ analyses: [] }, ['2026-08-10']), /AI_INVALID_OUTPUT/);
-  assert.equal(ANALYSIS_VERSION, 'weather-v1');
+  assert.equal(ANALYSIS_VERSION, 'weather-v2');
 });
 
 function responseRecorder() {
@@ -100,6 +110,25 @@ test('Supabase 新 secret key 不放入 JWT Authorization 头', async () => {
     });
     assert.equal(headers.apikey, 'sb_secret_example');
     assert.equal(headers.Authorization, undefined);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('分析完成后自动删除同一预设点的旧模型和旧提示词版本', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), method: init.method });
+    return new Response(null, { status: 204 });
+  };
+  try {
+    await completeAnalysis('sanya', 456, 'weather-v2', [], {}, {
+      SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SECRET_KEY: 'sb_secret_example',
+    });
+    assert.deepEqual(calls.map((call) => call.method), ['PATCH', 'DELETE', 'DELETE']);
+    assert.match(calls[1].url, /model_version=lt\.456/);
+    assert.match(calls[2].url, /analysis_version=neq\.weather-v2/);
   } finally {
     globalThis.fetch = originalFetch;
   }
