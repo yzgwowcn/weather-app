@@ -322,6 +322,36 @@ html, body { overflow-x: hidden; }
 }
 .panel-btn:hover { background: rgba(255, 255, 255, .13); }
 .panel-btn.danger { color: #ffb3ac; border-color: rgba(255, 143, 135, .35); }
+.panel-link-btn { display: block; box-sizing: border-box; text-align: center; text-decoration: none; }
+/* 未设置昵称提醒：关闭仅影响当前页面会话，再次进入仍会检查。 */
+.nickname-prompt {
+  position: fixed; right: 22px; bottom: 22px; z-index: 58;
+  width: min(340px, calc(100vw - 32px)); box-sizing: border-box;
+  padding: 18px; border: 1px solid rgba(240, 180, 90, .34); border-radius: 14px;
+  background: rgba(24, 31, 45, .92); color: #e6ecf2;
+  backdrop-filter: blur(18px) saturate(1.35); -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  box-shadow: 0 12px 38px rgba(0, 0, 0, .36);
+  animation: nickname-prompt-in .24s ease;
+}
+.nickname-prompt strong { display: block; padding-right: 28px; font-size: 15px; }
+.nickname-prompt p { margin: 7px 0 14px; color: rgba(226, 233, 240, .78); font-size: 13px; line-height: 1.65; }
+.nickname-prompt-close {
+  position: absolute; top: 10px; right: 10px; width: 28px; height: 28px;
+  border: 0; border-radius: 8px; background: transparent; color: rgba(226, 233, 240, .7); cursor: pointer;
+}
+.nickname-prompt-close:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+.nickname-prompt-action {
+  display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px;
+  border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 700;
+  background: linear-gradient(135deg, #f0b45a, #e08a3c); color: #1a1a1a;
+}
+@keyframes nickname-prompt-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (max-width: 600px) {
+  .nickname-prompt { right: 16px; bottom: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nickname-prompt { animation: none; }
+}
 /* 移动端抽屉遮罩（桌面端不显示） */
 .panel-mask { display: none; position: fixed; inset: 0; z-index: 55; background: rgba(0, 0, 0, .45); }
 .panel-mask.show { display: block; }

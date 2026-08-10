@@ -1,4 +1,4 @@
-// 用户数据模块：用户名（profiles）与收藏位置（favorites）
+// 用户数据模块：昵称（profiles.username）与收藏位置（favorites）
 // 依赖：js/auth.js（window.Auth）、js/config.js（SUPABASE_CONFIG）
 // 数据表：profiles / favorites（Supabase 建表，RLS 保护——用户仅能读写自己的行）
 // 未注入 Supabase 配置或未登录时各方法返回 { ok: false, message }
@@ -15,10 +15,10 @@
     return window.Auth ? window.Auth.getUser() : null;
   }
 
-  // ---- 用户名 ----
-  // 校验规则：2-20 位中文/字母/数字/下划线（支持小红书昵称等中文用户名）
+  // ---- 昵称 ----
+  // 校验规则：2-20 位中文/字母/数字，不允许空格、下划线或其他特殊符号。
   function isValidUsername(name) {
-    return typeof name === 'string' && /^[\u4e00-\u9fa5A-Za-z0-9_]{2,20}$/.test(name);
+    return typeof name === 'string' && /^[\u4e00-\u9fa5A-Za-z0-9]{2,20}$/.test(name);
   }
 
   // 获取当前用户 profile（无记录返回 profile: null）
@@ -51,19 +51,20 @@
     var user = currentUser();
     if (!client) return { ok: false, message: '认证服务未配置' };
     if (!user) return { ok: false, message: '未登录' };
-    if (!isValidUsername(name)) return { ok: false, message: '用户名需为 2-20 位中文/字母/数字/下划线' };
+    if (!isValidUsername(name)) return { ok: false, message: '昵称需为 2-20 个中文、英文字母或数字，不得包含空格或特殊符号' };
     var current = await getProfile();
     if (current.ok && current.profile && current.profile.username === name) {
       return { ok: true }; // 未变化
     }
     var taken = await isUsernameTaken(name);
     if (!taken.ok) return taken;
-    if (taken.taken) return { ok: false, message: '该用户名已被占用' };
+    if (taken.taken) return { ok: false, message: '该昵称已被占用' };
     var { error } = await client
       .from('profiles')
       .upsert({ user_id: user.id, username: name }, { onConflict: 'user_id' });
     if (error) {
-      if (error.code === '23505') return { ok: false, message: '该用户名已被占用' };
+      if (error.code === '23505') return { ok: false, message: '该昵称已被占用' };
+      if (error.code === '23514') return { ok: false, message: '昵称需为 2-20 个中文、英文字母或数字，不得包含空格或特殊符号' };
       return { ok: false, message: error.message };
     }
     return { ok: true };

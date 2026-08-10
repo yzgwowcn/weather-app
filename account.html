@@ -63,12 +63,12 @@
       <div class="auth-card">
         <h2 style="margin:0 0 16px;font-size:18px;">我的账户</h2>
         <div class="account-row"><span class="k">邮箱</span><span class="v" id="acc-email">—</span></div>
-        <div class="account-row"><span class="k">用户名</span><span class="v" id="acc-username">—</span></div>
+        <div class="account-row"><span class="k">昵称</span><span class="v" id="acc-username">—</span></div>
         <div class="account-row"><span class="k">当前等级</span><span class="v" id="acc-plan">—</span></div>
         <div class="account-row"><span class="k">账户 ID（UID）</span><span class="v" id="acc-uid" style="font-family:monospace;">—</span></div>
         <div class="uname-edit" id="uname-edit">
-          <label for="uname-input">用户名（2-20 位中文/字母/数字/下划线）</label>
-          <input type="text" id="uname-input" maxlength="20" placeholder="建议使用小红书昵称">
+          <label for="uname-input">昵称（2-20 个中文、英文字母或数字，不含空格和特殊符号）</label>
+          <input type="text" id="uname-input" minlength="2" maxlength="20" pattern="[\u4e00-\u9fa5A-Za-z0-9]{2,20}" placeholder="建议使用小红书昵称" autocomplete="nickname">
           <button type="button" id="uname-save">保存</button>
           <button type="button" id="uname-cancel">取消</button>
         </div>
@@ -123,17 +123,23 @@
         document.getElementById('acc-email').textContent = user.email || '—';
         document.getElementById('acc-uid').textContent = user.id;
 
-        // 加载用户名（profile 行存在但 username 为 null 时也视为未设置）
+        // 加载昵称（profile 行存在但 username 为 null 时也视为未设置）
         var profile = await User.getProfile();
+        var editButton = document.createElement('button');
+        editButton.type = 'button';
+        editButton.className = 'link-btn';
+        editButton.id = 'uname-edit-btn';
         if (profile.ok && profile.profile && profile.profile.username) {
           usernameEl.textContent = profile.profile.username;
           unameInput.value = profile.profile.username;
+          editButton.textContent = '修改';
         } else {
-          usernameEl.innerHTML = '未设置 <button type="button" class="link-btn" id="uname-set">设置</button>';
-          document.getElementById('uname-set').addEventListener('click', showUnameEdit);
+          usernameEl.textContent = '未设置';
+          editButton.textContent = '设置昵称';
         }
-        usernameEl.innerHTML += ' <button type="button" class="link-btn" id="uname-edit-btn">修改</button>';
-        document.getElementById('uname-edit-btn').addEventListener('click', showUnameEdit);
+        usernameEl.appendChild(document.createTextNode(' '));
+        usernameEl.appendChild(editButton);
+        editButton.addEventListener('click', showUnameEdit);
 
         // 当前等级（三档：免费版 / Pro / Ultra；过期显示「已过期」）
         var status = User.getPlanStatus(profile.ok ? profile.profile : null);
@@ -146,16 +152,20 @@
         }
         document.getElementById('acc-plan').textContent = planText;
 
-        // 保存用户名
+        // 保存昵称
         document.getElementById('uname-save').addEventListener('click', async function () {
           var name = unameInput.value.trim();
           var r = await User.setUsername(name);
           if (!r.ok) { setMsg(r.message, true); return; }
           usernameEl.childNodes[0].textContent = name; // 更新显示值（保留修改按钮）
+          editButton.textContent = '修改';
           hideUnameEdit();
-          setMsg('用户名已更新');
+          setMsg('昵称已更新');
         });
         document.getElementById('uname-cancel').addEventListener('click', hideUnameEdit);
+
+        // 首页抽屉与缺少昵称提醒会携带此参数，进入账户页后直接展开编辑区。
+        if (new URLSearchParams(window.location.search).get('edit') === 'username') showUnameEdit();
 
         // 退出登录
         var logoutBtn = document.getElementById('acc-logout');
