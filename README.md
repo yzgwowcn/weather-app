@@ -73,6 +73,8 @@ NODE_PATH="$(npm root -g)" node tests/e2e.check.js   # 端到端（真实 API + 
 
 `SUPABASE_URL` 已用于现有账户构建配置，同时也会由服务端函数读取。缺少任一服务端密钥时，AI 接口返回不可用，页面自动保留原规则分析。管理访问令牌（`sbp_...`）只用于 CLI/Management API，不可替代 `SUPABASE_SERVICE_ROLE_KEY`。
 
+`api/weather-analysis.mjs` 在 `vercel.json` 中配置 90 秒函数上限，其中 DeepSeek 最多等待 70 秒，剩余时间用于结果校验和 Supabase 写回。Vercel 当前默认启用 Fluid Compute；若项目手动关闭了该功能且套餐只允许 60 秒，请先在项目 Functions 设置中重新启用 Fluid Compute，避免部署配置或长请求被截断。
+
 ## 目录结构
 
 ```

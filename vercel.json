@@ -5,7 +5,7 @@
   "framework": null,
   "functions": {
     "api/weather-analysis.mjs": {
-      "maxDuration": 60
+      "maxDuration": 90
     }
   },
   "rewrites": [

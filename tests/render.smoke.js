@@ -95,6 +95,13 @@ const htmlAiSeen = renderWeatherApp(bundle, dest, 3, null, { aiAnalyses: {
   [DAYS[0]]: { summary: '晴好窗口稳定', reason: '低中云较少', uncertainty: '集合一致', advice: '注意防晒' },
 }, aiSeenDates: new Set([DAYS[0]]) });
 if (htmlAiSeen.includes('data-ai-typing="true"')) { console.error('AI TYPEWRITER REPEATED'); process.exit(1); }
+const htmlAiLoading = renderWeatherApp(bundle, dest, 3, null, { aiStatus: 'loading' });
+for (const c of ['ai-analysis ai-loading', 'DeepSeek 正在分析', '正在结合 EC 集合、分层云与近海浪场分析', 'ai-loading-dots']) {
+  if (!htmlAiLoading.includes(c)) { console.error('AI LOADING MISSING:', c); process.exit(1); }
+}
+const htmlAiRetrying = renderWeatherApp(bundle, dest, 3, null, { aiStatus: 'retrying' });
+if (!htmlAiRetrying.includes('正在进行一次安全重试')) { console.error('AI RETRY COPY MISSING'); process.exit(1); }
+if (htmlAi.includes('ai-loading')) { console.error('AI READY STILL LOADING'); process.exit(1); }
 // 概率环形图：SVG 环（pathLength=100，dasharray 即百分比；全成员晴好 → 100 100）
 for (const c of ['prob-ring', 'prob-arc', 'prob-track', 'stroke-dasharray="100 100"', 'rotate(-90 60 60)']) {
   if (!html.includes(c)) { console.error('PROB-RING MISSING:', c); process.exit(1); }
