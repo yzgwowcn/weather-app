@@ -18,6 +18,19 @@ const GlassSea = (() => {
   }
   function datePart(value) { return String(value).slice(0, 10); }
   function hourPart(value) { return Number(String(value).slice(11, 13)); }
+  function distanceKm(lat1, lon1, lat2, lon2) {
+    const values = [lat1, lon1, lat2, lon2].map(finite);
+    if (values.some((value) => value == null)) return null;
+    const [aLat, aLon, bLat, bLon] = values.map((value) => value * Math.PI / 180);
+    const dLat = bLat - aLat;
+    const dLon = bLon - aLon;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(aLat) * Math.cos(bLat) * Math.sin(dLon / 2) ** 2;
+    return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  }
+  function isNearSeaGrid(lat, lon, marineResponse, maxKm = 20) {
+    const distance = distanceKm(lat, lon, marineResponse?.latitude, marineResponse?.longitude);
+    return distance != null && distance <= maxKm;
+  }
   function within(point, limits) {
     return point.mask <= limits.mask && point.precipitation <= limits.precipitation &&
       point.wind <= limits.wind && point.wave <= limits.wave && point.windWave <= limits.windWave &&
@@ -109,7 +122,7 @@ const GlassSea = (() => {
       })),
     };
   }
-  return { LIMITS, build, compact, hourLabel };
+  return { LIMITS, build, compact, hourLabel, distanceKm, isNearSeaGrid };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = GlassSea;

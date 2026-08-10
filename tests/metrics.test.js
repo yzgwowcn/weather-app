@@ -6,8 +6,9 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const context = {};
-vm.runInNewContext(`${fs.readFileSync('js/glass-sea.js', 'utf8')}\n${fs.readFileSync('js/metrics.js', 'utf8')}\nglobalThis.metricsUnderTest = Metrics;`, context);
+vm.runInNewContext(`${fs.readFileSync('js/glass-sea.js', 'utf8')}\n${fs.readFileSync('js/metrics.js', 'utf8')}\nglobalThis.metricsUnderTest = Metrics; globalThis.glassSeaUnderTest = GlassSea;`, context);
 const Metrics = context.metricsUnderTest;
+const GlassSea = context.glassSeaUnderTest;
 
 const DAY = '2026-08-08';
 
@@ -281,6 +282,8 @@ function ecMain(hourly = hourlyFixture()) { return { 'ECMWF IFS': { hourly } }; 
   assert.equal(result.windows[0].highCloudMean, 100, '高云 100% 不否决候选');
   assert.equal(result.windows[1].level, 'possible');
   assert.equal(Metrics.buildGlassSeaForecast({ hourly: weather }, null, [DAY])[DAY].level, 'unavailable');
+  assert.equal(GlassSea.isNearSeaGrid(18.224, 109.512, { latitude: 18.208, longitude: 109.542 }), true, '沿海点距海格近');
+  assert.equal(GlassSea.isNearSeaGrid(19.05, 109.78, { latitude: 18.8, longitude: 109.7 }), false, '内陆点距海格超过20km');
 }
 
 console.log('metrics fixture tests passed');

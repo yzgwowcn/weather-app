@@ -494,7 +494,8 @@ function renderWeatherApp(bundle, destination, requestedDays, selectedDate, ui =
   const dates = forecast.daily.time;
   const assessments = Metrics.buildAssessment(bundle.ensembles, bundle.deterministic, dates);
   const cloudSeries = Metrics.buildCloudSeries(bundle.deterministic['ECMWF IFS'], forecast, dates);
-  const glassSeaDays = destination.marine ? Metrics.buildGlassSeaForecast(bundle.deterministic['ECMWF IFS'], bundle.marine, dates) : {};
+  const marineNearby = destination.marine && GlassSea.isNearSeaGrid(destination.lat, destination.lon, bundle.marine);
+  const glassSeaDays = marineNearby ? Metrics.buildGlassSeaForecast(bundle.deterministic['ECMWF IFS'], bundle.marine, dates) : {};
   const days = dates.map((date, index) => ({ ...dailyData(forecast, index), assessment: assessments[date], iconCodes: hourlyCodesFor(forecast, date), glassSea: glassSeaDays[date] }));
   const cloudCurves = Object.fromEntries(dates.map((date) => [date, cloudCurve(forecast, date)]));
   const currentDate = days.some((day) => day.date === selectedDate) ? selectedDate : days[0].date;
@@ -505,5 +506,5 @@ function renderWeatherApp(bundle, destination, requestedDays, selectedDate, ui =
   const regionNotice = destination.outOfRegion ? `<p class="notice">${regionTexts().regionNotice}</p>` : '';
   const aiAnalysis = ui.aiAnalyses && ui.aiAnalyses[currentDate];
   const aiAnimate = !!aiAnalysis && !(ui.aiSeenDates && ui.aiSeenDates.has(currentDate));
-  return `${regionNotice}${farNotice}${renderDayRail(days, currentDate)}${renderEcHero(selected, selected.assessment, destination, aiAnalysis, aiAnimate)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderForecastCards(days, currentDate, cloudCurves)}${renderMarineCards(bundle.marine, destination)}`;
+  return `${regionNotice}${farNotice}${renderDayRail(days, currentDate)}${renderEcHero(selected, selected.assessment, destination, aiAnalysis, aiAnimate)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderForecastCards(days, currentDate, cloudCurves)}${renderMarineCards(marineNearby ? bundle.marine : null, destination)}`;
 }

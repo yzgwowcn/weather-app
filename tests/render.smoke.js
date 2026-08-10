@@ -66,6 +66,7 @@ const bundle = {
     'GFS 集合': { hourly: ens(members.slice(0, 3)) },
   },
   marine: {
+    latitude: 18.208, longitude: 109.542,
     hourly: {
       time: DAYS.flatMap((d) => allDay(d).time),
       wave_height: DAYS.flatMap(() => Array(24).fill(0.4)),
@@ -112,6 +113,8 @@ if ((htmlC.match(/class="cloud-line/g) || []).length !== 2) { console.error('CLO
 if ((htmlC.match(/class="cloud-hit"/g) || []).length !== 24) { console.error('CLOUD HIT COUNT FAIL（应为 24 条）'); process.exit(1); }
 if ((htmlC.match(/class="cloud-bar"/g) || []).length !== 7) { console.error('CLOUD BAR COUNT FAIL（应为 7 根降雨柱）'); process.exit(1); }
 if ((htmlC.match(/cloud-curve-wrap/g) || []).length !== 1) { console.error('CLOUD CURVE WRAP COUNT FAIL（应仅选中卡片展开）'); process.exit(1); }
+const inlandHtml = renderWeatherApp(bundle, { ...dest, id: 'custom', lat: 19.05, lon: 109.78 }, 3, null, {});
+if (inlandHtml.includes('glass-sea-detail') || inlandHtml.includes('marine-section')) { console.error('INLAND MARINE SHOULD BE HIDDEN'); process.exit(1); }
 const iRail = html.indexOf('date-rail');
 const iHero = html.indexOf('ec-hero');
 const iSky = html.indexOf('sky-section');
