@@ -35,6 +35,6 @@ test('注册和修改昵称统一限制为 2-20 个中文、英文字母或数�
   assert.match(auth, /id="signup-username"[^>]+minlength="2"[^>]+maxlength="20"/);
   assert.match(account, /id="uname-input"[^>]+minlength="2"[^>]+maxlength="20"/);
   assert.match(migration, /char_length\(username\) BETWEEN 2 AND 20/);
-  assert.match(migration, /username ~ '\^\[一-龥A-Za-z0-9\]\+\$'/);
+  assert.match(migration, /username ~ U&'\^\[\\4E00-\\9FA5A-Za-z0-9\]\+\$'/);
   assert.match(migration, /NOT VALID/);
 });

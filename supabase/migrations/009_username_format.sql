@@ -9,6 +9,8 @@ ALTER TABLE public.profiles
   CHECK (
     username IS NULL OR (
       char_length(username) BETWEEN 2 AND 20
-      AND username ~ '^[一-龥A-Za-z0-9]+$'
+      -- 使用 PostgreSQL Unicode 转义保持迁移文件 SQL 主体为 ASCII，
+      -- 避免 Windows CLI / Management API 传输时把中文边界字符损坏为问号。
+      AND username ~ U&'^[\4E00-\9FA5A-Za-z0-9]+$'
     )
   ) NOT VALID;
