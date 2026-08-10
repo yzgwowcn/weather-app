@@ -222,7 +222,13 @@
     renderDestButtons();
     query();
   };
-  // 各模型数据时效表：模型名（状态灯：正常绿 / error 红）· 更新到（hourly 末项）· 多久前（Metadata API 的 last_run_availability_time 距今）
+  // 各模型数据时效表：模型名（状态灯：正常绿 / error 红）· 预报覆盖至（hourly 末项）· 模型可用时间（Metadata API 的 last_run_availability_time）
+  // Unix 秒 → 北京时间（固定 +8 换算，不依赖浏览器时区）
+  function fmtBJT(unixSec) {
+    const d = new Date((Number(unixSec) + 8 * 3600) * 1000);
+    const p = (n) => String(n).padStart(2, '0');
+    return p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
+  }
   function renderModelTable() {
     const wrap = document.getElementById('model-table');
     if (!wrap) return;
@@ -232,26 +238,36 @@
       return;
     }
     const meta = state.bundle && state.bundle.modelMeta;
-    const now = Date.now();
+    let liveCount = 0;
     const rows = ['ECMWF IFS', 'NOAA GFS', 'JMA GSM', 'CMA GRAPES'].map(function (name) {
       const m = det[name];
       if (!m || m.error || !m.hourly || !m.hourly.time || !m.hourly.time.length) {
         return '<div class="model-row dead"><span class="model-name"><i class="status-dot" aria-hidden="true"></i>' + name + '</span><span class="model-upto">未返回</span><span class="model-ago">—</span></div>';
       }
+      liveCount += 1;
       const last = String(m.hourly.time[m.hourly.time.length - 1]).slice(5, 16).replace('T', ' ');
-      // "多久前更新" = 模型数据在 API 可用的时间（last_run_availability_time，Unix 秒）距今
-      let ago = '—';
+      // "模型可用时间" = 模型数据在 API 可用的时间（last_run_availability_time，Unix 秒，北京时间）
+      let availText = '—';
       const mMeta = meta && meta[name];
       const avail = mMeta && !mMeta.error ? Number(mMeta.last_run_availability_time) : NaN;
-      if (Number.isFinite(avail) && avail > 0) {
-        const mins = Math.max(0, Math.round((now / 1000 - avail) / 60));
-        ago = mins < 60 ? mins + ' 分钟前' : Math.floor(mins / 60) + ' 小时前';
-      }
-      return '<div class="model-row live"><span class="model-name"><i class="status-dot" aria-hidden="true"></i>' + name + '</span><span class="model-upto">' + last + '</span><span class="model-ago">' + ago + '</span></div>';
+      if (Number.isFinite(avail) && avail > 0) availText = fmtBJT(avail);
+      return '<div class="model-row live"><span class="model-name"><i class="status-dot" aria-hidden="true"></i>' + name + '</span><span class="model-upto">' + last + '</span><span class="model-ago">' + availText + '</span></div>';
     });
-    wrap.innerHTML = rows.join('');
+    // 移动端默认折叠为一行摘要，点击展开四行详情（桌面端由 CSS 直接展开详情、隐藏摘要）
+    const open = wrap.classList.contains('open');
+    const summaryState = liveCount === rows.length ? 'live' : liveCount > 0 ? 'partial' : 'dead';
+    wrap.innerHTML =
+      '<button type="button" class="model-summary ' + summaryState + '" aria-expanded="' + open + '">' +
+        '<span class="model-name"><i class="status-dot" aria-hidden="true"></i>' + liveCount + '/' + rows.length + ' 模型可用</span>' +
+        '<span class="model-toggle" aria-hidden="true"></span>' +
+      '</button>' +
+      '<div class="model-detail">' +
+        '<div class="model-row model-head" aria-hidden="true"><span>模型</span><span>预报覆盖至</span><span>模型可用时间</span></div>' +
+        rows.join('') +
+      '</div>';
+    wrap.classList.toggle('open', open);
   }
-  // 首屏数据来源状态：未查询 / 更新至（取 hourly 最后时间戳）/ 暂不可用
+  // 首屏数据来源状态：未查询 / 预报覆盖至（取 hourly 最后时间戳）/ 暂不可用
   function updateDataStatus() {
     const el = document.getElementById('data-status');
     if (!el) return;
@@ -265,7 +281,7 @@
       textEl.textContent = f && f.error ? '数据：暂不可用' : '数据：尚未查询';
     } else {
       const last = String(f.hourly.time[f.hourly.time.length - 1]).slice(0, 16).replace('T', ' ');
-      textEl.textContent = '数据更新至 ' + last + '（北京时间）';
+      textEl.textContent = '预报覆盖至 ' + last + '（北京时间）';
     }
     renderModelTable();
   }
@@ -444,6 +460,15 @@
     renderDestButtons();
     applyDayAccess();
     applySavedPrefs();
+    // 模型时效表折叠：移动端点击摘要展开/收起（桌面端摘要隐藏，事件无影响）
+    document.addEventListener('click', function (e) {
+      const summary = e.target.closest('.model-summary');
+      if (!summary) return;
+      const wrap = summary.closest('.model-table');
+      if (!wrap) return;
+      const open = wrap.classList.toggle('open');
+      summary.setAttribute('aria-expanded', String(open));
+    });
     // 登录状态变化（登录/退出）：刷新 14 天门槛；登录后应用默认区域与默认城市（auth.js 异步初始化完成后触发）
     document.addEventListener('auth-change', function (e) {
       applyDayAccess();

@@ -14,7 +14,7 @@ const API = (() => {
     gfs: { label: 'GFS 集合', model: 'gfs_seamless' },
   };
   // Metadata API（不计请求限额）：https://api.open-meteo.com/data/{model}/static/meta.json
-  // 返回 last_run_availability_time（数据在 API 可用的时间）等字段，用于展示"模型数据多久前更新"
+  // 返回 last_run_availability_time（数据在 API 可用的时间）等字段，用于展示"模型可用时间"
   const MODEL_META = {
     ecmwf: { name: 'ecmwf_ifs025' },
     gfs: { name: 'ncep_gfs025' },
