@@ -216,7 +216,7 @@ body[data-mood="storm"]::after {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   body::before, body::after { transform: none !important; filter: none !important; }
-  .spinner { animation: spin 1.4s linear infinite !important; }
+  .spinner, .boot-spinner { animation: spin 1.4s linear infinite !important; }
 }
 
 button { font: inherit; }
@@ -589,6 +589,27 @@ html, body { overflow-x: hidden; }
 /* ---- 加载与提示 ---- */
 .loading { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 100px; color: var(--muted); font-size: 14px; }
 .hidden { display: none; }
+/* ---- 首屏加载动画（boot splash）---- */
+/* 覆盖 JS 就绪前的空白期（目的地/文案/状态由 DOMContentLoaded 后 init() 填充）：
+   全屏深色底 + 居中 spinner；首屏渲染完成后由 app.js 加 .done 淡出移除，
+   内联脚本 10s 兜底防 JS 异常时永久遮挡。z-index 100 高于 toast(60)/地图面板(50)。 */
+#boot-splash {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(255, 196, 96, .38), transparent 60%),
+    linear-gradient(160deg, #1b2338 0%, #2a3348 55%, #192131 100%);
+  transition: opacity .35s ease;
+}
+.boot-splash-inner { text-align: center; }
+.boot-spinner {
+  width: 34px; height: 34px; margin: 0 auto 14px;
+  border: 3px solid rgba(255, 255, 255, .18); border-top-color: var(--blue);
+  border-radius: 50%; animation: spin .8s linear infinite;
+}
+.boot-title { margin: 0; color: #fff; font-size: 15px; font-weight: 750; letter-spacing: .02em; }
+.boot-hint { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+#boot-splash.done { opacity: 0; pointer-events: none; }
 .spinner {
   width: 16px; height: 16px; border: 2px solid rgba(255, 255, 255, .22); border-top-color: var(--blue);
   border-radius: 50%; animation: spin .8s linear infinite;

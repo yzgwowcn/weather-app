@@ -454,11 +454,24 @@
     resultEl.removeAttribute('aria-busy');
     renderResult();
   }
+  // 首屏渲染完成：淡出并移除 boot splash（覆盖 JS 就绪前的空白期）。
+  // 兜底链：init() 同步渲染后主动调用 → window load 事件 → index.html 内联脚本 10s 强制 .done
+  function hideBootSplash() {
+    const splash = document.getElementById('boot-splash');
+    if (!splash || splash.classList.contains('done')) return;
+    splash.classList.add('done');
+    // 等 .35s opacity 过渡结束后移除节点，避免残留元素拦截后续交互
+    setTimeout(function () {
+      if (splash.parentNode) splash.parentNode.removeChild(splash);
+    }, 400);
+  }
   function init() {
     CURRENT_REGION = state.region;
     applyRegionTexts();
     renderDestButtons();
     applyDayAccess();
+    // 首屏内容（目的地/文案/状态）就绪即展示页面；天气数据查询由 #loading 提示
+    hideBootSplash();
     applySavedPrefs();
     // 模型时效表折叠：移动端点击摘要展开/收起（桌面端摘要隐藏，事件无影响）
     document.addEventListener('click', function (e) {
@@ -644,4 +657,6 @@
     query();
   }
   document.addEventListener('DOMContentLoaded', init);
+  // 兜底：即使 DOMContentLoaded 路径异常，页面资源全部加载后也淡出 splash
+  window.addEventListener('load', hideBootSplash);
 })();

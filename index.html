@@ -10,6 +10,24 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body data-mood="neutral">
+  <!-- 首屏加载动画：覆盖层盖住 JS 就绪前的空白期（目的地/文案/状态由 DOMContentLoaded 后 init() 填充），
+       首屏渲染完成后由 app.js 淡出移除；内联脚本兜底防 JS 异常时永久遮挡 -->
+  <div id="boot-splash" role="status" aria-label="页面加载中">
+    <div class="boot-splash-inner">
+      <div class="boot-spinner" aria-hidden="true"></div>
+      <p class="boot-title">晴海 · 海南旅行天气判断</p>
+      <p class="boot-hint">正在加载，请稍候…</p>
+    </div>
+  </div>
+  <script>
+    // boot splash 兜底：10 秒后强制淡出，防止主脚本未就绪/异常时覆盖层永久遮挡页面
+    (function () {
+      setTimeout(function () {
+        var s = document.getElementById('boot-splash');
+        if (s && !s.classList.contains('done')) s.classList.add('done');
+      }, 10000);
+    })();
+  </script>
   <canvas id="rain-layer" aria-hidden="true"></canvas>
   <!-- 区域示意地图背景：海南/四川风格化轮廓（DataV GeoAtlas 简化数据，非标准政区图），随区域模式切换；js/region-map.js 控制显隐与目的地光点 -->
   <div id="region-map" aria-hidden="true">
