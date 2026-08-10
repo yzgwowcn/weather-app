@@ -8,6 +8,8 @@ import { claimAnalysis, completeAnalysis, failAnalysis, getAnalysis } from './_w
 
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 const SETTLE_SECONDS = 600;
+export const UPSTREAM_TIMEOUT_MS = 25000;
+export const DEEPSEEK_TIMEOUT_MS = 70000;
 let warnedOrigin = false;
 
 function send(res, status, body) {
@@ -23,8 +25,8 @@ async function readBody(req) {
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {};
 }
 
-async function getJson(url, init = {}) {
-  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(25000) });
+async function getJson(url, init = {}, timeoutMs = UPSTREAM_TIMEOUT_MS) {
+  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
   if (!response.ok) throw new Error(`UPSTREAM_HTTP_${response.status}`);
   return response.json();
 }
@@ -104,7 +106,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(deepSeekRequest(preset, modelVersion, days, model)),
-    });
+    }, DEEPSEEK_TIMEOUT_MS);
     const content = completion?.choices?.[0]?.message?.content;
     const parsed = JSON.parse(content);
     const analyses = validateAnalyses(parsed, days.map((day) => day.date), { requireGlassSea: preset.region === 'hainan' });
@@ -114,9 +116,12 @@ export default async function handler(req, res) {
       analysisVersion: ANALYSIS_VERSION, generatedAt: new Date().toISOString(), analyses,
     });
   } catch (error) {
-    const code = String(error?.message || 'ANALYSIS_FAILED').replace(/[^A-Z0-9_]/gi, '_').slice(0, 80);
+    const timedOut = error?.name === 'TimeoutError' || error?.name === 'AbortError';
+    const code = timedOut
+      ? 'DEEPSEEK_OR_UPSTREAM_TIMEOUT'
+      : String(error?.message || 'ANALYSIS_FAILED').replace(/[^A-Z0-9_]/gi, '_').slice(0, 80);
     try { await failAnalysis(presetId, modelVersion, ANALYSIS_VERSION, code); } catch { /* 下次租约过期后可重试 */ }
     console.error(`weather-analysis: generation failed (${code})`);
-    return send(res, 502, { ok: false, error: 'ANALYSIS_UNAVAILABLE' });
+    return send(res, 502, { ok: false, status: 'retryable', error: 'ANALYSIS_UNAVAILABLE', retryAfterSeconds: 8 });
   }
 }

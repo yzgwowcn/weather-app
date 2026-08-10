@@ -252,7 +252,7 @@ const ADVICE_META = {
   none: { cls: 'none' },
 };
 
-function renderEcHero(day, assessment, destination, aiAnalysis, aiAnimate) {
+function renderEcHero(day, assessment, destination, aiAnalysis, aiAnimate, aiStatus) {
   const main = assessment.ec.main;
   const finalSuitable = assessment.finalSuitable === true;
   const ensembleOverturn = finalSuitable && main && !main.suitable;
@@ -277,6 +277,14 @@ function renderEcHero(day, assessment, destination, aiAnalysis, aiAnimate) {
     advice: escapeText(aiAnalysis.advice),
     glassSea: aiAnalysis.glassSea ? escapeText(aiAnalysis.glassSea) : '',
   } : null;
+  const pendingAi = ['loading', 'settling', 'generating', 'retrying'].includes(aiStatus);
+  const loadingCopy = aiStatus === 'settling'
+    ? '最新一轮气象数据正在同步，稍后开始分析'
+    : aiStatus === 'generating'
+      ? '正在等待同一预报版本的共享分析'
+      : aiStatus === 'retrying'
+        ? '刚才响应较慢，正在进行一次安全重试'
+        : '正在结合 EC 集合、分层云与近海浪场分析';
   const narrative = ai
     ? `<div class="ai-analysis ${aiAnimate ? 'typing' : ''}" aria-label="DeepSeek 智能分析" ${aiAnimate ? `data-ai-typing="true" data-ai-date="${day.date}"` : ''}>
         <span class="ai-avatar" aria-hidden="true">DS</span>
@@ -288,7 +296,15 @@ function renderEcHero(day, assessment, destination, aiAnalysis, aiAnimate) {
           <p class="ai-advice" data-ai-text>${ai.advice}</p>
         </div>
       </div>`
-    : (advice.note ? `<p class="advice-note">${advice.note}</p>` : '');
+    : pendingAi
+      ? `<div class="ai-analysis ai-loading" role="status" aria-live="polite" aria-label="DeepSeek 正在分析">
+          <span class="ai-avatar" aria-hidden="true">DS</span>
+          <div class="ai-bubble">
+            <span class="ai-analysis-label">DEEPSEEK 天气分析</span>
+            <p class="ai-loading-copy">${loadingCopy}<span class="ai-loading-dots" aria-hidden="true"><i></i><i></i><i></i></span></p>
+          </div>
+        </div>`
+      : (advice.note ? `<p class="advice-note">${advice.note}</p>` : '');
   return `
   <section class="ec-hero" data-mood="${assessment.weatherMood.mood}" data-cloud="${day.cloud < 30 ? 'clear' : day.cloud < 60 ? 'partly' : 'cloudy'}" data-thunder-intensity="${Metrics.thunderIntensity(day, main)}">
     <div class="ec-verdict">
@@ -506,5 +522,5 @@ function renderWeatherApp(bundle, destination, requestedDays, selectedDate, ui =
   const regionNotice = destination.outOfRegion ? `<p class="notice">${regionTexts().regionNotice}</p>` : '';
   const aiAnalysis = ui.aiAnalyses && ui.aiAnalyses[currentDate];
   const aiAnimate = !!aiAnalysis && !(ui.aiSeenDates && ui.aiSeenDates.has(currentDate));
-  return `${regionNotice}${farNotice}${renderDayRail(days, currentDate)}${renderEcHero(selected, selected.assessment, destination, aiAnalysis, aiAnimate)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderForecastCards(days, currentDate, cloudCurves)}${renderMarineCards(marineNearby ? bundle.marine : null, destination)}`;
+  return `${regionNotice}${farNotice}${renderDayRail(days, currentDate)}${renderEcHero(selected, selected.assessment, destination, aiAnalysis, aiAnimate, ui.aiStatus)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderForecastCards(days, currentDate, cloudCurves)}${renderMarineCards(marineNearby ? bundle.marine : null, destination)}`;
 }

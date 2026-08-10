@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import handler from '../api/weather-analysis.mjs';
+import handler, { DEEPSEEK_TIMEOUT_MS, UPSTREAM_TIMEOUT_MS } from '../api/weather-analysis.mjs';
 import {
   ANALYSIS_VERSION, PRESETS, addGlassSeaForecast, deepSeekRequest, marineUrl, shanghaiDateRange,
   summarizeWeather, validateAnalyses, weatherUrls,
@@ -33,6 +33,13 @@ test('预设白名单固定为 12 个坐标且不含 custom', () => {
   assert.equal(Object.keys(PRESETS).length, 12);
   assert.equal(PRESETS.custom, undefined);
   assert.equal(PRESETS.sanya.name, '三亚·亚龙湾');
+});
+
+test('DeepSeek 使用独立长超时并为函数收尾留出余量', () => {
+  assert.equal(UPSTREAM_TIMEOUT_MS, 25000);
+  assert.equal(DEEPSEEK_TIMEOUT_MS, 70000);
+  assert.ok(DEEPSEEK_TIMEOUT_MS > UPSTREAM_TIMEOUT_MS);
+  assert.ok(DEEPSEEK_TIMEOUT_MS < 90000);
 });
 
 test('服务端聚合 EC 主运行与集合并保持规则结论', () => {

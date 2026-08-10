@@ -512,9 +512,14 @@
       renderResult();
       return;
     }
-    // 新模型正在跨节点同步或已有请求取得生成租约时，当前页面最多自动复查一次。
-    if ((result.status === 'settling' || result.status === 'generating') && attempt < 1) {
+    renderResult();
+    // 同步/排队可有限复查；生成超时或短暂网络失败仅重试一次，避免异常配置持续消耗调用。
+    const waiting = result.status === 'settling' || result.status === 'generating';
+    const retryableFailure = result.status === 'retryable' || result.status === 'unavailable';
+    if ((waiting && attempt < 2) || (retryableFailure && attempt < 1)) {
       const delay = Math.min(60000, Math.max(3000, Number(result.retryAfterSeconds || 8) * 1000));
+      state.aiStatus = retryableFailure ? 'retrying' : result.status;
+      renderResult();
       setTimeout(() => {
         if (seq === requestSeq && !abortController.signal.aborted) loadAiAnalysis(seq, attempt + 1);
       }, delay);
