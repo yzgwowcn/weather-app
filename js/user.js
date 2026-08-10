@@ -53,15 +53,23 @@
     if (!user) return { ok: false, message: '未登录' };
     if (!isValidUsername(name)) return { ok: false, message: '昵称需为 2-20 个中文、英文字母或数字，不得包含空格或特殊符号' };
     var current = await getProfile();
-    if (current.ok && current.profile && current.profile.username === name) {
+    if (!current.ok) return current;
+    if (current.profile && current.profile.username === name) {
       return { ok: true }; // 未变化
     }
     var taken = await isUsernameTaken(name);
     if (!taken.ok) return taken;
     if (taken.taken) return { ok: false, message: '该昵称已被占用' };
-    var { error } = await client
-      .from('profiles')
-      .upsert({ user_id: user.id, username: name }, { onConflict: 'user_id' });
+    // 不使用 upsert：冲突更新会把请求中的 user_id 一并纳入 UPDATE 权限检查，
+    // 而安全策略有意只授予 UPDATE(username)，因此 PostgREST 会返回 42501。
+    // 注册触发器通常已创建 profile；仅在确实无记录时走受 RLS 保护的 INSERT。
+    var write;
+    if (current.profile) {
+      write = client.from('profiles').update({ username: name }).eq('user_id', user.id);
+    } else {
+      write = client.from('profiles').insert({ user_id: user.id, username: name });
+    }
+    var { error } = await write;
     if (error) {
       if (error.code === '23505') return { ok: false, message: '该昵称已被占用' };
       if (error.code === '23514') return { ok: false, message: '昵称需为 2-20 个中文、英文字母或数字，不得包含空格或特殊符号' };
