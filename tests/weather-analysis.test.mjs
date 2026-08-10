@@ -61,17 +61,22 @@ test('上海日期范围和天气 URL 不接受客户端坐标', () => {
   assert.match(urls.ensemble, /models=ecmwf_ifs025/);
 });
 
-test('DeepSeek 请求关闭思考并要求 JSON，输出严格按日期校验', () => {
+test('DeepSeek 请求按海南云层口径解释并严格校验 JSON', () => {
   const days = [{ date: '2026-08-10', verdict: '推荐出行' }];
   const request = deepSeekRequest(PRESETS.sanya, 123, days);
   assert.equal(request.thinking.type, 'disabled');
   assert.equal(request.response_format.type, 'json_object');
   assert.match(request.messages[0].content, /ecDisagreement=main_opposed/);
   assert.match(request.messages[0].content, /ecDisagreement=members_split/);
+  assert.match(request.messages[0].content, /阴晴观感以低云和中云/);
+  assert.match(request.messages[0].content, /覆盖率而非光学厚度/);
+  assert.match(request.messages[0].content, /不得笼统写“云量少”/);
+  assert.match(request.messages[0].content, /禁止仅凭高云或 windKmh 承诺\/否定玻璃海/);
+  assert.doesNotMatch(deepSeekRequest(PRESETS.chengdu, 123, days).messages[0].content, /玻璃海/);
   const payload = { analyses: [{ date: '2026-08-10', summary: '晴好', reason: '云量低', uncertainty: '集合一致', advice: '注意防晒' }] };
   assert.deepEqual(validateAnalyses(payload, ['2026-08-10']), payload.analyses);
   assert.throws(() => validateAnalyses({ analyses: [] }, ['2026-08-10']), /AI_INVALID_OUTPUT/);
-  assert.equal(ANALYSIS_VERSION, 'weather-v2');
+  assert.equal(ANALYSIS_VERSION, 'weather-v3');
 });
 
 function responseRecorder() {
@@ -123,12 +128,12 @@ test('分析完成后自动删除同一预设点的旧模型和旧提示词版�
     return new Response(null, { status: 204 });
   };
   try {
-    await completeAnalysis('sanya', 456, 'weather-v2', [], {}, {
+    await completeAnalysis('sanya', 456, 'weather-v3', [], {}, {
       SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SECRET_KEY: 'sb_secret_example',
     });
     assert.deepEqual(calls.map((call) => call.method), ['PATCH', 'DELETE', 'DELETE']);
     assert.match(calls[1].url, /model_version=lt\.456/);
-    assert.match(calls[2].url, /analysis_version=neq\.weather-v2/);
+    assert.match(calls[2].url, /analysis_version=neq\.weather-v3/);
   } finally {
     globalThis.fetch = originalFetch;
   }

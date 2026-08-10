@@ -1,7 +1,7 @@
 // DeepSeek 天气分析的纯函数核心：预设点白名单、ECMWF 数据聚合、规则结论与输出校验。
 // 服务端只接收 presetId；坐标和判断口径均以本文件为准，避免客户端伪造数据污染共享缓存。
 
-export const ANALYSIS_VERSION = 'weather-v2';
+export const ANALYSIS_VERSION = 'weather-v3';
 export const DEEPSEEK_MODEL_DEFAULT = 'deepseek-v4-flash';
 export const MODEL_META_URL = 'https://api.open-meteo.com/data/ecmwf_ifs025/static/meta.json';
 
@@ -203,7 +203,7 @@ export function validateAnalyses(payload, expectedDates) {
 }
 
 export function deepSeekRequest(preset, modelVersion, days, model = DEEPSEEK_MODEL_DEFAULT) {
-  const system = [
+  const systemRules = [
     '你是旅行天气解释器，只解释程序已经计算出的结论，不得改变 verdict、数值或安全口径。',
     '使用简洁自然的中文，面向普通游客。雷阵雨只是避雨提醒，不自动否定出行；中雨及以上、遮蔽云量和平均风速按输入结论解释。不要机械复述所有数字。',
     '按需控制详略：仅当 verdictLevel 为 caution/watch/avoid，或输入含 ecDisagreement 时展开；其余 recommended/suitable 保持精炼。展开时明确真正拖累出行的因素及数值、风险意味着什么，并给出可执行的改期/室内安排/临近复核建议。',
@@ -212,8 +212,12 @@ export function deepSeekRequest(preset, modelVersion, days, model = DEEPSEEK_MOD
     '不得声称这是官方预警或历史准确率，不得编造输入中没有的天气、景区开放或交通信息。',
     '必须输出 json，格式为 {"analyses":[{"date":"YYYY-MM-DD","summary":"...","reason":"...","uncertainty":"...","advice":"..."}]}。',
     '每个输入日期必须恰好输出一项。无 ecDisagreement 的 recommended/suitable：summary≤35字、reason≤50字、uncertainty≤35字、advice≤35字；caution/watch/avoid 或含 ecDisagreement：summary≤55字、reason≤120字、uncertainty≤80字、advice≤90字。',
-  ].join('\n');
-  const user = JSON.stringify({ destination: preset.name, modelVersion, timezone: 'Asia/Shanghai', days });
+  ];
+  if (preset.region === 'hainan') systemRules.splice(2, 0,
+    '海南海边的阴晴观感以低云和中云形成的 maskMean 为主，高云 highCloudMean 只辅助描述日照通透感、天空乳白感、海水显色与摄影反差。highCloudMean 是覆盖率而非光学厚度：低中云少、无阻断降水且风满足规则时，即使高云多，也不得写成阴天、无太阳或不适合出行，也不得笼统写“云量少”或保证“阳光充足”；应明确写“低中云少，仍有日照机会，高云可能让阳光偏柔、蓝天与海水色彩反差略弱”。语气客观但不要放大不影响安全的小瑕疵。',
+    '“玻璃海”首先是低风、低浪的海面状态，还受涌浪、水体清澈度、潮流和观测光线影响。输入未提供完整浪高、水质、潮汐和太阳角度，禁止仅凭高云或 windKmh 承诺/否定玻璃海；需要提及时写成“云层只影响观感，是否呈现玻璃海仍需结合临近海况与现场水质”。');
+  const system = systemRules.join('\n');
+  const user = JSON.stringify({ destination: preset.name, region: preset.region, modelVersion, timezone: 'Asia/Shanghai', days });
   return {
     model,
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
