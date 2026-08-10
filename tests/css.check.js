@@ -4,7 +4,7 @@
 const fs = require('node:fs');
 const css = fs.readFileSync('css/style.css', 'utf8');
 
-for (const key of ['.ai-avatar', '.ai-bubble', '.ai-glass-sea', '.glass-sea-detail', '.glass-sea-window', '.ai-analysis.typing', '.ai-loading-dots', '@keyframes ai-caret', '@keyframes ai-loading-dot']) {
+for (const key of ['.ai-avatar', '.ai-bubble', '.ai-glass-sea', '.glass-sea-detail', '.glass-sea-window', '.ai-analysis.typing', '.ai-loading-dots', '.ai-unavailable-copy', '.result.stable-update .ec-hero', '@keyframes ai-caret', '@keyframes ai-loading-dot']) {
   if (!css.includes(key)) { console.error('AI bubble style MISSING:', key); process.exit(1); }
 }
 

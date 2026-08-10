@@ -286,12 +286,14 @@
     }
     renderModelTable();
   }
-  function renderResult() {
+  function renderResult(options = {}) {
     const oldScroll = resultEl.querySelector('.sky-scroll');
     const scrollLeft = oldScroll ? oldScroll.scrollLeft : 0;
     const oldRail = resultEl.querySelector('.date-rail');
     const railLeft = oldRail ? oldRail.scrollLeft : 0;
     if (typingTimer) { clearTimeout(typingTimer); typingTimer = null; }
+    // AI 加载态切换为正文时只更新内容，不重播整张结果卡的淡入动画，避免短暂 opacity:0 闪烁。
+    resultEl.classList.toggle('stable-update', options.stable === true);
     resultEl.innerHTML = renderWeatherApp(state.bundle, state.dest, state.days, state.selectedDate, {
       skyView: state.skyView, skyIndex: state.skyIndex, aiAnalyses: state.aiAnalyses,
       aiStatus: state.aiStatus, aiSeenDates: state.aiSeenDates,
@@ -509,21 +511,20 @@
     state.aiStatus = result.status;
     if (result.status === 'ready') {
       state.aiAnalyses = result.analyses;
-      renderResult();
+      renderResult({ stable: true });
       return;
     }
-    renderResult();
     // 同步/排队可有限复查；生成超时或短暂网络失败仅重试一次，避免异常配置持续消耗调用。
     const waiting = result.status === 'settling' || result.status === 'generating';
     const retryableFailure = result.status === 'retryable' || result.status === 'unavailable';
     if ((waiting && attempt < 2) || (retryableFailure && attempt < 1)) {
       const delay = Math.min(60000, Math.max(3000, Number(result.retryAfterSeconds || 8) * 1000));
       state.aiStatus = retryableFailure ? 'retrying' : result.status;
-      renderResult();
       setTimeout(() => {
         if (seq === requestSeq && !abortController.signal.aborted) loadAiAnalysis(seq, attempt + 1);
       }, delay);
     }
+    renderResult({ stable: true });
   }
   // 首屏渲染完成：淡出并移除 boot splash（覆盖 JS 就绪前的空白期）。
   // 兜底链：init() 同步渲染后主动调用 → window load 事件 → index.html 内联脚本 10s 强制 .done
