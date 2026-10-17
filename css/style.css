@@ -6,7 +6,7 @@
   --ink: #f2f5f9;
   --muted: rgba(222, 230, 238, .88);
   --line: rgba(255, 255, 255, .13);
-  /* 亚克力面板底（半透明 + 模糊） */
+  /* 毛玻璃面板底：上半受光（暖白）+ 下半落影（冷蓝黑），叠在 backdrop 模糊之上形成玻璃厚度 */
   --glass: rgba(255, 255, 255, .09);
   --glass-strong: rgba(255, 255, 255, .13);
   --blue: #7db4ff;
@@ -15,15 +15,28 @@
   --amber: #f2c063;
   --red: #ff8f87;
   --purple: #b79cff;
-  --shadow: 0 18px 44px rgba(3, 9, 20, .38);
+  --shadow: 0 30px 70px -20px rgba(2, 8, 18, .6), 0 12px 30px rgba(2, 8, 18, .3), 0 1px 2px rgba(2, 8, 18, .22);
   --r-lg: 22px;
   --r-md: 15px;
   --r-sm: 10px;
-  /* Liquid Glass：玻璃渐变描边（padding-box 底 + border-box 亮边） */
-  --glass-border: linear-gradient(rgba(255, 255, 255, .06), rgba(255, 255, 255, .035)) padding-box,
-                  linear-gradient(165deg, rgba(255, 255, 255, .34), rgba(255, 255, 255, .05) 38%, rgba(255, 255, 255, .18)) border-box;
-  /* 顶部内高光（Liquid Glass 边缘反光） */
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, .16);
+  /* 统一毛玻璃模糊：模糊半径 + 饱和度提升 + 轻微提亮，让背景色透进面板而不发灰 */
+  --glass-blur: blur(30px) saturate(1.95) brightness(1.02) contrast(1.03);
+  /* Liquid Glass：玻璃渐变描边（padding-box 底 + border-box 亮边）
+     第 1 层：磨砂颗粒（feTurbulence 噪点，只作用于玻璃面板内部，模拟霜面粗糙度）；
+     底：左上受光冷白 → 中段近透明 → 底部冷蓝落影；再叠一层极薄深色底保证白字对比；
+     边：左上强反光 → 中段细亮线 → 右下二次反光，模拟真实玻璃棱边 */
+  --glass-border: var(--frost-noise) padding-box,
+                  linear-gradient(155deg, rgba(120, 160, 220, .14), rgba(16, 30, 52, .13) 38%, rgba(8, 16, 30, .25)) padding-box,
+                  linear-gradient(rgba(14, 34, 64, .18), rgba(14, 34, 64, .18)) padding-box,
+                  linear-gradient(158deg, rgba(255, 255, 255, .66), rgba(255, 255, 255, .13) 26%, rgba(255, 255, 255, .04) 52%, rgba(255, 255, 255, .3) 78%, rgba(255, 255, 255, .56)) border-box;
+  /* 顶部内高光 + 内缘落影（Liquid Glass 边缘反光 + 玻璃厚度） */
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, .34),
+                     inset 0 -1px 0 rgba(4, 10, 22, .45),
+                     inset 1px 0 0 rgba(255, 255, 255, .1),
+                     inset -1px 0 0 rgba(255, 255, 255, .1),
+                     inset 0 14px 26px -20px rgba(255, 255, 255, .55);
+  /* 磨砂颗粒：SVG feTurbulence 噪点（面板内部霜面质感），叠加在玻璃底之上 */
+  --frost-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.18'/%3E%3C/svg%3E");
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -38,16 +51,17 @@ body {
     linear-gradient(160deg, #1b2338 0%, #2a3348 55%, #192131 100%);
   transition: background 1.2s ease;
 }
-/* 云量分档：云越少越有大太阳 + 蓝天蓝海感（clear <30% / partly 30–60% / cloudy ≥60% 默认） */
+/* 云量分档：云越少越有大太阳 + 蓝天蓝海感（clear <30% / partly 30–60% / cloudy ≥60% 默认）
+   基底比纯白天空更深一档：毛玻璃面板需要后方有色彩层次才能显出磨砂质感 */
 body[data-cloud="clear"] {
   background:
-    radial-gradient(120% 95% at 50% -10%, rgba(255, 216, 130, .55), transparent 62%),
-    linear-gradient(160deg, #2b5488 0%, #4a7db8 55%, #2b4a72 100%);
+    radial-gradient(130% 100% at 50% -12%, rgba(255, 206, 122, .48), transparent 58%),
+    linear-gradient(158deg, #20497b 0%, #3d6ea6 52%, #1e4069 100%);
 }
 body[data-cloud="partly"] {
   background:
-    radial-gradient(120% 90% at 50% -10%, rgba(255, 205, 110, .44), transparent 60%),
-    linear-gradient(160deg, #243b68 0%, #3a5f8f 55%, #24354f 100%);
+    radial-gradient(125% 95% at 50% -10%, rgba(255, 200, 112, .4), transparent 58%),
+    linear-gradient(158deg, #1f345c 0%, #33567f 52%, #1f2f47 100%);
 }
 /* 背景结构：底色恒为暖金阳光基调（"晴天阳光偏多"）；
    ::before 固定日照渐层并缓慢漂移；
@@ -67,16 +81,16 @@ body::before {
     radial-gradient(120% 90% at 50% -10%, rgba(120, 150, 205, .28), transparent 62%);
   animation: sun-drift 26s ease-in-out infinite alternate;
 }
-/* 云量越低：日照光层更强（大太阳感） */
+/* 云量越低：日照光层更强（大太阳感）；暖金更饱和、范围收窄，让天空保持通透的蓝 */
 body[data-cloud="clear"]::before {
   background:
-    radial-gradient(95% 75% at 68% 6%, rgba(255, 232, 160, .8), transparent 60%),
-    radial-gradient(130% 100% at 50% -12%, rgba(150, 195, 245, .5), transparent 66%);
+    radial-gradient(78% 62% at 70% 4%, rgba(255, 192, 96, .8), transparent 62%),
+    radial-gradient(120% 95% at 50% -14%, rgba(120, 170, 235, .42), transparent 66%);
 }
 body[data-cloud="partly"]::before {
   background:
-    radial-gradient(92% 72% at 68% 7%, rgba(255, 215, 130, .62), transparent 58%),
-    radial-gradient(125% 95% at 50% -10%, rgba(135, 175, 225, .38), transparent 63%);
+    radial-gradient(85% 68% at 70% 6%, rgba(255, 200, 112, .62), transparent 60%),
+    radial-gradient(122% 96% at 50% -12%, rgba(130, 172, 226, .36), transparent 64%);
 }
 body::after { opacity: 0; }
 /* 非晴 mood：压低暖金基底（透明度 42%），让云/雨/雷的冷灰蓝氛围层透出 */
@@ -228,11 +242,12 @@ button { font: inherit; }
   min-height: 76px;
   display: flex;
   align-items: center;
-  border-bottom: 1px solid var(--line);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  /* 顶栏底色明显提亮（比内容区亮两级，深蓝玻璃） */
-  background: rgba(58, 80, 120, .85);
+  border-bottom: 1px solid rgba(255, 255, 255, .16);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  /* 顶栏玻璃：上沿受光、下沿落影，半透明深蓝与页面天空透叠 */
+  background: linear-gradient(180deg, rgba(46, 68, 104, .64), rgba(25, 40, 64, .48));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 12px 34px -18px rgba(2, 8, 18, .5);
   overflow-x: clip; /* 窄屏（微信/夸克内置浏览器）防子项溢出产生横向滚动 */
 }
 html, body { overflow-x: hidden; }
@@ -270,10 +285,10 @@ html, body { overflow-x: hidden; }
   position: fixed; top: 0; right: 0; bottom: 0; left: auto;
   z-index: 60; width: 320px; max-width: 86vw; height: 100%;
   padding: 20px 16px; overflow-y: auto;
-  background: rgba(255, 255, 255, .08);
-  backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  border: 1px solid rgba(255, 255, 255, .14); border-radius: 16px 0 0 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, .3);
+  background: linear-gradient(158deg, rgba(52, 74, 108, .58), rgba(15, 26, 44, .82));
+  backdrop-filter: blur(30px) saturate(1.6); -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, .2); border-radius: 16px 0 0 16px;
+  box-shadow: -24px 0 64px rgba(2, 8, 18, .5), inset 0 1px 0 rgba(255, 255, 255, .2);
   animation: drawer-in .22s ease;
 }
 @keyframes drawer-in { from { transform: translateX(100%); } to { transform: none; } }
@@ -451,8 +466,8 @@ html, body { overflow-x: hidden; }
   position: relative; z-index: 10;
   padding: 16px; border: 1px solid transparent; border-radius: var(--r-lg);
   background: var(--glass-border);
-  backdrop-filter: blur(16px) saturate(1.5);
-  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow), var(--glass-highlight);
 }
 .workspace-section { padding: 0 2px; }
@@ -495,11 +510,11 @@ html, body { overflow-x: hidden; }
 .search-results {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
   width: min(420px, 100%); margin: 0; padding: 5px; list-style: none;
-  border: 1px solid var(--line); border-radius: var(--r-sm);
-  background: rgba(23, 31, 46, .94);
-  backdrop-filter: blur(14px) saturate(1.4);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  box-shadow: var(--shadow);
+  border: 1px solid rgba(255, 255, 255, .2); border-radius: var(--r-sm);
+  background: linear-gradient(160deg, rgba(40, 60, 92, .84), rgba(11, 19, 34, .94));
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow: 0 28px 60px -18px rgba(2, 8, 18, .6), inset 0 1px 0 rgba(255, 255, 255, .16);
 }
 .search-item { display: flex; align-items: baseline; gap: 8px; padding: 7px 10px; border-radius: 7px; cursor: pointer; font-size: 13px; color: rgba(222, 230, 238, .9); }
 .search-item:hover, .search-item:focus-visible { background: rgba(125, 180, 255, .14); color: #fff; }
@@ -538,11 +553,13 @@ html, body { overflow-x: hidden; }
 .search-item-tag { flex-shrink: 0; padding: 1px 7px; border-radius: 99px; background: rgba(242, 192, 99, .16); color: #f5d68a; font-size: 12px; white-space: nowrap; }
 .toast {
   position: fixed; left: 50%; bottom: 28px; z-index: 60; max-width: min(420px, 86vw);
-  padding: 10px 16px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .18);
-  background: rgba(9, 17, 30, .92); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  padding: 10px 16px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .22);
+  background: linear-gradient(158deg, rgba(42, 62, 94, .78), rgba(9, 17, 30, .94));
+  backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
   color: var(--ink); font-size: 13px; line-height: 1.5;
   opacity: 0; transform: translate(-50%, 8px); pointer-events: none;
-  transition: opacity .2s ease, transform .2s ease; box-shadow: var(--shadow);
+  transition: opacity .2s ease, transform .2s ease;
+  box-shadow: 0 26px 60px -18px rgba(2, 8, 18, .6), inset 0 1px 0 rgba(255, 255, 255, .18);
 }
 .toast.visible { opacity: 1; transform: translate(-50%, 0); }
 .query-btn {
@@ -560,8 +577,8 @@ html, body { overflow-x: hidden; }
   margin-top: 14px; padding: 16px;
   border: 1px solid transparent; border-radius: var(--r-lg);
   background: var(--glass-border);
-  backdrop-filter: blur(16px) saturate(1.5);
-  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow), var(--glass-highlight);
 }
 .fav-tools { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
@@ -655,12 +672,19 @@ html, body { overflow-x: hidden; }
 .ec-hero {
   display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: center;
   min-height: 250px; padding: 34px 40px;
+  position: relative; overflow: hidden;
   border: 1px solid transparent; border-radius: var(--r-lg);
   background: var(--glass-border);
-  backdrop-filter: blur(18px) saturate(1.5);
-  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow), var(--glass-highlight);
 }
+/* 首屏结论卡顶部斜向柔光带：静态玻璃反光（不再叠加动效，保证文字清晰） */
+.ec-hero::after {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(112deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .025) 26%, transparent 45%, transparent 72%, rgba(255, 255, 255, .04));
+}
+.ec-hero > * { position: relative; z-index: 1; }
 .ec-hero .section-kicker { color: var(--blue); }
 .ec-verdict { min-width: 0; }
 .verdict-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
@@ -756,9 +780,11 @@ html, body { overflow-x: hidden; }
 .probability-orb {
   position: relative;
   display: grid; place-content: center; width: 162px; aspect-ratio: 1; border-radius: 50%; text-align: center;
-  background: radial-gradient(circle, rgba(13, 22, 36, .92) 0 55%, rgba(13, 22, 36, .55) 57%, transparent 59%);
-  border: 1px solid rgba(255, 255, 255, .16);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .3), inset 0 0 26px rgba(125, 180, 255, .12);
+  background: radial-gradient(circle at 50% 24%, rgba(255, 255, 255, .14), rgba(13, 22, 36, .9) 56%, rgba(13, 22, 36, .56) 63%, transparent 66%);
+  border: 1px solid rgba(255, 255, 255, .22);
+  backdrop-filter: blur(16px) saturate(1.5); -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  box-shadow: 0 18px 40px rgba(2, 8, 18, .42), inset 0 1px 0 rgba(255, 255, 255, .3),
+              inset 0 -14px 28px rgba(2, 8, 18, .34), inset 0 0 30px rgba(125, 180, 255, .14);
 }
 /* 概率环形图：SVG 圆环（pathLength=100，dasharray 即百分比），平头端点保证弧线边界精确 */
 .prob-ring { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -781,10 +807,11 @@ html, body { overflow-x: hidden; }
 .metric-grid {
   display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 14px;
   border: 1px solid transparent; border-radius: var(--r-md);
-  background: var(--glass-border); backdrop-filter: blur(14px) saturate(1.5); -webkit-backdrop-filter: blur(14px) saturate(1.5);
-  overflow: hidden; box-shadow: 0 12px 30px rgba(3, 9, 20, .25), var(--glass-highlight);
+  background: var(--glass-border); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  overflow: hidden; box-shadow: var(--shadow), var(--glass-highlight);
 }
-.metric-tile { min-height: 112px; padding: 19px; border-right: 1px solid var(--line); background: rgba(255, 255, 255, .02); }
+.metric-tile { min-height: 112px; padding: 19px; border-right: 1px solid var(--line); background: linear-gradient(180deg, rgba(255, 255, 255, .045), rgba(255, 255, 255, .015)); transition: background .22s ease, box-shadow .22s ease; }
+.metric-tile:hover { background: linear-gradient(180deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .03)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16); }
 .metric-tile:last-child { border: 0; }
 .metric-tile strong { display: block; margin: 5px 0; font-size: 23px; letter-spacing: -.06em; }
 .metric-tile small { display: block; color: var(--muted); font-size: 12px; line-height: 1.4; }
@@ -830,8 +857,10 @@ html, body { overflow-x: hidden; }
 .result.stable-update .forecast-section { animation: none; }
 .sky-scroll {
   overflow-x: auto; padding-bottom: 8px;
-  border: 1px solid var(--line); border-radius: var(--r-md);
-  background: rgba(8, 16, 28, .45); /* 深色底随容器圆角裁剪，滚动到最右也是圆角 */
+  border: 1px solid rgba(255, 255, 255, .14); border-radius: var(--r-md);
+  background: rgba(8, 16, 28, .42); /* 深色玻璃底随容器圆角裁剪，滚动到最右也是圆角 */
+  backdrop-filter: blur(20px) saturate(1.5); -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  box-shadow: 0 18px 40px -20px rgba(3, 9, 20, .55), inset 0 1px 0 rgba(255, 255, 255, .1);
   scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .25) transparent;
 }
 .sky-chart { position: relative; width: max-content; min-width: 100%; outline: none; border-radius: var(--r-md); }
@@ -859,11 +888,12 @@ html, body { overflow-x: hidden; }
 .sky-crosshair.visible { opacity: 1; }
 .sky-tooltip {
   position: absolute; top: 6px; left: 0; z-index: 4; min-width: 158px; padding: 10px 12px;
-  border-radius: 11px; background: rgba(9, 17, 30, .86); border: 1px solid rgba(255, 255, 255, .18);
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-radius: 11px; background: linear-gradient(158deg, rgba(44, 66, 100, .78), rgba(10, 18, 34, .92));
+  border: 1px solid rgba(255, 255, 255, .22);
+  backdrop-filter: blur(18px) saturate(1.6); -webkit-backdrop-filter: blur(18px) saturate(1.6);
   color: var(--ink); font-size: 13px; line-height: 1.8;
   opacity: 0; pointer-events: none; transform: translateX(-50%);
-  transition: opacity .12s ease; box-shadow: var(--shadow);
+  transition: opacity .12s ease; box-shadow: 0 22px 50px -16px rgba(2, 8, 18, .6), inset 0 1px 0 rgba(255, 255, 255, .18);
 }
 .sky-tooltip.visible { opacity: 1; }
 .sky-tooltip strong { display: block; margin-bottom: 3px; color: #fff; font-size: 12.5px; }
@@ -877,9 +907,11 @@ html, body { overflow-x: hidden; }
 .cross-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
 .cross-stat {
   padding: 15px 18px; border: 1px solid transparent; border-radius: var(--r-md);
-  background: var(--glass-border); backdrop-filter: blur(12px) saturate(1.4); -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  box-shadow: var(--glass-highlight);
+  background: var(--glass-border); backdrop-filter: blur(24px) saturate(1.8); -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  box-shadow: var(--shadow), var(--glass-highlight);
+  transition: transform .22s ease, box-shadow .22s ease;
 }
+.cross-stat:hover { transform: translateY(-2px); }
 .cross-stat span, .cross-stat small { display: block; color: var(--muted); font-size: 12px; }
 .cross-stat b { display: block; margin: 2px 0; font-size: 27px; letter-spacing: -.05em; }
 .cross-stat.support b { color: var(--green); }
@@ -904,11 +936,11 @@ html, body { overflow-x: hidden; }
 .date-chip {
   flex: 0 0 112px; padding: 11px 12px; border: 1px solid transparent; border-radius: 12px;
   background: var(--glass-border); color: var(--muted); text-align: left; cursor: pointer;
-  backdrop-filter: blur(10px) saturate(1.4); -webkit-backdrop-filter: blur(10px) saturate(1.4);
-  box-shadow: var(--glass-highlight);
-  transition: box-shadow .18s ease, background .18s ease;
+  backdrop-filter: blur(20px) saturate(1.75); -webkit-backdrop-filter: blur(20px) saturate(1.75);
+  box-shadow: 0 12px 28px -14px rgba(3, 9, 20, .5), var(--glass-highlight);
+  transition: box-shadow .18s ease, background .18s ease, transform .18s ease;
 }
-.date-chip:hover, .date-chip:focus-visible { box-shadow: 0 0 0 1px var(--blue), var(--glass-highlight); outline: none; }
+.date-chip:hover, .date-chip:focus-visible { box-shadow: 0 16px 34px -14px rgba(3, 9, 20, .55), 0 0 0 1px var(--blue), var(--glass-highlight); outline: none; transform: translateY(-2px); }
 .date-chip span { display: block; font-size: 12px; }
 .date-chip small { display: block; font-size: 13px; }
 .date-chip strong { display: block; color: var(--ink); font-size: 15px; }
@@ -921,8 +953,8 @@ html, body { overflow-x: hidden; }
 .forecast-list {
   border: 1px solid transparent; border-radius: var(--r-lg);
   background: var(--glass-border);
-  backdrop-filter: blur(14px) saturate(1.4);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow), var(--glass-highlight);
   overflow: hidden; /* 展开详情跟随大框圆角裁剪 */
 }
@@ -970,8 +1002,10 @@ html, body { overflow-x: hidden; }
 .cloud-curve-head small { font-size: 12px; color: var(--muted); }
 .cloud-scroll {
   overflow-x: auto; padding-bottom: 8px; margin-top: 4px;
-  border: 1px solid var(--line); border-radius: var(--r-md);
-  background: rgba(8, 16, 28, .45); /* 深色底随容器圆角裁剪，滚动到最右也是圆角 */
+  border: 1px solid rgba(255, 255, 255, .14); border-radius: var(--r-md);
+  background: rgba(8, 16, 28, .42); /* 深色玻璃底随容器圆角裁剪，滚动到最右也是圆角 */
+  backdrop-filter: blur(20px) saturate(1.5); -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  box-shadow: 0 18px 40px -20px rgba(3, 9, 20, .55), inset 0 1px 0 rgba(255, 255, 255, .1);
   scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .25) transparent;
 }
 .cloud-chart { position: relative; width: max-content; min-width: 100%; outline: none; border-radius: var(--r-md); }
@@ -993,11 +1027,12 @@ html, body { overflow-x: hidden; }
 .cloud-crosshair.visible { opacity: 1; }
 .cloud-tooltip {
   position: absolute; top: 6px; left: 0; z-index: 4; min-width: 150px; padding: 9px 12px;
-  border-radius: 11px; background: rgba(9, 17, 30, .86); border: 1px solid rgba(255, 255, 255, .18);
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-radius: 11px; background: linear-gradient(158deg, rgba(44, 66, 100, .78), rgba(10, 18, 34, .92));
+  border: 1px solid rgba(255, 255, 255, .22);
+  backdrop-filter: blur(18px) saturate(1.6); -webkit-backdrop-filter: blur(18px) saturate(1.6);
   color: var(--ink); font-size: 13px; line-height: 1.8;
   opacity: 0; pointer-events: none; transform: translateX(-50%);
-  transition: opacity .12s ease; box-shadow: var(--shadow);
+  transition: opacity .12s ease; box-shadow: 0 22px 50px -16px rgba(2, 8, 18, .6), inset 0 1px 0 rgba(255, 255, 255, .18);
 }
 .cloud-tooltip.visible { opacity: 1; }
 .cloud-tooltip strong { display: block; margin-bottom: 3px; color: #fff; font-size: 12.5px; }
@@ -1015,8 +1050,9 @@ html, body { overflow-x: hidden; }
 /* ---- 海况 ---- */
 .marine-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 8px; }
 .marine-item {
-  padding: 16px; border: 1px solid rgba(125, 180, 255, .3); border-radius: 10px;
-  background: rgba(125, 180, 255, .08);
+  padding: 16px; border: 1px solid rgba(155, 195, 245, .34); border-radius: 12px;
+  background: linear-gradient(158deg, rgba(255, 255, 255, .1), rgba(125, 180, 255, .1) 55%, rgba(20, 40, 70, .16));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 10px 26px -16px rgba(3, 9, 20, .5);
 }
 .marine-item span, .marine-item strong, .marine-item b { display: block; }
 .marine-item span { color: var(--muted); font-size: 12px; }
@@ -1145,9 +1181,10 @@ html, body { overflow-x: hidden; }
 .map-panel-inner {
   width: min(520px, 100%); max-height: 86vh; overflow-y: auto; padding: 18px;
   border-radius: 18px 18px 0 0;
-  border: 1px solid var(--glass-border); border-bottom: 0;
-  background: rgba(15, 23, 38, .96); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  box-shadow: var(--glass-highlight), var(--shadow);
+  border: 1px solid rgba(255, 255, 255, .2); border-bottom: 0;
+  background: linear-gradient(160deg, rgba(46, 66, 98, .82), rgba(12, 21, 38, .95));
+  backdrop-filter: blur(30px) saturate(1.6); -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), var(--shadow);
   transform: translateY(24px); transition: transform .22s ease;
 }
 .map-panel.open .map-panel-inner { transform: translateY(0); }
@@ -1177,9 +1214,10 @@ html, body { overflow-x: hidden; }
 .map-layer-switch {
   position: absolute; right: 10px; bottom: 10px; z-index: 10;
   display: inline-flex; gap: 2px; padding: 3px;
-  border: 1px solid rgba(255, 255, 255, .22); border-radius: 99px;
-  background: rgba(9, 17, 30, .82); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  box-shadow: var(--shadow);
+  border: 1px solid rgba(255, 255, 255, .24); border-radius: 99px;
+  background: linear-gradient(158deg, rgba(40, 60, 92, .72), rgba(9, 17, 30, .88));
+  backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  box-shadow: 0 16px 34px -14px rgba(2, 8, 18, .55), inset 0 1px 0 rgba(255, 255, 255, .2);
 }
 .map-layer-btn {
   padding: 4px 12px; border: 0; border-radius: 99px; background: transparent;
@@ -1200,5 +1238,105 @@ html, body { overflow-x: hidden; }
 .map-cancel { border: 1px solid var(--line); background: transparent; color: var(--muted); }
 @media (min-width: 640px) {
   .map-panel { align-items: center; }
-  .map-panel-inner { border-radius: 18px; border-bottom: 1px solid var(--glass-border); }
+  .map-panel-inner { border-radius: 18px; border-bottom: 1px solid rgba(255, 255, 255, .2); }
+}
+
+/* ============================================================
+   毛玻璃增强层（Glass 2.0）
+   1) 页面级环境光斑：给面板 backdrop-filter 提供可被模糊的色块层次；
+   2) 面板磨砂颗粒：噪点层随 --glass-border 进入每个玻璃面板内部（不糊整页、不压暗天空）；
+   3) 交互层：玻璃胶囊 / 主按钮 / 状态徽章的内高光、落影与悬停浮起；
+   4) 降级：不支持 backdrop-filter 时退回较实的深色玻璃；移动端收窄模糊半径保帧率。
+   ============================================================ */
+
+/* ---- 页面级环境光斑（不新增 DOM，挂在根元素伪元素上，位于地图/氛围层之下） ---- */
+html::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(38vw 30vw at 12% 14%, rgba(255, 186, 100, .22), transparent 70%),
+    radial-gradient(34vw 28vw at 88% 8%, rgba(126, 178, 255, .22), transparent 72%),
+    radial-gradient(46vw 36vw at 76% 84%, rgba(88, 214, 196, .14), transparent 74%),
+    radial-gradient(40vw 32vw at 14% 88%, rgba(183, 156, 255, .12), transparent 74%);
+}
+
+/* ---- 玻璃胶囊 / 次级按钮：细棱反光 + 底部落影（不覆盖搜索框的放大镜背景图） ---- */
+.region-toggle, .xhs-link, .hamburger-btn, .coord-toggle, .map-btn, .fav-add,
+.panel-btn, .panel-close, .map-close, .map-locate, .sky-switch {
+  background-image: linear-gradient(158deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .04) 58%, rgba(10, 20, 36, .14));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), inset 0 -1px 0 rgba(4, 10, 22, .28), 0 10px 22px -14px rgba(2, 8, 18, .55);
+}
+.region-toggle:hover, .xhs-link:hover, .hamburger-btn:hover, .coord-toggle:hover, .map-btn:hover:not(:disabled),
+.fav-add:hover, .panel-btn:hover, .map-close:hover {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), inset 0 -1px 0 rgba(4, 10, 22, .3), 0 14px 28px -14px rgba(2, 8, 18, .6);
+}
+
+/* ---- 主按钮：顶部受光、底部内落影，压出玻璃厚度 ---- */
+.query-btn, .coord-confirm, .fav-confirm, .map-confirm, .panel-btn-primary, .nickname-prompt-action {
+  box-shadow: 0 16px 32px -12px rgba(6, 16, 36, .58), inset 0 1px 0 rgba(255, 255, 255, .46), inset 0 -2px 6px rgba(6, 14, 30, .24);
+}
+
+/* ---- 选中态白色芯片：上沿强反光 + 下沿浅压痕，避免纯白“贴纸感” ---- */
+.dest-btn.active, .days-btn.active, .date-chip.active, .sky-view-btn.active, .map-layer-btn.active {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .95), inset 0 -2px 6px rgba(20, 35, 55, .16), 0 12px 26px -14px rgba(3, 9, 20, .5);
+}
+
+/* ---- 状态徽章 / 提示气泡：薄玻璃片（细棱 + 轻落影） ---- */
+.verdict-badge, .confidence-pill, .thunder-window, .gust-window {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .26), inset 0 -1px 0 rgba(4, 10, 22, .26), 0 6px 16px -10px rgba(2, 8, 18, .5);
+}
+
+/* ---- 列表内小玻璃块：收藏项 / 外部模型项 / 海况时段 ---- */
+.fav-item, .cross-list li {
+  background-image: linear-gradient(158deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .02) 62%, rgba(12, 22, 38, .14));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), inset 0 -1px 0 rgba(4, 10, 22, .2);
+}
+.fav-item:hover { border-color: rgba(255, 255, 255, .24); }
+.glass-sea-detail { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12); }
+.glass-sea-window {
+  background: rgba(8, 28, 38, .32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), inset 0 -1px 0 rgba(2, 10, 16, .3);
+}
+.fav-name, .coord-input { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+
+/* ---- DeepSeek 气泡：同属毛玻璃层，跟随面板材质 ---- */
+.ai-bubble {
+  background: linear-gradient(135deg, rgba(96, 150, 225, .24), rgba(20, 40, 70, .42));
+  backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 14px 30px -16px rgba(2, 8, 18, .55);
+}
+.ai-uncertainty { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+
+/* ---- 逐日卡片行：悬停时给出顶部反光，选中行叠加柔和内光 ---- */
+.forecast-summary:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14); }
+.forecast-card.selected .forecast-summary { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), inset 0 -1px 0 rgba(4, 10, 22, .2); }
+
+/* ---- 天空剖面/云量图滚动容器：滚动条与玻璃底更融合 ---- */
+.sky-scroll::-webkit-scrollbar, .cloud-scroll::-webkit-scrollbar, .date-rail::-webkit-scrollbar { height: 8px; }
+.sky-scroll::-webkit-scrollbar-thumb, .cloud-scroll::-webkit-scrollbar-thumb, .date-rail::-webkit-scrollbar-thumb {
+  border-radius: 99px; background: rgba(255, 255, 255, .22);
+}
+
+/* ---- 移动端：收窄模糊半径，保证中低端机滚动帧率 ---- */
+@media (max-width: 760px) {
+  html::before { opacity: .8; }
+  .workspace, .fav-section, .ec-hero, .metric-grid, .cross-stat, .date-chip, .forecast-list,
+  .account-panel, .sky-scroll, .cloud-scroll, .probability-orb, .search-results {
+    backdrop-filter: blur(16px) saturate(1.5);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  }
+  .site-header {
+    backdrop-filter: blur(18px) saturate(1.5);
+    -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  }
+}
+
+/* ---- 降级：不支持 backdrop-filter 的引擎退回较实的深色玻璃底，文字对比依旧成立 ---- */
+@supports not ((backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px))) {
+  .workspace, .fav-section, .ec-hero, .metric-grid, .cross-stat, .date-chip, .forecast-list,
+  .account-panel, .search-results, .sky-scroll, .cloud-scroll, .marine-item,
+  .map-panel-inner, .toast, .sky-tooltip, .cloud-tooltip, .probability-orb {
+    background: linear-gradient(160deg, rgba(52, 72, 104, .94), rgba(18, 30, 50, .97));
+    border-color: rgba(255, 255, 255, .2);
+  }
+  .site-header { background: linear-gradient(180deg, rgba(46, 68, 104, .96), rgba(25, 40, 64, .94)); }
 }

@@ -28,6 +28,12 @@ for (const sel of glassPanels) {
   const block = css.slice(idx, blockEnd);
   if (!block.includes('backdrop-filter')) { console.error('acrylic panel should use backdrop-filter:', sel); process.exit(1); }
 }
+// 毛玻璃增强（Glass 2.0）：统一模糊 token、面板内磨砂颗粒、页面级环境光斑、不支持 blur 的降级
+for (const key of ['--glass-blur', '--frost-noise', 'var(--frost-noise) padding-box', 'html::before', '@supports not ((backdrop-filter']) {
+  if (!css.includes(key)) { console.error('frosted glass layer missing:', key); process.exit(1); }
+}
+// 交互层：玻璃面板悬停浮起 / 内高光保持存在
+if (!css.includes('.metric-tile:hover') || !css.includes('.date-chip:hover')) { console.error('glass hover states missing'); process.exit(1); }
 // 可读性：主内容区不应再有 11px 小字
 if (css.includes('font-size: 11px')) { console.error('11px font remains'); process.exit(1); }
 // CSS 雨线/闪电关键帧应已移除（由 Canvas 接管）
