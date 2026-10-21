@@ -1060,6 +1060,123 @@ html, body { overflow-x: hidden; }
 .marine-item b { color: var(--blue); font-size: 19px; }
 .section-note { color: var(--muted); font-size: 13px; }
 
+/* ---- 朝晚霞机会（最近 3 天，规则模型见 js/sunset.js） ---- */
+.sunset-section { padding-top: 46px; }
+.sunset-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.sunset-heading h2 { margin-bottom: 8px; }
+.sunset-switch { margin-bottom: 8px; }
+.sunset-mode-btn {
+  padding: 6px 14px; border: 0; border-radius: 99px; background: transparent;
+  color: var(--muted); cursor: pointer; font-size: 12.5px; font-weight: 650;
+  transition: background .18s ease, color .18s ease;
+}
+.sunset-mode-btn:hover { color: var(--ink); }
+.sunset-mode-btn.active { background: rgba(238, 242, 246, .92); color: #101c2c; }
+.sunset-note { margin: 0 0 12px; max-width: 760px; color: var(--muted); font-size: 13px; }
+.sunset-days { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.sunset-card {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px;
+  grid-template-areas: "day score" "verdict score" "swatch swatch";
+  padding: 15px 16px 13px; color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+  border: 1px solid transparent; border-radius: var(--r-md);
+  background: var(--glass-border);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow), var(--glass-highlight);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.sunset-card:hover, .sunset-card:focus-visible { transform: translateY(-2px); box-shadow: 0 16px 34px -14px rgba(3, 9, 20, .55), var(--glass-highlight); }
+.sunset-card.active { box-shadow: 0 0 0 1px rgba(238, 242, 246, .6), 0 16px 34px -14px rgba(3, 9, 20, .55), var(--glass-highlight); }
+.sunset-card.unavailable { cursor: default; opacity: .55; }
+.sunset-card.unavailable:hover { transform: none; }
+.sunset-day { grid-area: day; color: var(--muted); font-size: 12.5px; }
+.sunset-score { grid-area: score; display: flex; align-items: baseline; gap: 2px; color: #ffb072; }
+.sunset-score b { font-size: 30px; letter-spacing: -.06em; line-height: 1; }
+.sunset-score small { color: var(--muted); font-size: 12px; }
+.sunset-card.none .sunset-score, .sunset-card.poor .sunset-score { color: var(--muted); }
+.sunset-card.weak .sunset-score { color: #ffd08a; }
+.sunset-card.fair .sunset-score { color: #ffb072; }
+.sunset-card.great .sunset-score { color: #ff8a52; }
+.sunset-card.epic .sunset-score { color: #ff6238; }
+.sunset-verdict { grid-area: verdict; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.sunset-verdict strong { font-size: 14px; }
+.sunset-verdict > span { color: var(--muted); font-size: 12.5px; }
+.sunset-alt { padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, .09); color: var(--muted); font-size: 12px; }
+/* 云面色条：由主色推出的三段渐变 + 同色柔光，低分时自动收敛（--sun 由 JS 注入） */
+.sunset-swatch {
+  grid-area: swatch; position: relative; height: 5px; margin-top: 11px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--sun-lo, #5b6373) 0%, var(--sun, #5b6373) 22%, var(--sun-hi, #9aa3b2) 50%, var(--sun, #5b6373) 78%, var(--sun-lo, #5b6373) 100%);
+  box-shadow: 0 0 16px -3px var(--sun, transparent), inset 0 0 0 1px rgba(255, 255, 255, .16);
+  overflow: hidden;
+}
+.sunset-swatch::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 34%, rgba(255, 255, 255, .55) 50%, transparent 66%);
+  transform: translateX(-120%);
+  animation: sunset-sheen 7s ease-in-out infinite;
+}
+@keyframes sunset-sheen {
+  0%, 12% { transform: translateX(-120%); opacity: 0; }
+  30% { opacity: .85; }
+  62%, 100% { transform: translateX(120%); opacity: 0; }
+}
+.sunset-detail {
+  margin-top: 11px; padding: 16px 18px;
+  border: 1px solid transparent; border-radius: var(--r-md);
+  background: var(--glass-border);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow), var(--glass-highlight);
+}
+.sunset-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 8px; }
+.sunset-metric {
+  padding: 10px 12px; border-radius: 11px;
+  background: rgba(255, 255, 255, .045); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1);
+  transition: background .18s ease;
+}
+.sunset-metric:hover { background: rgba(255, 255, 255, .075); }
+.sunset-metric span { display: block; color: var(--muted); font-size: 12px; }
+.sunset-metric strong { display: block; margin: 3px 0 2px; font-size: 19px; letter-spacing: -.05em; }
+.sunset-metric small { display: block; color: var(--muted); font-size: 12px; line-height: 1.42; }
+.sunset-metric.sunset-time strong { color: var(--amber); }
+.sunset-aside { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
+.sunset-color { display: flex; align-items: center; gap: 12px; }
+/* 云面反射色块：径向高光 + 主色渐变 + 同色柔光晕，内部一层缓慢扫过的反光 */
+.sunset-chip {
+  position: relative; width: 48px; height: 48px; border-radius: 16px; overflow: hidden;
+  background:
+    radial-gradient(115% 95% at 24% 16%, rgba(255, 255, 255, .78), rgba(255, 255, 255, 0) 54%),
+    linear-gradient(152deg, var(--sun-hi, #9aa3b2) 0%, var(--sun, #5b6373) 46%, var(--sun-lo, #2a2130) 100%);
+  box-shadow:
+    0 0 24px -4px var(--sun, transparent),
+    0 0 52px -14px var(--sun, transparent),
+    0 12px 24px -14px rgba(3, 9, 20, .85),
+    inset 0 0 0 1px rgba(255, 255, 255, .24),
+    inset 0 1px 0 rgba(255, 255, 255, .6),
+    inset 0 -3px 8px rgba(0, 0, 0, .32);
+}
+.sunset-chip i {
+  position: absolute; inset: -35% -55%;
+  background: linear-gradient(104deg, transparent 38%, rgba(255, 255, 255, .5) 50%, transparent 62%);
+  animation: chip-sheen 8.5s ease-in-out infinite;
+}
+@keyframes chip-sheen {
+  0%, 15% { transform: translateX(-90%) rotate(4deg); opacity: 0; }
+  38% { opacity: .9; }
+  70%, 100% { transform: translateX(90%) rotate(4deg); opacity: 0; }
+}
+.sunset-color strong { display: block; font-size: 14px; }
+.sunset-color small { display: block; color: var(--muted); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) {
+  .sunset-swatch::after, .sunset-chip i { animation: none; opacity: 0; }
+  .sunset-card:hover, .sunset-card:focus-visible { transform: none; }
+}
+.sunset-rain {
+  margin: 0; padding: 5px 11px; border-radius: 99px; font-size: 12.5px; font-weight: 650;
+  border: 1px solid rgba(125, 180, 255, .4); background: rgba(125, 180, 255, .12); color: #cfe4ff;
+}
+.sunset-notes { display: grid; gap: 5px; margin: 11px 0 0; padding: 0; list-style: none; }
+.sunset-notes li { position: relative; padding-left: 14px; color: rgba(226, 233, 240, .86); font-size: 13px; line-height: 1.55; }
+.sunset-notes li::before { content: '·'; position: absolute; left: 2px; color: #ffb072; font-weight: 800; }
+
 /* ---- 错误与页脚 ---- */
 .error-card {
   padding: 24px; border: 1px solid rgba(255, 143, 135, .4); border-radius: var(--r-md);
@@ -1085,6 +1202,8 @@ html, body { overflow-x: hidden; }
   .forecast-detail { padding: 0 18px 18px; }
   .forecast-detail p { grid-column: 1 / -1; }
   .cross-list { grid-template-columns: 1fr; }
+  .sunset-days { grid-template-columns: 1fr 1fr; }
+  .sunset-detail { padding: 14px; }
 }
 @media (max-width: 560px) {
   .page-shell { width: min(100% - 24px, 1180px); }
@@ -1144,6 +1263,12 @@ html, body { overflow-x: hidden; }
   .forecast-detail p { font-size: 12px; }
   .glass-sea-window { grid-template-columns: 1fr auto; }
   .glass-sea-window small { grid-column: 1 / -1; text-align: left; }
+  .sunset-heading { align-items: flex-start; }
+  .sunset-days { grid-template-columns: 1fr; gap: 8px; }
+  .sunset-card { padding: 13px 14px 11px; }
+  .sunset-score b { font-size: 26px; }
+  .sunset-metrics { grid-template-columns: 1fr 1fr; }
+  .sunset-metric strong { font-size: 17px; }
   .section-heading h2 { font-size: 26px; }
 }
 

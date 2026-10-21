@@ -498,6 +498,95 @@ function renderMarineCards(marine, destination) {
   return cards ? `<section class="marine-section"><div class="section-heading"><p class="section-kicker">NEARSHORE</p><h2>近海海况</h2></div><div class="marine-list">${cards}</div><p class="section-note">海况是海洋网格模式指导，乘船、潜水与浮潜请以当天码头和景区通知为准。</p></section>` : '';
 }
 
+// ---- 朝晚霞机会（3 天） ---------------------------------------------------
+// 规则结论全部来自 js/sunset.js（无 AI）。渲染层只负责排版、配色与转义。
+function sunsetHex(value, fallback) {
+  return /^#[0-9a-f]{6}$/i.test(String(value)) ? String(value) : fallback;
+}
+// 由云面主色推出一组渐变色阶（高光 / 主色 / 暗部），供 CSS 做柔光渐变与动态反光
+function sunsetColorVars(value, fallback) {
+  const base = sunsetHex(value, fallback);
+  const rgb = [1, 3, 5].map((index) => parseInt(base.slice(index, index + 2), 16));
+  const mix = (target, ratio) => rgb.map((channel, index) => Math.round(channel + (target[index] - channel) * ratio));
+  const hex = (channels) => `#${channels.map((channel) => Math.max(0, Math.min(255, channel)).toString(16).padStart(2, '0')).join('')}`;
+  return `--sun:${base};--sun-hi:${hex(mix([255, 255, 255], 0.46))};--sun-lo:${hex(mix([14, 8, 16], 0.5))};`;
+}
+function sunsetMetaOf(day, mode) {
+  if (!day) return null;
+  return mode === 'sunrise' ? day.sunrise : day.sunset;
+}
+function renderSunsetCard(day, index, mode, currentDate) {
+  const event = sunsetMetaOf(day, mode);
+  const other = sunsetMetaOf(day, mode === 'sunrise' ? 'sunset' : 'sunrise');
+  const active = day.date === currentDate;
+  const otherWord = mode === 'sunrise' ? '晚霞' : '朝霞';
+  const otherLine = other && other.available ? `<span class="sunset-alt">${otherWord} ${other.score}</span>` : '';
+  const dayWord = index === 0 ? '今天' : dateLabel(day.date);
+  if (!event || !event.available) {
+    return `<div class="sunset-card unavailable" aria-disabled="true">
+      <span class="sunset-day">${dayWord}</span>
+      <span class="sunset-verdict"><strong>数据待补充</strong><span>${escapeText((event && event.note) || '缺少该日的日出/日落时刻')}</span></span>
+    </div>`;
+  }
+  return `<button type="button" class="sunset-card ${event.level}${active ? ' active' : ''}" data-select-date="${day.date}" aria-pressed="${active}" aria-label="查看 ${dateLabel(day.date)} 的 ${event.modeLabel}判断：${event.label} ${event.score} 分" style="${sunsetColorVars(event.color.hex, '#5b6373')}">
+    <span class="sunset-day">${dayWord}</span>
+    <span class="sunset-score"><b>${event.score}</b><small>分</small></span>
+    <span class="sunset-verdict"><strong>${escapeText(event.label)}</strong><span>${escapeText(event.window.startLabel)}–${escapeText(event.window.endLabel)}</span>${otherLine}</span>
+    <span class="sunset-swatch" aria-hidden="true"></span>
+  </button>`;
+}
+function renderSunsetDetail(day, mode) {
+  const event = sunsetMetaOf(day, mode);
+  if (!event || !event.available) return '';
+  const clearSky = event.cloudBaseKm == null;
+  const elevationText = event.boundaryElevationDeg == null
+    ? '—'
+    : event.boundaryElevationDeg < 0 ? '地平线下' : `${event.boundaryElevationDeg.toFixed(1)}°`;
+  const tile = (label, value, note, tone = '') =>
+    `<div class="sunset-metric ${tone}"><span>${label}</span><strong>${value}</strong><small>${note}</small></div>`;
+  return `<div class="sunset-detail">
+    <div class="sunset-metrics">
+      ${tile('云底高度', clearSky ? '—' : `${event.cloudBaseKm} km`, escapeText(event.cloudBaseSource))}
+      ${tile('云幕距离', event.boundaryCapped ? `${event.boundaryKm} km+` : `${event.boundaryKm} km`, event.boundaryScanned ? '沿太阳方向逐点扫描' : '按总云量折算')}
+      ${tile('可照距离', clearSky ? '—' : `${event.glowReachKm} km`, '低角度阳光能照到该云底的最远距离')}
+      ${tile('大气通透度', `${Math.round(event.clarity * 100)}%`, `气溶胶 ${event.aod.toFixed(2)}${event.aodSource === 'CAMS' ? '（实测）' : ''}`)}
+      ${tile('云幕高度角', event.boundaryCapped ? '—' : elevationText, event.boundaryCapped ? '扫描范围内无成片云' : (event.hasLocal ? '本地头顶在可照区内' : '本地头顶未被照亮'))}
+      ${tile(`${event.modeLabel}时段`, `${event.window.startLabel}–${event.window.endLabel}`, `${event.mode === 'sunrise' ? '日出' : '日落'} ${event.timeLabel} · 约 ${event.window.durationMin} 分钟`, 'sunset-time')}
+    </div>
+    <div class="sunset-aside">
+      <div class="sunset-color">
+        <span class="sunset-chip" style="${sunsetColorVars(event.color.hex, '#5b6373')}" aria-hidden="true"><i></i></span>
+        <div><strong>${escapeText(event.color.name)}</strong><small>云面反射色 · ${escapeText(event.color.tone)}</small></div>
+      </div>
+      ${event.rain.penalty > 0 ? `<p class="sunset-rain">${escapeText(event.rain.label)} · 雨幕扣 ${event.rain.penalty} 分</p>` : ''}
+    </div>
+    <ul class="sunset-notes">${event.notes.map((note) => `<li>${escapeText(note)}</li>`).join('')}</ul>
+  </div>`;
+}
+function renderSunsetSection(sunset, currentDate, mode) {
+  if (typeof Sunset === 'undefined' || !sunset || !sunset.days) return '';
+  const dates = Object.keys(sunset.days);
+  if (!dates.length) return '';
+  const activeMode = mode === 'sunrise' ? 'sunrise' : 'sunset';
+  const activeWord = activeMode === 'sunrise' ? '朝霞' : '晚霞';
+  const fallbackDate = dates[0];
+  const currentDay = sunset.days[currentDate] || sunset.days[fallbackDate];
+  const buttons = [
+    { key: 'sunset', label: '晚霞' },
+    { key: 'sunrise', label: '朝霞' },
+  ].map((item) => `<button type="button" class="sunset-mode-btn${item.key === activeMode ? ' active' : ''}" data-sunset-mode="${item.key}" aria-pressed="${item.key === activeMode}">${item.label}</button>`).join('');
+  return `
+  <section class="sunset-section" aria-label="朝晚霞机会">
+    <div class="section-heading sunset-heading">
+      <div><p class="section-kicker">SUNSET · SUNRISE</p><h2>${activeWord}机会</h2></div>
+      <div class="sky-switch sunset-switch" role="group" aria-label="朝霞 / 晚霞切换">${buttons}</div>
+    </div>
+    <p class="sunset-note">最近 ${dates.length} 天，逐日给出染色时段与云面颜色。</p>
+    <div class="sunset-days" role="group" aria-label="逐日${activeWord}机会">${dates.map((date, index) => renderSunsetCard(sunset.days[date], index, activeMode, currentDay.date)).join('')}</div>
+    ${renderSunsetDetail(currentDay, activeMode)}
+  </section>`;
+}
+
 // ---- 主入口：EC 主结论 → EC 晴好率与成员一致性 → 天空剖面 → 外部模型验证 → 逐日判断与海况 ----
 // 目的地名称可能来自外部地理编码服务，统一转义后再进入模板（防 XSS）
 function escapeText(text) {
@@ -531,5 +620,8 @@ function renderWeatherApp(bundle, destination, requestedDays, selectedDate, ui =
   const regionNotice = destination.outOfRegion ? `<p class="notice">${regionTexts().regionNotice}</p>` : '';
   const aiAnalysis = ui.aiAnalyses && ui.aiAnalyses[currentDate];
   const aiAnimate = !!aiAnalysis && !(ui.aiSeenDates && ui.aiSeenDates.has(currentDate));
-  return `${regionNotice}${farNotice}${renderDayRail(days, currentDate)}${renderEcHero(selected, selected.assessment, destination, aiAnalysis, aiAnimate, ui.aiStatus)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${renderCrossModel(selected.assessment)}${renderForecastCards(days, currentDate, cloudCurves)}${renderMarineCards(marineNearby ? bundle.marine : null, destination)}`;
+  // 朝晚霞机会：与全站同一套选点/选日逻辑，数据只取最近 3 天（js/sunset.js 内限定的 DAY_LIMIT）
+  const sunset = typeof Sunset !== 'undefined' ? Sunset.build(bundle, destination, dates) : null;
+  const sunsetSection = renderSunsetSection(sunset, currentDate, ui.sunsetMode);
+  return `${regionNotice}${farNotice}${renderDayRail(days, currentDate)}${renderEcHero(selected, selected.assessment, destination, aiAnalysis, aiAnimate, ui.aiStatus)}${renderEcMetrics(selected.assessment)}${renderSkySection(cloudSeries, dates, skyView, skyIndex)}${sunsetSection}${renderCrossModel(selected.assessment)}${renderForecastCards(days, currentDate, cloudCurves)}${renderMarineCards(marineNearby ? bundle.marine : null, destination)}`;
 }

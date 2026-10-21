@@ -53,6 +53,17 @@ const cloudBlock = css.slice(cloudIdx, css.indexOf('}', cloudIdx));
 if (!cloudBlock.includes('border-radius') || !cloudBlock.includes('overflow-x: auto')) { console.error('cloud-scroll rounded scroll container missing'); process.exit(1); }
 if (!css.includes('.cloud-tooltip') || !css.includes('.cloud-crosshair') || !css.includes('.cloud-hit')) { console.error('cloud curve interactive styles missing'); process.exit(1); }
 
+// 朝晚霞机会区块：卡片与明细块沿用同一套毛玻璃面板，且必须有移动端折叠规则
+for (const key of ['.sunset-section', '.sunset-days', '.sunset-card', '.sunset-score', '.sunset-verdict', '.sunset-swatch', '.sunset-detail', '.sunset-metrics', '.sunset-metric', '.sunset-chip', '.sunset-notes', '.sunset-mode-btn']) {
+  if (!css.includes(key)) { console.error('sunset style MISSING:', key); process.exit(1); }
+}
+for (const sel of ['.sunset-card {', '.sunset-detail {']) {
+  const idx = css.indexOf(sel);
+  if (idx === -1) { console.error('sunset glass panel missing:', sel); process.exit(1); }
+  const block = css.slice(idx, css.indexOf('}', idx));
+  if (!block.includes('backdrop-filter') || !block.includes('var(--glass-border)')) { console.error('sunset panel should reuse glass tokens:', sel); process.exit(1); }
+}
+
 const start = css.indexOf('@media (prefers-reduced-motion: reduce)');
 let depth = 0;
 let end = start;

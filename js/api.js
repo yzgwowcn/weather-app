@@ -22,14 +22,16 @@ const API = (() => {
     cma: { name: 'cma_grapes_global' },
   };
 
-  const HOURLY = ['temperature_2m', 'precipitation', 'rain', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'cloud_cover', 'cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'visibility'].join(',');
+  // 朝晚霞模块需要的气象变量：露点/湿度用于低云云底高度，边界层高度用于气溶胶消光标高
+  const HOURLY = ['temperature_2m', 'dew_point_2m', 'relative_humidity_2m', 'precipitation', 'rain', 'weather_code', 'wind_speed_10m', 'wind_gusts_10m', 'cloud_cover', 'cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'visibility', 'boundary_layer_height'].join(',');
   const DAILY = ['weather_code', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'precipitation_probability_max', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'sunrise', 'sunset', 'cloud_cover_mean', 'cloud_cover_max', 'cloud_cover_min'].join(',');
   const MODEL_HOURLY = ['weather_code', 'cloud_cover', 'cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'precipitation', 'wind_speed_10m'].join(',');
   const MARINE_HOURLY = ['wave_height', 'wind_wave_height', 'swell_wave_height', 'wave_direction', 'wave_period', 'swell_wave_period'].join(',');
   const MARINE_DAILY = 'wave_height_max,wave_period_max,swell_wave_height_max,swell_wave_period_max';
 
   // ---- 用户侧缓存：同一地点 + 预报范围短时间重复查询，先查模型是否更新（meta 不计配额），未更新直接读缓存 ----
-  const CACHE_PREFIX = 'omCache:v1:';
+  // v3：新增沿太阳方位云量扫描与气溶胶请求，旧缓存形状作废
+  const CACHE_PREFIX = 'omCache:v3:';
   const CACHE_MAX_KEYS = 8;            // 最多保留 8 个地点的缓存，超出删最旧
   const CACHE_STALE_LIMIT_MS = 6 * 3600 * 1000; // meta 查询失败兜底：缓存超 6 小时强制重新请求
 
@@ -111,6 +113,71 @@ const API = (() => {
     const meta = MODEL_META[id];
     return safeRequest(`https://api.open-meteo.com/data/${meta.name}/static/meta.json`, meta.name, signal);
   }
+  // ---- 朝晚霞：沿太阳方位做等距云量扫描 + 气溶胶实测 ----
+  // 扫描点由调用方给出的方位角（日落/日出时的太阳方位）与距离表生成，一次多坐标请求取回全部点，
+  // 结果压成「距离 → 逐小时总云量」的紧凑数组，既是真实观测点值，也不会撑爆本地缓存。
+  const SUN_SCAN_DISTANCES = [0, 25, 50, 75, 100, 125, 150, 175, 200, 250, 300, 350, 400, 450, 500, 600];
+  const AIR_QUALITY_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality';
+
+  // 大圆航线上按方位角/距离取点（与 js/sunset.js 的几何一致）
+  function destinationPoint(lat, lon, bearingDeg, distanceKm) {
+    const toRad = (value) => value * Math.PI / 180;
+    const angular = distanceKm / 6371;
+    const bearing = toRad(bearingDeg);
+    const phi = toRad(lat);
+    const lambda = toRad(lon);
+    const phi2 = Math.asin(Math.sin(phi) * Math.cos(angular) + Math.cos(phi) * Math.sin(angular) * Math.cos(bearing));
+    const lambda2 = lambda + Math.atan2(
+      Math.sin(bearing) * Math.sin(angular) * Math.cos(phi),
+      Math.cos(angular) - Math.sin(phi) * Math.sin(phi2),
+    );
+    return { lat: phi2 * 180 / Math.PI, lon: ((lambda2 * 180 / Math.PI + 540) % 360) - 180 };
+  }
+  // bearings: { sunset: 度, sunrise: 度 }
+  // 返回 { distances, times, covers: { sunset: [每距离][每小时], sunrise: [...] } }
+  async function fetchSunPath(lat, lon, startDate, endDate, bearings, signal) {
+    const modes = ['sunset', 'sunrise'];
+    const points = [];
+    modes.forEach((mode) => {
+      SUN_SCAN_DISTANCES.forEach((distance) => {
+        points.push({ ...destinationPoint(lat, lon, bearings[mode], distance), mode });
+      });
+    });
+    const url = `${FORECAST_URL}?${query({
+      latitude: points.map((point) => point.lat.toFixed(3)).join(','),
+      longitude: points.map((point) => point.lon.toFixed(3)).join(','),
+      start_date: startDate,
+      end_date: endDate,
+      timezone: TIMEZONE,
+      hourly: 'cloud_cover',
+    })}`;
+    let payload;
+    try {
+      payload = await getJSON(url, signal);
+    } catch (error) {
+      return { error: `太阳方位云量扫描请求失败：${error.message}`, source: '太阳方位云量扫描' };
+    }
+    // 多坐标请求返回数组；单坐标时是对象
+    const list = Array.isArray(payload) ? payload : [payload];
+    if (list.length !== points.length) {
+      return { error: `太阳方位云量扫描返回 ${list.length} 个点，期望 ${points.length} 个`, source: '太阳方位云量扫描' };
+    }
+    const times = (list[0] && list[0].hourly && list[0].hourly.time) || [];
+    const covers = { sunset: [], sunrise: [] };
+    points.forEach((point, index) => {
+      const series = (list[index] && list[index].hourly && list[index].hourly.cloud_cover) || [];
+      covers[point.mode].push(series.map((value) => {
+        const number = Number(value);
+        return Number.isFinite(number) ? Math.round(number) : 0;
+      }));
+    });
+    return { distances: SUN_SCAN_DISTANCES, times, covers, source: '太阳方位云量扫描' };
+  }
+  // 气溶胶光学厚度（CAMS），用于大气通透度与云面染色
+  function fetchAerosol(lat, lon, startDate, endDate, signal) {
+    const url = `${AIR_QUALITY_URL}?${query({ ...baseParams(lat, lon, startDate, endDate), hourly: 'aerosol_optical_depth' })}`;
+    return safeRequest(url, '气溶胶 AOD', signal);
+  }
   // ---- 地名搜索（高德 inputtips 优先，Photon 兜底）----
   // 高德通道：经 /_AMapService 代理（Vercel 部署时可用），国内节点快、中文地名全；
   //           key 未注入（本地开发）或代理失败/超时 → 返回 null 交给调用方回退。
@@ -162,10 +229,10 @@ const API = (() => {
       return [];
     }
   }
-  // 完整拉取（无缓存路径）：8 个天气请求 + 4 个 meta
-  async function fetchBundleFresh(destination, startDate, endDate, signal) {
+  // 完整拉取（无缓存路径）：8 个天气请求 + 4 个 meta + 气溶胶 + 太阳方位云量扫描
+  async function fetchBundleFresh(destination, startDate, endDate, signal, sunBearings) {
     const { lat, lon, marine } = destination;
-    const [forecast, ecmwf, gfs, jma, cma, ensembleEcmwf, ensembleGfs, marineData, metaEcmwf, metaGfs, metaJma, metaCma] = await Promise.all([
+    const [forecast, ecmwf, gfs, jma, cma, ensembleEcmwf, ensembleGfs, marineData, metaEcmwf, metaGfs, metaJma, metaCma, aerosol, sunPath] = await Promise.all([
       fetchForecast(lat, lon, startDate, endDate, signal),
       fetchDeterministic('ecmwf', lat, lon, startDate, endDate, signal),
       fetchDeterministic('gfs', lat, lon, startDate, endDate, signal),
@@ -178,6 +245,8 @@ const API = (() => {
       fetchModelMeta('gfs', signal),
       fetchModelMeta('jma', signal),
       fetchModelMeta('cma', signal),
+      fetchAerosol(lat, lon, startDate, endDate, signal),
+      sunBearings ? fetchSunPath(lat, lon, startDate, endDate, sunBearings, signal) : Promise.resolve(null),
     ]);
     return {
       forecast,
@@ -185,10 +254,12 @@ const API = (() => {
       ensembles: { 'ECMWF IFS 集合': ensembleEcmwf, 'GFS 集合': ensembleGfs },
       marine: marineData,
       modelMeta: { 'ECMWF IFS': metaEcmwf, 'NOAA GFS': metaGfs, 'JMA GSM': metaJma, 'CMA GRAPES': metaCma },
+      aerosol,
+      sunPath,
     };
   }
   // 带缓存的入口：同一地点短时间重复查询，先查 EC meta（不计配额）判断模型是否出新数据，未更新直接读缓存
-  async function fetchBundle(destination, startDate, endDate, signal) {
+  async function fetchBundle(destination, startDate, endDate, signal, sunBearings) {
     const key = cacheKey(destination, startDate, endDate);
     const cached = cacheGet(key);
     if (cached) {
@@ -203,7 +274,7 @@ const API = (() => {
       }
       // meta 显示模型已更新，或缓存超过 6 小时 → 重新请求
     }
-    const bundle = await fetchBundleFresh(destination, startDate, endDate, signal);
+    const bundle = await fetchBundleFresh(destination, startDate, endDate, signal, sunBearings);
     // 配额耗尽兜底：天气请求被限流且有缓存时，受限部分用缓存对应数据替换，避免页面空白
     if (cached && hasRateLimitError(bundle)) {
       const merged = { ...bundle, deterministic: { ...bundle.deterministic }, ensembles: { ...bundle.ensembles } };

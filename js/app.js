@@ -2,7 +2,7 @@
 // 并把渲染层输出的 weatherMood 应用到页面背景状态机。
 (() => {
   'use strict';
-  const state = { region: readRegion(), dest: null, days: DEFAULT_DAYS, bundle: null, selectedDate: null, skyView: 'ec', skyIndex: null, cloudPick: null, customDest: null, aiAnalyses: {}, aiStatus: 'idle', aiSeenDates: new Set() };
+  const state = { region: readRegion(), dest: null, days: DEFAULT_DAYS, bundle: null, selectedDate: null, skyView: 'ec', skyIndex: null, cloudPick: null, sunsetMode: 'sunset', customDest: null, aiAnalyses: {}, aiStatus: 'idle', aiSeenDates: new Set() };
   state.dest = currentDestinations()[0];
   const destListEl = document.getElementById('dest-list');
   const daysGroupEl = document.getElementById('days-group');
@@ -296,7 +296,7 @@
     resultEl.classList.toggle('stable-update', options.stable === true);
     resultEl.innerHTML = renderWeatherApp(state.bundle, state.dest, state.days, state.selectedDate, {
       skyView: state.skyView, skyIndex: state.skyIndex, aiAnalyses: state.aiAnalyses,
-      aiStatus: state.aiStatus, aiSeenDates: state.aiSeenDates,
+      aiStatus: state.aiStatus, aiSeenDates: state.aiSeenDates, sunsetMode: state.sunsetMode,
     });
     updateDataStatus();
     const mood = resultEl.querySelector('[data-mood]')?.dataset.mood || 'neutral';
@@ -482,7 +482,9 @@
     loadingEl.textContent = `正在汇集 ${state.dest.name} 附近的模型数据`;
     loadingEl.classList.remove('hidden');
     resultEl.setAttribute('aria-busy', 'true');
-    const bundle = await API.fetchBundle(state.dest, start, end, abortController.signal);
+    // 朝晚霞：先按首日的日落/日出方位算出扫描方位角，随主请求一起取回沿太阳方向的云量
+    const sunBearings = typeof Sunset !== 'undefined' && Sunset.scanBearings ? Sunset.scanBearings(state.dest, [start, end]) : null;
+    const bundle = await API.fetchBundle(state.dest, start, end, abortController.signal, sunBearings);
     if (seq !== requestSeq) return; // 过期响应丢弃
     state.bundle = bundle;
     state.selectedDate = null;
@@ -642,11 +644,17 @@
       if (!event.target.closest('.location-search')) closeSearchResults();
     });
 
-    // 点击委托：日期选择与天空剖面视图切换
+    // 点击委托：日期选择、天空剖面视图切换与朝霞/晚霞视图切换
     resultEl.addEventListener('click', (event) => {
       const viewBtn = event.target.closest('[data-sky-view]');
       if (viewBtn) {
         state.skyView = viewBtn.dataset.skyView;
+        renderResult();
+        return;
+      }
+      const sunsetBtn = event.target.closest('[data-sunset-mode]');
+      if (sunsetBtn) {
+        state.sunsetMode = sunsetBtn.dataset.sunsetMode === 'sunrise' ? 'sunrise' : 'sunset';
         renderResult();
         return;
       }

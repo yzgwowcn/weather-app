@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 const ctx = {};
 vm.runInNewContext(
-  `${fs.readFileSync('js/glass-sea.js', 'utf8')}\n${fs.readFileSync('js/metrics.js', 'utf8')}\n${fs.readFileSync('js/render.js', 'utf8')}\nglobalThis.__out = { renderWeatherApp };`,
+  `${fs.readFileSync('js/glass-sea.js', 'utf8')}\n${fs.readFileSync('js/sunset.js', 'utf8')}\n${fs.readFileSync('js/metrics.js', 'utf8')}\n${fs.readFileSync('js/render.js', 'utf8')}\nglobalThis.__out = { renderWeatherApp };`,
   ctx,
 );
 const { renderWeatherApp } = ctx.__out;
@@ -43,6 +43,9 @@ const bundle = {
       precipitation_sum: [0, 3, 8], precipitation_probability_max: [10, 60, 90],
       wind_speed_10m_max: [21, 25, 33], wind_gusts_10m_max: [30, 38, 45],
       temperature_2m_min: [25, 24, 23], temperature_2m_max: [31, 30, 28],
+      // 朝晚霞模块按日落/日出时刻取分层云量，需要 daily 提供这两个时刻
+      sunrise: ['2026-08-08T06:09', '2026-08-09T06:09', '2026-08-10T06:10'],
+      sunset: ['2026-08-08T19:11', '2026-08-09T19:10', '2026-08-10T19:09'],
     },
     hourly: {
       time: DAYS.flatMap((d) => allDay(d).time),
@@ -53,6 +56,11 @@ const bundle = {
       // 第二天 08–14 时有降雨（云量曲线降雨柱 fixture）
       precipitation: [...Array(24).fill(0), ...Array(24).fill(0).map((_, i) => (i >= 8 && i <= 14 ? [1.2, 2.5, 3.1, 2.2, 1.0, 0.4, 0.2][i - 8] : 0)), ...Array(24).fill(0)],
       wind_speed_10m: DAYS.flatMap(() => Array(24).fill(20)),
+      // 朝晚霞模块：能见度反演 AOD、温度/露点修正低云云底（抬升凝结高度）
+      visibility: DAYS.flatMap(() => Array(24).fill(20000)),
+      temperature_2m: DAYS.flatMap(() => Array(24).fill(28)),
+      dew_point_2m: DAYS.flatMap(() => Array(24).fill(24)),
+      weather_code: DAYS.flatMap(() => Array(24).fill(0)),
     },
   },
   deterministic: {
@@ -126,11 +134,36 @@ if ((htmlC.match(/class="cloud-bar"/g) || []).length !== 7) { console.error('CLO
 if ((htmlC.match(/cloud-curve-wrap/g) || []).length !== 1) { console.error('CLOUD CURVE WRAP COUNT FAIL（应仅选中卡片展开）'); process.exit(1); }
 const inlandHtml = renderWeatherApp(bundle, { ...dest, id: 'custom', lat: 19.05, lon: 109.78 }, 3, null, {});
 if (inlandHtml.includes('glass-sea-detail') || inlandHtml.includes('marine-section')) { console.error('INLAND MARINE SHOULD BE HIDDEN'); process.exit(1); }
+// 朝晚霞机会：3 天卡片（分数/时段/色条）+ 明细（云底高度、云幕距离、可照距离、通透度、时段）+ 理由列表
+for (const c of ['sunset-section', 'sunset-days', 'sunset-card', 'sunset-score', 'sunset-verdict', 'sunset-swatch',
+  'sunset-detail', 'sunset-metrics', '云底高度', '云幕距离', '可照距离', '大气通透度', '云幕高度角',
+  '晚霞时段', 'sunset-chip', 'sunset-notes', 'data-sunset-mode="sunset"', 'data-sunset-mode="sunrise"', '晚霞机会']) {
+  if (!html.includes(c)) { console.error('SUNSET MISSING:', c); process.exit(1); }
+}
+if ((html.match(/class="sunset-card/g) || []).length !== 3) { console.error('SUNSET CARD COUNT FAIL（应为 3 天）'); process.exit(1); }
+// 朝霞视图切换：标题、激活态按钮、指标标签都跟随切换
+const htmlSunrise = renderWeatherApp(bundle, dest, 3, null, { sunsetMode: 'sunrise' });
+for (const c of ['朝霞机会', 'class="sunset-mode-btn active" data-sunset-mode="sunrise"', '朝霞时段']) {
+  if (!htmlSunrise.includes(c)) { console.error('SUNRISE VIEW MISSING:', c); process.exit(1); }
+}
+// 晴空（三层云量均 <12%）必须判为无霞，而不是给出高分
+const clearBundle = {
+  ...bundle,
+  deterministic: {
+    ...bundle.deterministic,
+    'ECMWF IFS': { hourly: { ...allDay(DAYS[0], 0, 10), cloud_cover_low: Array(24).fill(2), cloud_cover_mid: Array(24).fill(0), cloud_cover_high: Array(24).fill(0) } },
+  },
+};
+const htmlClear = renderWeatherApp(clearBundle, dest, 3, null, {});
+if (!htmlClear.includes('三层云量都低于')) { console.error('CLEAR SKY SHOULD EXPLAIN NO-GLOW'); process.exit(1); }
+if (!htmlClear.includes('sunset-card none')) { console.error('CLEAR SKY CARD SHOULD BE none LEVEL'); process.exit(1); }
+// 区块顺序：日期条 → EC 主结论 → 天空剖面 → 朝晚霞 → 外部模型验证
 const iRail = html.indexOf('date-rail');
 const iHero = html.indexOf('ec-hero');
 const iSky = html.indexOf('sky-section');
+const iSunset = html.indexOf('sunset-section');
 const iCross = html.indexOf('cross-section');
-if (!(iRail < iHero && iHero < iSky && iSky < iCross)) { console.error('ORDER FAIL'); process.exit(1); }
+if (!(iRail < iHero && iHero < iSky && iSky < iSunset && iSunset < iCross)) { console.error('ORDER FAIL'); process.exit(1); }
 
 const htmlF = renderWeatherApp(bundle, dest, 3, DAYS[2], { skyView: 'forecast', skyIndex: 32 });
 if (!htmlF.includes('data-sky-view="ec" hidden') || !htmlF.includes('sky-crosshair-line')) { console.error('VIEW/SKY FAIL'); process.exit(1); }
